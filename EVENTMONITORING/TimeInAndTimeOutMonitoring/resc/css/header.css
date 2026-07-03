@@ -1,0 +1,256 @@
+/* ============================================================
+   resc/css/header.css
+   Styles for the shared <header> include.
+   Replaces the old css_header.css.
+============================================================ */
+
+:root {
+    --green-dark:   #1a4731;
+    --green-mid:    #2d6a4f;
+    --green-bright: #40916c;
+    --yellow:       #f4c430;
+    --yellow-light: #fde68a;
+    --white:        #ffffff;
+}
+
+/* ====== HEADER ====== */
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--green-dark);
+    padding: 0 28px 0 20px;
+    box-shadow: 0 2px 16px rgba(0,0,0,.22);
+    z-index: 200;          /* above sidebar (z-index: 100) */
+    box-sizing: border-box;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+    gap: 16px;
+}
+
+/* ── Left: Logos + System title ── */
+.top-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+}
+
+.top-left-logos {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.top-left-logos img {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    border-radius: 6px;
+}
+
+.top-left-divider {
+    width: 1px;
+    height: 36px;
+    background: rgba(255,255,255,.18);
+    flex-shrink: 0;
+}
+
+.top-left-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+}
+
+.top-left-text h2 {
+    margin: 0;
+    font-family: 'Nunito', sans-serif;
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--white);
+    letter-spacing: .2px;
+    white-space: nowrap;
+    line-height: 1;
+}
+
+.top-left-text p {
+    margin: 0;
+    margin-top: 5px;
+    font-size: 11px;
+    color: rgba(255,255,255,.55);
+    font-weight: 600;
+    font-family: 'Nunito Sans', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    line-height: 1;
+}
+
+/* ── Center: Clock ── */
+.header-time {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    pointer-events: none;
+    user-select: none;
+}
+
+.header-time .time-display {
+    font-family: 'Nunito', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--white);
+    letter-spacing: 3px;
+    line-height: 1;
+}
+
+.header-time .time-meta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.header-time .time-meta i {
+    font-size: 10px;
+    color: var(--yellow);
+    opacity: .85;
+}
+
+.header-time .time-meta span {
+    font-size: 12px;
+    color: rgba(255,255,255,.65);
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 600;
+    letter-spacing: .4px;
+    white-space: nowrap;
+}
+/* ── Right: Buttons ── */
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px; /* Added gap to separate the two buttons */
+    flex-shrink: 0;
+}
+
+/* Homepage Button Styling */
+.header-home-btn {
+    background: transparent;
+    color: rgba(255,255,255,.85);
+    text-decoration: none;
+    border: 1.5px solid rgba(255,255,255,.16);
+    border-radius: 8px;
+    padding: 8px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
+    letter-spacing: .2px;
+}
+
+
+
+.header-home-btn i { font-size: 13px; }
+
+.header-home-btn:hover {
+    background: var(--green-bright);
+    color: var(--white);
+    border-color: var(--green-bright);
+    box-shadow: 0 4px 16px rgba(64,145,108,.35); /* Soft green glow */
+}
+
+/* Logout Button Styling */
+.header-logout {
+    background: transparent;
+    color: rgba(255,255,255,.65);
+    border: 1.5px solid rgba(255,255,255,.16);
+    border-radius: 8px;
+    padding: 8px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
+    letter-spacing: .2px;
+}
+
+.header-logout i { font-size: 13px; }
+
+.header-logout:hover {
+    background: #ef4444;
+    color: var(--white);
+    border-color: #ef4444;
+    box-shadow: 0 4px 16px rgba(239,68,68,.35); /* Soft red glow */
+}
+
+/* Take Attendance Button Styling */
+.header-attendance-btn {
+    background: transparent;
+    color: rgba(255,255,255,.85);
+    text-decoration: none;
+    border: 1.5px solid rgba(255,255,255,.16);
+    border-radius: 8px;
+    padding: 8px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
+    letter-spacing: .2px;
+}
+
+.header-attendance-btn i { font-size: 13px; }
+
+.header-attendance-btn:hover {
+    background: var(--yellow); /* Bright yellow/amber hover */
+    color: var(--green-dark);  /* Dark text for contrast */
+    border-color: var(--yellow);
+    box-shadow: 0 4px 16px rgba(244, 196, 48, 0.35); /* Yellow glow */
+}
+
+/* ====== RESPONSIVE ====== */
+@media (max-width: 900px) {
+    header {
+        height: auto;
+        padding: 12px 16px;
+        flex-wrap: wrap;
+        gap: 10px;
+        position: relative;
+    }
+
+    .top-left-logos img { width: 34px; height: 34px; }
+
+    .header-time {
+        position: static;
+        transform: none;
+        order: 3;
+        width: 100%;
+        flex-direction: row;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .header-time .time-display { font-size: 20px; }
+}
+

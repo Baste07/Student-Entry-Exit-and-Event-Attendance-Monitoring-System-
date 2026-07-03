@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedules Management | Laboratory Attendance System</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+
+    <link rel="stylesheet" href="../resc/css/schedules.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-calendar-week"></i> Schedules</h1>
+                    <p>Manage laboratory schedules and associated details</p>
+                </div>
+
+                <span class="total-badge"><span id="statTotal">0</span> Total</span>
+                <div class="stats-mini">
+                    <div class="stat-mini active-sched">
+                        <i class="fa-solid fa-calendar-check"></i>
+                        <strong><span id="statActive">0</span></strong> Active
+                    </div>
+                    <div class="stat-mini inactive-sched">
+                        <i class="fa-solid fa-calendar-xmark"></i>
+                        <strong><span id="statInactive">0</span></strong> Inactive
+                    </div>
+                </div>
+                
+                <div class="page-actions">
+                    <button class="btn-report" onclick="openReportModal()">
+                        <i class="fa-solid fa-file-chart-column"></i> Generate Report
+                    </button>
+                </div>
+                <button class="btn-add-sched" id="addScheduleBtn">
+                    <i class="fa-solid fa-plus-circle"></i> Add Schedule
+                </button>
+            </div>
+            <hr>
+
+            <div class="table-container">
+                <div class="controls-card">
+                    <div class="controls-header">
+                        <h2><i class="fa-solid fa-sliders-h"></i> Filters &amp; Search</h2>
+                    </div>
+                    <div class="table-controls">
+                        <div class="control-group">
+                            <label for="searchInput"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                            <div class="search-container">
+                                <input type="text" id="searchInput" placeholder="Search professor, subject, lab..." />
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="subjectFilter"><i class="fa-solid fa-book"></i> Filter by Subject</label>
+                            <div class="filter-container">
+                                <select id="subjectFilter">
+                                    <option value="all">All Subjects</option>
+                                </select>
+                            </div>
+                        </div>
+
+                       <div class="control-group">
+                            <label for="semesterFilter"><i class="fa-solid fa-graduation-cap"></i> Filter by Semester</label>
+                            <div class="filter-container">
+                                <select id="semesterFilter">
+                                    <option value="all">Loading Semesters...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="sectionFilter"><i class="fa-solid fa-users"></i> Filter by Students</label>
+                            <div class="filter-container">
+                                <select id="sectionFilter">
+                                    <option value="all">All Students</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="dayFilter"><i class="fa-solid fa-calendar-day"></i> Filter by Day</label>
+                            <div class="filter-container">
+                                <select id="dayFilter">
+                                    <option value="all">All Days</option>
+                                    <option value="Monday">Monday</option>
+                                    <option value="Tuesday">Tuesday</option>
+                                    <option value="Wednesday">Wednesday</option>
+                                    <option value="Thursday">Thursday</option>
+                                    <option value="Friday">Friday</option>
+                                    <option value="Saturday">Saturday</option>
+                                    <option value="Sunday">Sunday</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label for="statusFilter"><i class="fa-solid fa-filter"></i> Filter by Status</label>
+                            <div class="filter-container">
+                                <select id="statusFilter">
+                                    <option value="all">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label for="labFilter"><i class="fa-solid fa-flask"></i> Filter by Lab</label>
+                            <div class="filter-container">
+                                <select id="labFilter">
+                                    <option value="all">All Laboratories</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <button id="clearFilters" class="btn-clear" style="height:40px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
+                                <i class="fa-solid fa-eraser"></i> Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <table class="data-table" id="schedulesTable">
+                    <thead>
+                        <tr>
+                            <th>SCHEDULE ID</th>
+                            <th>PROFESSOR</th>
+                            <th>SUBJECT</th>
+                            <th>STUDENTS</th> 
+                            <th>DAY</th>
+                            <th>TIME</th>
+                            <th>LABORATORY</th>
+                            <th>SEMESTER</th>
+                            <th>STATUS</th>
+                            <th>ENROLLED</th>
+                            <th>ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedulesBody">
+                        <tr><td colspan="11" style="text-align:center;padding:40px;color:#6b7280"><i class="fa-solid fa-spinner fa-spin"></i> Loading schedules...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div></main>
+
+    <div id="scheduleModal" class="sched-modal">
+        <div class="sched-modal-card">
+            <div class="sched-modal-header">
+                <h2 id="schedModalTitle">
+                    <i class="fa-solid fa-plus-circle"></i>
+                    <span id="schedModalTitleText">Add Schedule</span>
+                </h2>
+                <button class="sched-modal-close" onclick="closeSchedModal('scheduleModal')">&times;</button>
+            </div>
+            <form id="scheduleForm">
+                <input type="hidden" id="scheduleId" name="schedule_id">
+                <div class="sched-modal-body">
+                    <div class="schedule-preview-card">
+                        <div class="schedule-preview-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Live Schedule Preview</div>
+                        <div class="schedule-preview-grid">
+                            <div class="preview-item"><span>Professor</span><strong id="previewProfessor">--</strong></div>
+                            <div class="preview-item"><span>Subject</span><strong id="previewSubject">--</strong></div>
+                            <div class="preview-item"><span>Section</span><strong id="previewSection">--</strong></div>
+                            <div class="preview-item"><span>Day / Time</span><strong id="previewTime">--</strong></div>
+                            <div class="preview-item"><span>Semester</span><strong id="previewSemester">--</strong></div>
+                            <div class="preview-item"><span>School Year</span><strong id="previewSchoolYear">--</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="schedule-progress-card" aria-live="polite">
+                        <div class="schedule-progress-top">
+                            <span id="scheduleProgressText">Form completion: 0%</span>
+                            <span id="scheduleProgressHint">Fill required fields to continue.</span>
+                        </div>
+                        <div class="schedule-progress-track">
+                            <div class="schedule-progress-fill" id="scheduleProgressBar" style="width:0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="pm-section">
+                        <div class="pm-section-title"><i class="fa-solid fa-chalkboard-teacher"></i> Professor &amp; Subject</div>
+                        <div class="pm-fields">
+                            <div class="pm-grid-2">
+                                <div class="pm-group">
+                                    <label>Professor <span class="pm-required">*</span></label>
+                                    <select id="professorId" name="professor_id" required>
+                                        <option value="" disabled selected>-- Select Professor --</option>
+                                        </select>
+                                </div>
+                                <div class="pm-group">
+                                    <label>Subject <span class="pm-required">*</span></label>
+                                    <select id="subjectId" name="subject_id" required>
+                                        <option value="" disabled selected>-- Select Subject --</option>
+                                        </select>
+                                </div>
+                            </div>
+                            <div class="pm-grid-2">
+                                <div class="pm-group">
+                                    <label>Students (Section) <span class="pm-required">*</span></label>
+                                    <select id="section" name="section" required>
+                                        <option value="" disabled selected>-- Loading sections... --</option>
+                                        </select>
+                                    <small style="color:#6b7280;margin-top:4px;display:block">
+                                        <i class="fa-solid fa-info-circle"></i> Based on registered students.
+                                    </small>
+                                </div>
+                                <div class="pm-group">
+                                    <label>Laboratory <span class="pm-required">*</span></label>
+                                    <select id="labId" name="lab_id" required>
+                                        <option value="" disabled selected>-- Select Laboratory --</option>
+                                        </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pm-section highlight">
+                        <div class="pm-section-title"><i class="fa-solid fa-clock"></i> Schedule Details</div>
+                        <div class="pm-fields">
+                            <div class="pm-group">
+                                <label>Day of Week <span class="pm-required">*</span></label>
+                                <select id="dayOfWeek" name="day_of_week" required>
+                                    <option value="" disabled selected>-- Select Day --</option>
+                                    <option value="Monday">Monday</option>
+                                    <option value="Tuesday">Tuesday</option>
+                                    <option value="Wednesday">Wednesday</option>
+                                    <option value="Thursday">Thursday</option>
+                                    <option value="Friday">Friday</option>
+                                    <option value="Saturday">Saturday</option>
+                                    <option value="Sunday">Sunday</option>
+                                </select>
+                            </div>
+                            <div class="pm-grid-2">
+                                <div class="pm-group">
+                                    <label>Start Time <span class="pm-required">*</span></label>
+                                    <input type="time" id="startTime" name="start_time" required>
+                                </div>
+                                <div class="pm-group">
+                                    <label>End Time <span class="pm-required">*</span></label>
+                                    <input type="time" id="endTime" name="end_time" required>
+                                </div>
+                            </div>
+                            <p class="pm-help-inline">
+                                <i class="fa-solid fa-circle-info"></i>
+                                Pick the exact time window. The system will block overlaps and invalid ranges.
+                            </p>
+                            <div id="conflictWarning" style="display:none;"></div>
+                        </div>
+                    </div>
+
+                    <div class="pm-section">
+                        <div class="pm-section-title"><i class="fa-solid fa-graduation-cap"></i> Semester &amp; Status</div>
+                        <div class="pm-fields">
+                            <div class="pm-badge-row">
+                                <span class="pm-active-badge"><i class="fa-solid fa-database"></i> Values loaded from active semester record</span>
+                            </div>
+                            <div class="pm-grid-3">
+                             <div class="pm-group">
+                                    <label>Active Semester <span class="pm-required">*</span></label>
+                                    <select id="semesterDisplay" disabled aria-disabled="true">
+                                        <option value="">Loading Semesters...</option>
+                                    </select>
+                                    <input type="hidden" id="semester" name="semester">
+                                    <small class="pm-help-text">Fetched from the semester flagged active in the Semesters table.</small>
+                                </div>
+                                <div class="pm-group">
+                                    <label>School Year <span class="pm-required">*</span></label>
+                                    <input type="text" id="schoolYearDisplay" disabled aria-disabled="true" placeholder="Loading school year...">
+                                    <input type="hidden" id="schoolYear" name="school_year">
+                                    <small class="pm-help-text">Fetched automatically from the active semester record.</small>
+                                </div>
+                                <div class="pm-group">
+                                    <label>Status <span class="pm-required">*</span></label>
+                                    <select id="schedStatus" name="status" required>
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="sched-modal-footer">
+                    <button type="button" class="pm-btn-cancel" onclick="closeSchedModal('scheduleModal')">
+                        <i class="fa-solid fa-xmark"></i> Cancel
+                    </button>
+                    <button type="submit" class="pm-btn-submit" id="submitBtn">
+                        <i class="fa-solid fa-save"></i>
+                        <span id="submitBtnText">Save Schedule</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="enrollmentsModal" class="sched-modal">
+        <div class="sched-modal-card wide">
+            <div class="sched-modal-header">
+                <h2><i class="fa-solid fa-users"></i> Enrolled Students</h2>
+                <button class="sched-modal-close" onclick="closeSchedModal('enrollmentsModal')">&times;</button>
+            </div>
+            <div class="sched-modal-body" style="padding-bottom:20px">
+                <p id="enrollScheduleInfo" style="margin:0 0 16px;color:var(--text-muted);font-size:13px;font-style:italic"></p>
+                <div class="enroll-stats">
+                    <div class="enroll-stat-item">
+                        <div class="stat-num" id="enrollCount">0</div>
+                        <div class="stat-label">Total Enrolled</div>
+                    </div>
+                    <div class="enroll-stat-item">
+                        <div class="stat-num" id="faceRegCount">0</div>
+                        <div class="stat-label">Face Registered</div>
+                    </div>
+                    <div class="enroll-stat-item">
+                        <div class="stat-num pending" id="pendingCount">0</div>
+                        <div class="stat-label">Pending Registration</div>
+                    </div>
+                </div>
+                <table class="enroll-table">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Course</th>
+                            <th>Year &amp; Section</th>
+                            <th>Face Status</th>
+                            <th>Enrolled</th>
+                        </tr>
+                    </thead>
+                    <tbody id="enrollmentsList"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="rm-overlay" id="rmOverlay" onclick="if(event.target===this)closeReportModal()">
+        <div class="rm-box">
+            <div class="rm-hd">
+                <div>
+                    <h2><i class="fa-solid fa-calendar-week"></i> Schedules — Report</h2>
+                    <p id="rmGenDate">Generated ...</p>
+                </div>
+                <button class="rm-x" onclick="closeReportModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="rm-tb">
+                <span class="rm-chip green"><i class="fa-solid fa-calendar-check"></i> <span id="rmActiveChip">0</span> Active</span>
+                <span class="rm-chip blue"><i class="fa-solid fa-calendar-week"></i> <span id="rmTotalChip">0</span> Total</span>
+                <span class="rm-chip amber"><i class="fa-solid fa-calendar-xmark"></i> <span id="rmInactiveChip">0</span> Inactive</span>
+                <div class="rm-tb-right">
+                    <button class="rm-btn print" onclick="printReport()"><i class="fa-solid fa-print"></i> Print</button>
+                    <button class="rm-btn pdf"  onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                    <button class="rm-btn excel" onclick="exportCSV()"><i class="fa-solid fa-file-excel"></i> Excel / CSV</button>
+                    <!-- XML generation removed -->
+                </div>
+            </div>
+            <div class="rm-body">
+                <table class="rm-table">
+                    <thead>
+                        <tr>
+                            <th>#</th><th>SCHEDULE ID</th><th>PROFESSOR</th><th>SUBJECT CODE</th>
+                            <th>SUBJECT NAME</th><th>SECTIONS</th><th>DAY</th><th>TIME</th>
+                            <th>Laboratory</th><th>Semester</th><th>School Year</th>
+                            <th>STATUS</th><th>ENROLLED</th><th>SESSIONS DONE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rmTableBody">
+                        <tr><td colspan="14" style="text-align:center;padding:40px;color:#9ca3af">Loading report data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+
+    <script src="../resc/js/schedules.js"></script>
+
+    <script>
+        loadHeader();
+        loadSidebar('schedules'); 
+    </script>
+</body>
+</html>

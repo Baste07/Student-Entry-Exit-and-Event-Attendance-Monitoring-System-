@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subjects Management | Laboratory Attendance System</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Shared component styles -->
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+
+    <!-- Page-specific styles -->
+    <link rel="stylesheet" href="../resc/css/subjects.css">
+
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+    <!-- Shared header injected by sidebar.js -->
+    <div id="header-container"></div>
+
+    <!-- Shared sidebar injected by sidebar.js -->
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+          <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-book"></i> Subjects Management</h1>
+                    <p>Manage academic subjects, course descriptions, and assigned units</p>
+                </div>
+
+                <div class="stats-badges">
+                    <span class="stat-badge total">
+                        <i class="fa-solid fa-book"></i>
+                        <span id="badgeTotalSubjects">0</span> Subjects
+                    </span>
+                    <span class="stat-badge schedules">
+                        <i class="fa-solid fa-calendar"></i>
+                        <span id="badgeActiveSchedules">0</span> Schedules
+                    </span>
+                    <span class="stat-badge units">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                        <span id="badgeTotalUnits">0</span> Total Units
+                    </span>
+                </div>
+                
+                <button class="btn-report" onclick="openReportModal()">
+                    <i class="fa-solid fa-file-chart-column"></i> Generate Report
+                </button>
+                <button class="btn-add" onclick="openAddModal()">
+                    <i class="fa-solid fa-plus"></i> Add Subject
+                </button>
+            </div>
+            <hr>
+
+            <!-- Filters -->
+            <div class="controls-card">
+                <div class="controls-header">
+                    <h2><i class="fa-solid fa-sliders-h"></i> Filters &amp; Search</h2>
+                </div>
+                <div class="table-controls">
+                    <div class="control-group">
+                        <label for="searchInput"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                        <div class="search-container">
+                            <input type="text" id="searchInput" placeholder="Search by code or name" />
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label for="semesterFilter"><i class="fa-solid fa-graduation-cap"></i> Filter by Semester</label>
+                        <select id="semesterFilter" style="padding:10px; border-radius:8px; border:1px solid #e5e7eb; outline:none; font-family:inherit; min-width: 200px;">
+                            <option value="all">Loading Semesters...</option>
+                        </select>
+                    </div>
+                    <div class="control-group" style="display: flex; align-items: flex-end;">
+                        <button id="clearFilters" class="btn btn-clear" style="height: 42px;">
+                            <i class="fa-solid fa-eraser"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+<div class="table-container">
+                <table class="subjects-table">
+                    <thead>
+                        <tr>
+                            <th>Subject Code</th>
+                            <th>Subject Name</th>
+                            <th>Semester</th> <th>Description</th>
+                            <th>Units</th>
+                            <th>Schedules</th>
+                            <th>Students</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="subjectsTableBody">
+                        <tr id="loadingRow">
+                            <td colspan="8" class="loading-cell">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading subjects...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ══ ADD / EDIT MODAL ══ -->
+    <div id="subjectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"><i class="fa-solid fa-plus"></i> Add Subject</h2>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+           <form id="subjectForm">
+                <input type="hidden" id="subjectId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Subject Code <span class="required">*</span></label>
+                        <input type="text" id="subjectCode" required placeholder="e.g., CS101L">
+                    </div>
+                    <div class="form-group">
+                        <label>Units <span class="required">*</span></label>
+                        <input type="number" id="units" required step="0.5" min="0" max="10" placeholder="e.g., 3.0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Semester <span class="required">*</span></label>
+                    <select id="semesterId" required style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-family: inherit; outline: none;">
+                        <option value="" disabled selected>-- Loading Semesters... --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Subject Name <span class="required">*</span></label>
+                    <input type="text" id="subjectName" required placeholder="e.g., Introduction to Programming Laboratory">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="description" placeholder="Optional: Enter subject description or course outline"></textarea>
+                </div>
+                <button type="submit" class="btn-submit" style="width:100%">
+                    <i class="fa-solid fa-save"></i> <span id="submitBtnText">Add Subject</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ══ REPORT MODAL ══ -->
+    <div class="rm-overlay" id="rmOverlay" onclick="if(event.target===this)closeReportModal()">
+        <div class="rm-box">
+
+            <div class="rm-hd">
+                <div>
+                    <h2><i class="fa-solid fa-book"></i> Subjects — Report</h2>
+                    <p id="rmGenDate">Loading...</p>
+                </div>
+                <button class="rm-x" onclick="closeReportModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="rm-tb">
+                <div class="rm-chips">
+                    <span class="rm-chip green"><i class="fa-solid fa-book"></i> <span id="rmTotalSubjects">0</span> Subjects</span>
+                    <span class="rm-chip blue"><i class="fa-solid fa-calendar"></i> <span id="rmActiveSchedules">0</span> Active Schedules</span>
+                    <span class="rm-chip amber"><i class="fa-solid fa-graduation-cap"></i> <span id="rmTotalUnits">0</span> Total Units</span>
+                </div>
+                <div class="rm-tb-right">
+                    <button class="rm-btn print" onclick="printReport()"><i class="fa-solid fa-print"></i> Print</button>
+                    <button class="rm-btn pdf" onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                    <button class="rm-btn excel" onclick="exportCSV()"><i class="fa-solid fa-file-excel"></i> Excel / CSV</button>
+                    <!-- XML generation removed -->
+                </div>
+            </div>
+
+            <div class="rm-body">
+                <table class="rm-table" id="reportTable">
+                  <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Subject Code</th>
+                            <th>Subject Name</th>
+                            <th>Semester</th> <th>Units</th>
+                            <th>Active Schedules</th>
+                            <th>Enrolled Students</th>
+                            <th>Sessions Done</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody">
+                        <tr>
+                            <td colspan="9" style="text-align:center;padding:40px;color:#9ca3af">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading report data...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+
+    <!-- Shared sidebar loader -->
+    <script src="../includes/sidebar.js"></script>
+
+    <!-- Page logic -->
+    <script src="../resc/js/subjects.js"></script>
+
+    <script>
+        loadHeader();
+        loadSidebar('subjects');
+    </script>
+</body>
+</html>

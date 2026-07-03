@@ -1,0 +1,306 @@
+/* ── Base layout ── */
+.settings-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.settings-section {
+    background: #ffffff;
+    border-radius: var(--radius);
+    padding: 2rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+    transition: box-shadow 0.2s;
+}
+
+.settings-section:hover { box-shadow: var(--shadow-md); }
+
+.settings-section:last-child {
+    grid-column: span 2;
+}
+
+.settings-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border);
+}
+
+.settings-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 0.5rem;
+}
+
+.settings-header p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 0;
+}
+
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* ── Active semester banner ── */
+.active-semester-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #eaf5ee;
+    border: 1px solid #b6dfc4;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
+.banner-badge {
+    background: var(--green-btn);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 0.2rem 0.55rem;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+
+/* ── Calendar tabs ── */
+.calendar-tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0;
+    margin-bottom: 0.25rem;
+}
+
+.cal-tab {
+    background: none;
+    border: none;
+    padding: 0.5rem 1.1rem 0.65rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.cal-tab:hover  { color: var(--text-main); }
+.cal-tab.active { color: var(--green-btn); border-bottom-color: var(--green-btn); }
+
+/* ── Panels ── */
+#panelSetActive,
+#panelCreate {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding-top: 1.25rem;
+}
+
+/* ── Semester preview strip ── */
+.semester-preview {
+    background: var(--body-bg);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem;
+}
+
+.preview-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.2rem;
+}
+
+.preview-value {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.status-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.55rem;
+    border-radius: 99px;
+}
+
+.status-badge.active   { background: #d1fae5; color: #065f46; }
+.status-badge.inactive { background: #f3f4f6; color: #6b7280; }
+
+/* ── Activate-on-create checkbox row ── */
+.activate-on-create-row {
+    background: var(--body-bg);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 0.85rem 1rem;
+}
+
+.activate-on-create-row .form-check-input {
+    width: 1.1em;
+    height: 1.1em;
+    margin-top: 0.1em;
+}
+
+/* ── Shared form elements ── */
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-label {
+    font-weight: 500;
+    color: var(--text-main);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.form-control {
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+    background-color: white;
+    color: var(--text-main);
+    font-family: inherit;
+}
+
+.form-control:focus {
+    border-color: var(--green-btn);
+    box-shadow: 0 0 0 3px rgba(26, 107, 54, 0.1);
+    outline: none;
+}
+
+.form-control::placeholder { color: var(--text-muted); }
+textarea.form-control { resize: vertical; font-family: inherit; }
+
+/* ── Buttons ── */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.95rem;
+    align-self: flex-start;
+}
+
+.btn-primary { background-color: var(--green-btn); color: white; }
+.btn-primary:hover {
+    background-color: var(--green-active);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary {
+    background-color: var(--body-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+}
+.btn-secondary:hover { background-color: #e8eceb; }
+
+/* ── Feature toggles ── */
+.feature-toggles { display: flex; flex-direction: column; gap: 1rem; }
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem;
+    background-color: var(--body-bg);
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+}
+
+.feature-item:hover { background-color: #e8eceb; border-color: var(--green-btn); }
+
+.feature-info { flex: 1; }
+.feature-info label { display: block; font-weight: 500; color: var(--text-main); margin-bottom: 0.25rem; cursor: pointer; }
+.feature-info small { display: block; color: var(--text-muted); font-size: 0.85rem; }
+
+.form-check-input {
+    width: 2.5rem;
+    height: 1.5rem;
+    cursor: pointer;
+    margin-left: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    background-color: var(--body-bg);
+    appearance: none;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.form-check-input:checked { background-color: var(--green-btn); border-color: var(--green-btn); }
+.form-check-input:focus   { box-shadow: 0 0 0 0.25rem rgba(26,107,54,0.25); border-color: var(--green-btn); }
+
+/* ── File upload ── */
+.file-upload-group { display: flex; flex-direction: column; gap: 0.5rem; }
+
+/* ── Two-column grid on large screens ── */
+@media (min-width: 1200px) {
+    .settings-container { grid-template-columns: repeat(2, 1fr); }
+    .settings-section   { grid-column: span 1; }
+    .settings-section:nth-child(n+5) { grid-column: span 2; }
+}
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+    .settings-section { padding: 1.5rem; }
+    .settings-header h2 { font-size: 1.1rem; }
+
+    .feature-item { flex-direction: column; align-items: flex-start; gap: 1rem; }
+    .form-check-input { margin-left: 0; }
+    .settings-container { gap: 1.5rem; }
+
+    .semester-preview .row > div { margin-bottom: 0.75rem; }
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.anim { animation: slideIn 0.4s ease-out forwards; opacity: 0; }
+.anim-1 { animation-delay: 0.1s; }
+.anim-2 { animation-delay: 0.2s; }
+.anim-3 { animation-delay: 0.3s; }
+
+/* ── Department detail panel ── */
+#departmentDetailsContainer { animation: slideIn 0.3s ease-out forwards; }
+#departmentDetailsContainer .form-group:last-of-type { margin-bottom: 1rem; }
+#departmentDetailsContainer .btn { margin-right: 0.75rem; align-self: flex-start; }
+#departmentDetailsContainer .btn-secondary { margin-right: 0; }
+
+#currentLogoPreview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 150px;
+    background-color: #f8f9fa;
+    border: 2px dashed #dee2e6;
+}
+#currentLogoPreview img { border-radius: 0.375rem; }
+
+#newLogoPreview {
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+}

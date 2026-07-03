@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Laboratory Attendance System</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+
+    <link rel="stylesheet" href="../resc/css/dashboard.css">
+</head>
+<body>
+
+    <div id="header-container"></div>
+
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-chart-pie"></i> Dashboard</h1>
+                    <p>Real-time overview of laboratory usage, attendance, and system metrics</p>
+                </div>
+            </div>
+            
+            <hr>
+
+            <section class="profile-section">
+                <div class="profile-card" id="profileCard">
+                    <div class="profile-picture">
+                        <img src="../resc/assets/pfp.png" alt="profile picture" id="profilePic">
+                    </div>
+                    <div class="profile-mini">
+                        <div class="profile-info">
+                            <h3 id="adminName">Loading...</h3>
+                            <p id="adminRole">Admin</p>
+                        </div>
+                        <div class="profile-actions-mini">
+                            <div class="profile-view-more">
+                                View Profile <i class="fa-solid fa-chevron-right"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="summary-section">
+                <div class="cards">
+                    <div class="card event-card">
+                        <div class="card-subheader">
+                            <i class="fa-solid fa-calendar-check card-icon"></i>
+                            <h3>Active Schedules</h3>
+                        </div>
+                        <p><strong id="totalSchedules">0</strong> Active Class/es</p>
+                        <div class="view">
+                            <a href="schedules.html">
+                                Click to view Schedules <i class="fa-solid fa-chevron-right"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="card attendee-card">
+                        <div class="card-subheader">
+                            <i class="fa-solid fa-users card-icon"></i>
+                            <h3>Registered Students</h3>
+                        </div>
+                        <p><strong id="totalStudents">0</strong> Active Student/s</p>
+                        <div class="view">
+                            <a href="attendeesList.html">
+                                Click to view Students <i class="fa-solid fa-chevron-right"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="card admin-card">
+                        <div class="card-subheader">
+                            <i class="fa-solid fa-user-tie card-icon"></i>
+                            <h3>Professors</h3>
+                        </div>
+                        <p><strong id="totalProfessors">0</strong> Active Prof/s</p>
+                        <div class="view">
+                            <a href="professorsManagement.html">
+                                Click to view Professors <i class="fa-solid fa-chevron-right"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="card report-card">
+                        <div class="card-subheader">
+                            <i class="fa-solid fa-file-lines card-icon"></i>
+                            <h3>Reports</h3>
+                        </div>
+                        <p><strong id="totalReports">0</strong> Generated</p>
+                        <div class="view">
+                            <a href="reports.html">
+                                Click to view Reports <i class="fa-solid fa-chevron-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="lab-section">
+                <div class="lab-header-title">
+                    <i class="fa-solid fa-building"></i>
+                    Laboratory Status &amp; Schedules
+                </div>
+                <div class="lab-grid" id="labGrid">
+                    <p class="no-schedules">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Loading laboratories...
+                    </p>
+                </div>
+            </section>
+
+        </div></main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+
+    <script src="../includes/sidebar.js"></script>
+
+    <script src="../resc/js/dashboard.js"></script>
+
+    <script>
+        loadHeader();
+        loadSidebar('dashboard');
+    </script>
+</body>
+</html>

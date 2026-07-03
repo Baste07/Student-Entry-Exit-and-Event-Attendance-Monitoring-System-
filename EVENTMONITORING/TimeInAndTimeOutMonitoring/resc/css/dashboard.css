@@ -1,0 +1,609 @@
+/* ============================================================
+   resc/css/dashboard.css
+   Original dashboard design — unchanged.
+   Added: .main-content shell so the page sits correctly
+   under the fixed header and beside the collapsed sidebar.
+   All other rules are identical to the original file.
+============================================================ */
+
+/* ===============================
+   Design System Tokens
+================================ */
+:root {
+    --green-dark:   #1a4731;
+    --green-mid:    #2d6a4f;
+    --green-bright: #40916c;
+    --green-light:  #74c69d;
+    --yellow:       #f4c430;
+    --yellow-light: #fde68a;
+    --white:        #ffffff;
+    --off-white:    #f5f8f5;
+    --surface:      #edf4ef;
+    --hover-bg:     #e2ede7;
+    --text-dark:    #0f2419;
+    --text-body:    #2a3d32;
+    --text-muted:   #5a7265;
+    --border:       #d4e6d9;
+    --red:          #dc2626;
+    --radius:       10px;
+    --radius-lg:    14px;
+    --shadow-sm:    0 2px 8px rgba(26,71,49,.07);
+    --shadow-md:    0 4px 16px rgba(26,71,49,.10);
+    --shadow-lg:    0 8px 32px rgba(26,71,49,.13);
+}
+
+/* ===============================
+   Reset & Base
+================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Nunito Sans', 'Segoe UI', sans-serif;
+    background: var(--white);
+    color: var(--text-body);
+    line-height: 1.75;
+    font-size: 15px;
+}
+
+/* ===============================
+   Layout shell
+   Keeps content below the fixed header (68px)
+   and to the right of the collapsed sidebar.
+   The sidebar.js mouseenter/mouseleave adds
+   .sidebar-open which widens the margin.
+================================ */
+.main-content {
+    margin-left: var(--sidebar-collapsed, 64px);
+    margin-top: 68px;
+    min-height: calc(100vh - 68px);
+    transition: margin-left 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.main-content.sidebar-open {
+    margin-left: var(--sidebar-expanded, 240px);
+}
+
+/* ===============================
+   Container
+================================ */
+.container {
+    background: var(--white);
+    padding: 32px 36px 48px;
+    min-height: 100%;
+    width: 100%;
+}
+
+.container h1 {
+    font-family: 'Nunito', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--green-dark);
+    margin: 0 0 8px;
+    letter-spacing: 0;
+}
+
+hr {
+    border: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--green-dark), var(--green-bright), transparent);
+    margin: 0 0 28px;
+    border-radius: 2px;
+}
+
+/* ===============================
+   Profile Banner
+================================ */
+.profile-section {
+    background: linear-gradient(135deg, var(--green-dark) 0%, var(--green-mid) 60%, var(--green-bright) 100%);
+    border-radius: var(--radius-lg);
+    padding: 22px 26px;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+    pointer-events: none;
+}
+
+.profile-card {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    position: relative;
+    z-index: 1;
+    cursor: default;
+    pointer-events: none;
+}
+
+.profile-picture img {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,.45);
+    object-fit: cover;
+    background: var(--surface);
+    flex-shrink: 0;
+    display: block;
+    pointer-events: none;
+}
+
+.profile-mini {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    pointer-events: none;
+}
+
+.profile-info h3 {
+    font-family: 'Nunito', sans-serif;
+    margin: 0 0 3px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--white);
+    letter-spacing: 0;
+    pointer-events: none;
+}
+
+.profile-info p {
+    margin: 0;
+    font-size: 13.5px;
+    color: rgba(255,255,255,.65);
+    font-weight: 500;
+    text-transform: capitalize;
+    pointer-events: none;
+}
+
+/* View Profile — only clickable element */
+.profile-view-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--green-dark);
+    background: var(--yellow);
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 8px;
+    white-space: nowrap;
+    pointer-events: auto;
+    user-select: none;
+    border: 2px solid transparent;
+    transition: background .2s, transform .2s, box-shadow .2s, border-color .2s;
+}
+
+.profile-view-more i { font-size: 12px; transition: transform .22s; }
+
+.profile-view-more:hover {
+    background: #fde047;
+    border-color: rgba(0,0,0,.10);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(244,196,48,.5);
+}
+
+.profile-view-more:hover i { transform: translateX(4px); }
+.profile-view-more:active  { transform: translateY(0); box-shadow: none; }
+
+/* ===============================
+   Stat Cards
+================================ */
+.summary-section { margin-bottom: 28px; }
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+.card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 0;
+    box-shadow: var(--shadow-sm);
+    border: 1.5px solid var(--border);
+    border-top: 3px solid var(--green-bright);
+    transition: transform .25s, box-shadow .25s;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.card-subheader {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 22px 22px 0;
+}
+
+.card-icon { font-size: 22px; color: var(--green-bright); }
+
+.card h3 {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.card p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+    font-family: 'Nunito Sans', sans-serif;
+    flex: 1;
+    padding: 0 22px 18px;
+}
+
+.card p strong {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--green-dark);
+    display: block;
+    line-height: 1.1;
+    margin-bottom: 3px;
+    font-family: 'Nunito', sans-serif;
+}
+
+.view {
+    border-top: 1px solid var(--border);
+    padding: 12px 22px;
+    background: var(--surface);
+    transition: background .2s;
+}
+
+.card:hover .view { background: var(--hover-bg); }
+
+.view a {
+    color: var(--green-mid);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    font-family: 'Nunito Sans', sans-serif;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: gap .2s, color .2s;
+}
+
+.view a:hover { color: var(--green-dark); gap: 8px; }
+
+/* ===============================
+   Lab Section
+================================ */
+.lab-section { margin-top: 0; }
+
+.lab-header-title {
+    font-family: 'Nunito', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--green-dark);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding-bottom: 12px;
+    border-bottom: 1.5px solid var(--border);
+}
+
+.lab-header-title i { color: var(--green-bright); }
+
+.lab-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 16px;
+}
+
+.lab-card {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: transform .25s, box-shadow .25s, border-color .25s;
+    cursor: pointer;
+}
+
+.lab-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--green-bright);
+}
+
+.lab-card.expanded {
+    border-color: var(--green-bright);
+    box-shadow: var(--shadow-lg);
+}
+
+.lab-card-header {
+    padding: 16px 16px 12px;
+    background: var(--surface);
+    border-bottom: 1.5px solid var(--border);
+    position: relative;
+}
+
+.lab-card-header.occupied   { background: linear-gradient(135deg,#dcfce7,#bbf7d0); border-bottom-color:#22c55e; }
+.lab-card-header.dismissing { background: linear-gradient(135deg,#fff7ed,#fed7aa); border-bottom-color:#f97316; }
+.lab-card-header.pending    { background: linear-gradient(135deg,#fefce8,#fef9c3); border-bottom-color:var(--yellow); }
+
+.lab-status-badge {
+    position: absolute;
+    top: 12px; right: 12px;
+    padding: 4px 11px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Nunito Sans', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+
+.lab-status-badge.occupied    { background: var(--green-dark);   color: var(--white); animation: pulse 2s infinite; }
+.lab-status-badge.available   { background: #166534; color: var(--white); }
+.lab-status-badge.maintenance { background: #6b7280; color: var(--white); }
+.lab-status-badge.dismissing  { background: #f97316; color: var(--white); animation: pulse 2s infinite; }
+.lab-status-badge.pending     { background: var(--yellow); color: var(--green-dark); }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.65} }
+
+.lab-top { margin-bottom: 8px; padding-right: 90px; }
+
+.lab-info h4 {
+    margin: 0 0 2px;
+    font-size: 16px;
+    color: var(--green-dark);
+    font-weight: 800;
+    font-family: 'Nunito', sans-serif;
+    letter-spacing: 0;
+}
+
+.lab-info span {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.lab-meta { display: flex; gap: 12px; flex-wrap: wrap; }
+
+.lab-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.lab-meta-item i { color: var(--green-bright); font-size: 11px; }
+
+.lab-progress-container {
+    height: 6px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 12px 16px 6px;
+}
+
+.lab-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green-bright), var(--green-mid));
+    border-radius: 4px;
+    transition: width .5s ease;
+}
+
+.lab-progress-bar.high { background: linear-gradient(90deg,#f97316,#dc2626); }
+
+.lab-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-body);
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.lab-capacity-text { color: var(--text-muted); font-size: 12.5px; }
+
+.current-session-info {
+    background: #f0fdf4;
+    padding: 12px 16px;
+    border-top: 1px solid #bbf7d0;
+}
+
+.current-session-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--green-dark);
+    margin-bottom: 7px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Nunito', sans-serif;
+}
+
+.current-session-detail {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.current-session-detail i { width: 14px; color: var(--green-bright); font-size: 12px; }
+
+.dismissing-session-info {
+    background: #fff7ed;
+    padding: 10px 16px;
+    border-top: 1px solid #f97316;
+    display: flex; align-items: center; gap: 7px;
+    font-size: 13px; color: #9a3412; font-weight: 600;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.pending-session-info {
+    background: #fefce8;
+    padding: 10px 16px;
+    border-top: 1px solid var(--yellow);
+    display: flex; align-items: center; gap: 7px;
+    font-size: 13px; color: #854d0e; font-weight: 600;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+/* ── Schedules toggle ── */
+.schedules-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border: none;
+    border-top: 1.5px solid var(--border);
+    color: var(--green-mid);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Nunito Sans', sans-serif;
+    cursor: pointer;
+    width: 100%;
+    transition: background .2s, color .2s;
+}
+
+.schedules-toggle:hover { background: var(--hover-bg); color: var(--green-dark); }
+.schedules-toggle i { transition: transform .3s; }
+.lab-card.expanded .schedules-toggle i { transform: rotate(180deg); }
+
+.schedules-container {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .35s ease-out;
+    border-top: 1.5px solid var(--border);
+}
+
+.lab-card.expanded .schedules-container { max-height: 2000px; }
+
+.schedules-content {
+    padding: 16px;
+    background: var(--off-white);
+}
+
+.schedule-day-group { margin-bottom: 12px; }
+
+.day-header {
+    background: var(--white);
+    padding: 7px 12px;
+    border-radius: 7px;
+    font-weight: 700;
+    color: var(--green-dark);
+    font-size: 13px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 7px;
+    border-left: 3px solid var(--green-bright);
+    font-family: 'Nunito', sans-serif;
+}
+
+.schedule-item {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 11px 14px;
+    margin-bottom: 7px;
+    font-size: 13px;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.schedule-item.active-now { border-color: var(--green-bright); background: #f0fdf4; }
+
+.schedule-time {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--green-dark);
+    margin-bottom: 5px;
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Nunito', sans-serif;
+}
+
+.schedule-subject { font-weight: 700; color: var(--text-dark); margin-bottom: 3px; }
+.schedule-detail  { font-size: 12.5px; color: var(--text-muted); margin-bottom: 2px; }
+
+.no-schedules {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.active-now-badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 9px; border-radius: 99px;
+    font-size: 11px; font-weight: 700;
+    background: var(--green-bright); color: var(--white);
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.schedule-count-badge {
+    background: var(--green-dark); color: var(--white);
+    padding: 2px 9px; border-radius: 99px;
+    font-size: 11px; margin-left: auto;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+/* ===============================
+   Responsive
+================================ */
+@media (max-width: 1024px) {
+    .cards { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 900px) {
+    .main-content { margin-left: 0; margin-top: 0; }
+    .container { padding: 20px 16px 40px; } 
+}
+
+@media (max-width: 700px) {
+    .cards { grid-template-columns: 1fr; }
+    .lab-grid { grid-template-columns: 1fr; }
+    .profile-mini { flex-direction: column; align-items: flex-start; gap: 10px; }
+}
+
+
+/* ── Page Header Titles (Stacking Fix) ── */
+.page-header .header-titles {
+    display: flex;
+    flex-direction: column;
+}
+
+.page-header .header-titles p {
+    color: var(--text-muted, #5a7265);
+    font-size: 13.5px;
+    margin-top: 2px;
+    margin-bottom: 0;
+    font-weight: 500;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.page-header h1 i,
+.page-header .header-titles h1 i { 
+    color: var(--green-bright); /* Or #40916c if you prefer hex */
+    font-size: 22px; 
+}

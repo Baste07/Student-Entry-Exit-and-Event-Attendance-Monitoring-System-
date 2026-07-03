@@ -1,0 +1,442 @@
+/* ============================================================
+   resc/css/enrollment.css
+   Aligned with Dashboard Design System
+============================================================ */
+
+:root {
+    --green-dark:   #1a4731;
+    --green-mid:    #2d6a4f;
+    --green-bright: #3aa96a;
+    --green-light:  #7ccba2;
+    --yellow:       #e0a800;
+    --yellow-light: #fde68a;
+    --white:        #ffffff;
+    --off-white:    #f7faf8;
+    --surface:      #eef6f1;
+    --hover-bg:     #e4efe8;
+    --text-dark:    #10281d;
+    --text-body:    #2b3d34;
+    --text-muted:   #5a6f64;
+    --border:       #d2e4d7;
+    --red:          #dc2626;
+    --radius:       10px;
+    --radius-lg:    14px;
+    --shadow-sm:    0 2px 8px rgba(21,60,44,.07);
+    --shadow-md:    0 6px 18px rgba(21,60,44,.11);
+    --shadow-lg:    0 16px 40px rgba(21,60,44,.14);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Nunito Sans', 'Segoe UI', sans-serif;
+    background:
+        radial-gradient(circle at top left, rgba(47,133,90,.06), transparent 22%),
+        radial-gradient(circle at top right, rgba(47,133,90,.06), transparent 20%),
+        linear-gradient(180deg, #ffffff 0%, #f6faf7 100%);
+    color: var(--text-body);
+    line-height: 1.75;
+    font-size: 15px;
+}
+
+.main-content {
+    margin-left: var(--sidebar-collapsed, 64px);
+    margin-top: 68px;
+    min-height: calc(100vh - 68px);
+    transition: margin-left 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.main-content.sidebar-open { margin-left: var(--sidebar-expanded, 240px); }
+
+.container { background: transparent; padding: 26px 30px 42px; min-height: 100%; width: 100%; }
+.container h1 { font-family: 'Nunito', sans-serif; font-size: 24px; font-weight: 700; color: var(--green-dark); margin: 0; display: flex; align-items: center; gap: 10px; }
+
+hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark), var(--green-bright), transparent); margin: 0 0 28px; border-radius: 2px; }
+
+/* Header & Stats */
+.page-header { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+    margin-bottom: 14px; 
+    flex-wrap: wrap; 
+}
+
+/* 1. Stacks the title and paragraph */
+.page-header .header-titles {
+    display: flex;
+    flex-direction: column;
+}
+
+/* 2. Formats the H1 */
+.page-header .header-titles h1 {
+    margin: 0;
+    font-family: 'Nunito', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--green-dark);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 3. Forces the icon to be bright green! */
+.page-header .header-titles h1 i {
+    color: var(--green-bright);
+    font-size: 22px;
+}
+
+/* 4. Formats the gray subtitle */
+.page-header .header-titles p {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-top: 2px;
+    margin-bottom: 0;
+    font-weight: 500;
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+/* (Leave your existing .total-badge and .stats-mini classes right below this) */
+
+.stats-badges { display: flex; gap: 10px; flex-wrap: wrap; margin-right: auto; }
+.stat-badge {
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Nunito Sans', sans-serif;
+    box-shadow: var(--shadow-sm);
+}
+.stat-badge.total       { background: linear-gradient(135deg, var(--green-dark), var(--green-mid)); color: var(--white); }
+.stat-badge.enrolled    { background: linear-gradient(135deg, #ecfdf3, #d1fae5); color: #166534; border: 1px solid #bbf7d0; }
+.stat-badge.enrollments { background: linear-gradient(135deg, #f8fbf9, #eef6f1); color: var(--green-dark); border: 1px solid var(--border); }
+
+/* Buttons */
+.btn-report {
+    padding: 9px 18px; 
+    background: linear-gradient(135deg, #ecfdf3, #d1fae5);
+    color: #166534;
+    border: 1.5px solid #b7ebc9;
+    border-radius: 8px; 
+    font-size: 13.5px; 
+    font-weight: 800; 
+    cursor: pointer; 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 8px; 
+    transition: all .2s ease; 
+    font-family: 'Nunito Sans', sans-serif; 
+    margin-left: auto;            /* Keeps it grouped with the Add button */
+}
+
+.btn-report:hover { 
+    background: linear-gradient(135deg, #d1fae5, #bbf7d0);
+    transform: translateY(-2px); 
+    box-shadow: 0 8px 18px rgba(22, 101, 52, 0.14);
+}
+/* Controls Card */
+.controls-card {
+    background: rgba(255,255,255,.98);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(210, 228, 215, 0.95);
+    border-top: 4px solid var(--green-bright);
+    transition: box-shadow 0.3s ease, transform .2s ease;
+}
+.controls-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.controls-header { display: flex; align-items: center; margin-bottom: 15px; }
+.controls-header h2 { font-family: 'Nunito', sans-serif; font-size: 16px; font-weight: 700; color: var(--green-dark); display: flex; align-items: center; gap: 8px; margin: 0; }
+.table-controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+.control-group { display: flex; flex-direction: column; gap: 6px; flex: 1 1 0; min-width: 160px; }
+.control-group label { font-family: 'Nunito Sans', sans-serif; font-size: 12.5px; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+.search-container input, .filter-container select {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1.5px solid #cfe4d5;
+    border-radius: 10px;
+    outline: none;
+    font-size: 13.5px;
+    height: 42px;
+    font-family: 'Nunito Sans', sans-serif;
+    transition: border-color .3s, box-shadow .3s, transform .15s;
+    background: #fff;
+    color: var(--text-dark);
+}
+.search-container input:focus, .filter-container select:focus { border-color: var(--green-bright); box-shadow: 0 0 0 3px rgba(47,133,90,.14); transform: translateY(-1px); }
+.btn-clear { height: 40px; padding: 0 16px; border-radius: 8px; background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); font-family: 'Nunito Sans', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; transition: all .2s; }
+.btn-clear:hover { background: var(--hover-bg); color: var(--green-dark); }
+/* Table Styling */
+.table-container { margin-top: 10px; }
+.students-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid rgba(210, 228, 215, 0.95);
+}
+.students-table thead {
+    background: linear-gradient(90deg, #166534, #14532d);
+}
+.students-table th {
+    background: transparent;
+    color: #ffffff;
+    font-size: 12.5px;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 14px 16px;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 2px solid rgba(255,255,255,.18);
+}
+.students-table td {
+    padding: 15px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+    vertical-align: middle;
+    color: var(--text-body);
+}
+
+.students-table tbody tr:nth-child(even) { background: #fbfdfb; }
+.students-table tbody tr.student-row { cursor: pointer; transition: background 0.18s ease, transform .18s ease; }
+.students-table tbody tr.student-row:hover { background: #eef7f1; }
+.students-table tbody tr.student-row.expanded { background: #dff2e6; }
+
+.students-table td:first-child,
+.students-table th:first-child { width: 40px; text-align: center; }
+.students-table td:nth-child(2) { font-weight: 800; color: var(--green-dark); white-space: nowrap; }
+.students-table td:nth-child(7),
+.students-table td:nth-child(8) { text-align: center; }
+
+/* Expandable Rows */
+.students-table tbody tr.student-row { cursor: pointer; transition: background 0.2s; }
+.students-table tbody tr.student-row:hover { background: var(--off-white); }
+.students-table tbody tr.student-row.expanded { background: var(--surface); border-bottom: none; }
+.expand-icon { transition: transform 0.3s; color: var(--green-mid); }
+.expanded .expand-icon { transform: rotate(90deg); color: var(--green-dark); }
+
+/* Hidden Details Row */
+.enrollment-details { display: none; }
+.enrollment-details.active { display: table-row; }
+.enrollment-details td { padding: 0 !important; background: linear-gradient(180deg, #f8fcff, #f3f8fb); border-bottom: 2px solid var(--border) !important; }
+.enrollment-content { padding: 20px 40px 30px 40px; animation: slideDown 0.3s ease-out; }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Subject Cards (Inside expanded row) */
+.enrollment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
+.subject-card {
+    background: linear-gradient(180deg, #ffffff, #fbfdff);
+    padding: 18px 16px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(210, 228, 215, .85);
+    border-left: 4px solid #2f855a;
+    box-shadow: 0 4px 14px rgba(16,40,29,.08);
+}
+.subject-header {
+    font-family: 'Nunito', sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--green-dark);
+    margin-bottom: 12px;
+    letter-spacing: 0.2px;
+}
+.subject-detail {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-family: 'Nunito Sans', sans-serif;
+    line-height: 1.5;
+}
+.subject-detail i { width: 16px; color: var(--green-bright); text-align: center; }
+.day-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #e6f5ed, #d7f0e1);
+    color: var(--green-dark);
+    border: 1px solid #bfe3cd;
+}
+.no-enrollments { text-align: center; padding: 20px; color: var(--text-muted); font-style: italic; background: var(--white); border-radius: 8px; border: 1px dashed var(--border); }
+
+/* Badges */
+.enrollment-count-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #ecfdf3, #d1fae5);
+    color: var(--green-dark);
+    border: 1px solid #c8e7d3;
+}
+.enrollment-count-badge.zero { background: linear-gradient(135deg, #fff5f5, #ffecec); color: var(--red); border-color: #fecaca; }
+.section-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #ecfdf3, #d1fae5);
+    color: var(--green-dark);
+    border: 1px solid #c8e7d3;
+}
+.subject-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.subject-pill {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #effaf3, #e3f4e8);
+    color: var(--green-dark);
+    border: 1px solid #c8e7d3;
+}
+
+.face-status-icon { font-size: 16px; }
+.face-status-icon.registered { color: #16a34a; }
+.face-status-icon.pending    { color: #d97706; }
+/* ===============================
+   Report Modal (Laboratories Theme)
+================================ */
+.rm-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.55); z-index: 10000;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(3px);
+}
+.rm-overlay.on { display: flex; }
+
+.rm-box {
+    background: white; border-radius: 16px;
+    width: 96%; max-width: 1200px; max-height: 93vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 22px 60px rgba(16,40,29,.24);
+    animation: rmIn .22s cubic-bezier(.34,1.56,.64,1);
+    overflow: hidden; /* Keeps bottom corners clean when scrolling */
+}
+@keyframes rmIn {
+    from { opacity: 0; transform: scale(.88) translateY(14px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.rm-hd {
+    background: linear-gradient(135deg, #14532d, #1f5c40 60%, #2f855a);
+    padding: 22px 28px; border-radius: 14px 14px 0 0;
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 14px; flex-shrink: 0;
+}
+.rm-hd h2 { color: white; font-size: 19px; font-weight: 700; display: flex; align-items: center; gap: 10px; margin: 0; font-family: 'Nunito', sans-serif; }
+.rm-hd p  { color: rgba(255,255,255,.72); font-size: 12.5px; margin-top: 3px; font-family: 'Nunito Sans', sans-serif; }
+
+.rm-x {
+    background: rgba(255,255,255,.15); border: none; color: white;
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+    font-size: 15px; display: flex; align-items: center; justify-content: center;
+    transition: .18s; flex-shrink: 0;
+}
+.rm-x:hover { background: rgba(255,255,255,.3); }
+
+.rm-tb {
+    padding: 14px 22px; border-bottom: 1.5px solid #d6eadf;
+    background: linear-gradient(180deg, #f8fef9, #f4fbf6); display: flex; align-items: center;
+    gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+}
+
+.rm-chip {
+    padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px; font-family: 'Nunito Sans', sans-serif;
+}
+.rm-chip.green { background: linear-gradient(135deg, #dcfce7, #d1fae5); color: #166534; border: 1px solid #bbf7d0; }
+.rm-chip.blue  { background: linear-gradient(135deg, #e6f5ed, #d7f0e1); color: #166534; border: 1px solid #bfe3cd; }
+.rm-chip.amber { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; border: 1px solid #fde68a; }
+
+.rm-tb-right { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
+.rm-btn {
+    padding: 8px 15px; border-radius: 7px; font-size: 13px; font-weight: 600;
+    cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: .15s; font-family: 'Nunito Sans', sans-serif; white-space: nowrap;
+}
+.rm-btn.save  { background: #166534; color: white; }
+.rm-btn.save:hover  { background: #14532d; }
+.rm-btn.print { background: #f0f9ff; color: #0369a1; border: 1.5px solid #bae6fd; }
+.rm-btn.print:hover { background: #0369a1; color: white; border-color: #0369a1; }
+.rm-btn.pdf   { background: #fff5f5; color: #dc2626; border: 1.5px solid #fecaca; }
+.rm-btn.pdf:hover   { background: #dc2626; color: white; border-color: #dc2626; }
+.rm-btn.excel { background: #f0fdf4; color: #166534; border: 1.5px solid #bbf7d0; }
+.rm-btn.excel:hover { background: #166534; color: white; border-color: #166534; }
+
+.rm-body { overflow-y: auto; flex: 1; background: white; }
+
+.rm-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'Nunito Sans', sans-serif; }
+.rm-table thead th {
+    background: linear-gradient(90deg, #14532d, #1f5c40, #2f855a); color: white; padding: 11px 14px;
+    text-align: left; font-size: 10.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .6px;
+    white-space: nowrap; position: sticky; top: 0; z-index: 2;
+    border-bottom: none;
+    border-right: 1px solid rgba(255,255,255,.2); /* Vertical white lines in header */
+}
+.rm-table thead th:last-child { border-right: none; }
+
+.rm-table tbody tr { border-bottom: 1px solid #e5e7eb; transition: background .1s; } /* Crisp horizontal rows */
+.rm-table tbody tr:nth-child(even) { background: #f9fffe; }
+.rm-table tbody tr:hover { background: #eaf7ef; }
+.rm-table td { padding: 11px 14px; vertical-align: middle; color: var(--text-body); }
+
+.rm-table td strong { color: var(--text-dark); }
+
+.rm-table td:nth-child(2) { font-weight: 800; color: var(--green-dark); }
+
+.rm-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+}
+.rm-badge.active   { background: #dcfce7; color: #166534; }
+.rm-badge.inactive { background: #fee2e2; color: #dc2626; }
+.rm-badge.registered     { background: #dcfce7; color: #166534; }
+.rm-badge.not-registered { background: #fef3c7; color: #92400e; }
+
+/* Toast */
+.toast { position: fixed; bottom: 30px; right: 30px; padding: 14px 24px; background: var(--green-dark); color: var(--white); border-radius: 12px; font-size: 14px; font-weight: 700; display: none; align-items: center; gap: 10px; z-index: 99999; box-shadow: var(--shadow-md); font-family: 'Nunito Sans', sans-serif;}
+.toast.on { display: flex; animation: slideUp 0.3s ease-out; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 900px) {
+    .main-content { margin-left: 0; margin-top: 0; }
+    .container { padding: 20px 16px 40px; } 
+    .page-header { align-items: flex-start; }
+    .stats-badges { margin-right: 0; }
+    .header-actions { width: 100%; display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-report { margin-left: 0; width: 100%; justify-content: center; }
+    .stats-badges .stat-badge { width: 100%; justify-content: center; }
+    .table-controls { gap: 12px; }
+    .control-group { min-width: 100%; }
+}
+@media (max-width: 768px) {
+    .enrollment-grid { grid-template-columns: 1fr; }
+    .enrollment-content { padding: 18px 16px 24px; }
+    .rm-tb { padding: 12px 14px; }
+    .rm-box { width: 98%; }
+}
+
+.students-table th { border-right: 1px solid rgba(255,255,255,.2); }
+.students-table th:last-child { border-right: none; }
+

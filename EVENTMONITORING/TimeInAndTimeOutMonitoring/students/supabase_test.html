@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Supabase Connection Test</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        h1 {
+            font-size: 1.4rem;
+            color: #22c55e;
+            margin-bottom: 8px;
+        }
+        p.sub {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+            max-width: 700px;
+        }
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 14px;
+        }
+        .result-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid #1e293b;
+            font-size: 14px;
+        }
+        .result-row:last-child { border-bottom: none; }
+        .badge {
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 70px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .badge-ok      { background: #14532d; color: #4ade80; }
+        .badge-fail    { background: #7f1d1d; color: #fca5a5; }
+        .badge-warn    { background: #78350f; color: #fde68a; }
+        .badge-loading { background: #1e3a5f; color: #93c5fd; }
+        .label { font-weight: 500; color: #cbd5e1; }
+        .value { color: #94a3b8; font-size: 13px; margin-top: 2px; word-break: break-all; }
+        .section { max-width: 700px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+        th {
+            text-align: left;
+            padding: 8px 10px;
+            background: #0f172a;
+            color: #64748b;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #1e293b;
+            color: #cbd5e1;
+        }
+        tr:last-child td { border-bottom: none; }
+        #student-id-input {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 14px;
+            width: 200px;
+            margin-right: 8px;
+        }
+        button {
+            padding: 8px 18px;
+            border-radius: 8px;
+            border: none;
+            background: #166534;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:hover { background: #14532d; }
+        .mono { font-family: monospace; font-size: 12px; color: #7dd3fc; }
+    </style>
+</head>
+<body>
+
+<div class="section">
+    <h1>🔌 Supabase Connection Test</h1>
+    <p class="sub">This file tests if your frontend is correctly connected to your Supabase database.</p>
+
+    <!-- STEP 1: Config Check -->
+    <div class="card">
+        <div class="card-title">Step 1 — Configuration Check</div>
+        <div id="config-results">
+            <div class="result-row">
+                <span class="badge badge-loading">CHECKING</span>
+                <div>
+                    <div class="label">Loading config...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 2: Connection Test -->
+    <div class="card">
+        <div class="card-title">Step 2 — Live Connection Test</div>
+        <div id="connection-results">
+            <div class="result-row">
+                <span class="badge badge-loading">WAITING</span>
+                <div><div class="label">Waiting for config...</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 3: Table Tests -->
+    <div class="card">
+        <div class="card-title">Step 3 — Table Access Test</div>
+        <div id="table-results">
+            <div class="result-row">
+                <span class="badge badge-loading">WAITING</span>
+                <div><div class="label">Waiting for connection...</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 4: Student Lookup Test -->
+    <div class="card">
+        <div class="card-title">Step 4 — Student Lookup Test</div>
+        <div style="margin-bottom: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <input type="text" id="student-id-input" placeholder="e.g. 23-00221" value="23-00221"/>
+            <button onclick="testStudentLookup()">Look Up Student</button>
+        </div>
+        <div id="lookup-results">
+            <div class="result-row">
+                <span class="badge badge-loading">WAITING</span>
+                <div><div class="label">Enter a student ID and click Look Up</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 5: Summary -->
+    <div class="card">
+        <div class="card-title">Step 5 — Summary</div>
+        <div id="summary-results">
+            <div class="result-row">
+                <span class="badge badge-loading">WAITING</span>
+                <div><div class="label">Running tests...</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- 
+    IMPORTANT: Copy this file to the same folder as your config files:
+    SmartAcademicManagementSystem/TimeInAndTimeOutMonitoring/students/
+    
+    Then open it in your browser via localhost.
+    It will automatically load your config/.env.js and config/config.js
+-->
+<script src="../../config/.env.js"></script>
+<script src="../../config/config.js"></script>
+
+<script>
+let client = null;
+let testsPassed = 0;
+let testsFailed = 0;
+
+function row(badgeClass, badgeText, label, value) {
+    return `
+        <div class="result-row">
+            <span class="badge ${badgeClass}">${badgeText}</span>
+            <div>
+                <div class="label">${label}</div>
+                ${value ? `<div class="value">${value}</div>` : ''}
+            </div>
+        </div>`;
+}
+
+// STEP 1: Check config
+function checkConfig() {
+    const el = document.getElementById('config-results');
+    let html = '';
+    let allGood = true;
+
+    const url  = typeof ENV !== 'undefined' ? ENV.SUPABASE_PROJECT_URL : null;
+    const key  = typeof ENV !== 'undefined' ? ENV.SUPABASE_ANON_KEY    : null;
+
+    if (typeof ENV === 'undefined') {
+        html += row('badge-fail', 'FAIL', 'ENV object not found',
+            'config/.env.js is not loaded. Make sure this file is in the students/ folder and served via localhost.');
+        allGood = false;
+    } else {
+        html += row('badge-ok', 'OK', 'ENV object loaded', 'config/.env.js found and loaded successfully.');
+    }
+
+    if (!url) {
+        html += row('badge-fail', 'FAIL', 'SUPABASE_PROJECT_URL is missing or empty', 'Check your config/.env.js file.');
+        allGood = false;
+    } else if (!url.includes('supabase.co')) {
+        html += row('badge-warn', 'WARN', 'SUPABASE_PROJECT_URL looks wrong', `Value: ${url}`);
+        allGood = false;
+    } else {
+        html += row('badge-ok', 'OK', 'SUPABASE_PROJECT_URL found', `<span class="mono">${url}</span>`);
+    }
+
+    if (!key) {
+        html += row('badge-fail', 'FAIL', 'SUPABASE_ANON_KEY is missing or empty', 'Check your config/.env.js file.');
+        allGood = false;
+    } else if (key.length < 100) {
+        html += row('badge-warn', 'WARN', 'SUPABASE_ANON_KEY looks too short — may be wrong key',
+            `Length: ${key.length} chars. Expected 200+ chars.`);
+        allGood = false;
+    } else {
+        html += row('badge-ok', 'OK', 'SUPABASE_ANON_KEY found',
+            `Length: ${key.length} chars &nbsp;|&nbsp; Preview: <span class="mono">${key.substring(0, 30)}...</span>`);
+    }
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+        html += row('badge-ok', 'OK', 'supabaseClient object exists', 'config/config.js initialized the client.');
+        client = supabaseClient;
+    } else if (url && key) {
+        html += row('badge-warn', 'WARN', 'supabaseClient not found — creating one now for testing', '');
+        try {
+            client = supabase.createClient(url, key);
+            html += row('badge-ok', 'OK', 'Test client created successfully', '');
+        } catch(e) {
+            html += row('badge-fail', 'FAIL', 'Failed to create client', e.message);
+            allGood = false;
+        }
+    }
+
+    el.innerHTML = html;
+    return allGood;
+}
+
+// STEP 2: Live connection test
+async function testConnection() {
+    const el = document.getElementById('connection-results');
+    el.innerHTML = row('badge-loading', 'TESTING', 'Pinging Supabase...', 'Sending a test query to your database...');
+
+    if (!client) {
+        el.innerHTML = row('badge-fail', 'FAIL', 'No client available', 'Fix config errors in Step 1 first.');
+        testsFailed++;
+        return false;
+    }
+
+    try {
+        const start = Date.now();
+        const { error } = await client.from('students').select('student_id').limit(1);
+        const ms = Date.now() - start;
+
+        if (error) {
+            el.innerHTML = row('badge-fail', 'FAIL', 'Connection failed: ' + error.message,
+                `Code: ${error.code} | Hint: ${error.hint || 'none'}`);
+            testsFailed++;
+            return false;
+        }
+
+        el.innerHTML = row('badge-ok', 'OK', `Connected to Supabase successfully`, `Response time: ${ms}ms`);
+        testsPassed++;
+        return true;
+    } catch(e) {
+        el.innerHTML = row('badge-fail', 'FAIL', 'Network error — could not reach Supabase', e.message);
+        testsFailed++;
+        return false;
+    }
+}
+
+// STEP 3: Table tests
+async function testTables() {
+    const el = document.getElementById('table-results');
+    const tables = ['students', 'professors', 'lab_schedules', 'lab_sessions', 'lab_attendance', 'schedule_enrollments'];
+    let html = '';
+
+    for (const table of tables) {
+        try {
+            const { data, error, count } = await client
+                .from(table)
+                .select('*', { count: 'exact', head: true });
+
+            if (error) {
+                html += row('badge-fail', 'FAIL', `Table: ${table}`,
+                    `Error: ${error.message} (code: ${error.code})`);
+                testsFailed++;
+            } else {
+                html += row('badge-ok', 'OK', `Table: ${table}`,
+                    `Accessible ✓ &nbsp;|&nbsp; Row count: ${count !== null ? count : 'unknown'}`);
+                testsPassed++;
+            }
+        } catch(e) {
+            html += row('badge-fail', 'FAIL', `Table: ${table}`, e.message);
+            testsFailed++;
+        }
+    }
+
+    el.innerHTML = html;
+}
+
+// STEP 4: Student lookup
+async function testStudentLookup() {
+    const el = document.getElementById('lookup-results');
+    const raw = document.getElementById('student-id-input').value.trim();
+
+    if (!raw) {
+        el.innerHTML = row('badge-warn', 'WARN', 'Please enter a student ID', '');
+        return;
+    }
+
+    if (!client) {
+        el.innerHTML = row('badge-fail', 'FAIL', 'No client — fix Step 1 first', '');
+        return;
+    }
+
+    el.innerHTML = row('badge-loading', 'LOOKING', `Searching for student ID: ${raw}`, 'Querying students table...');
+
+    const normalized = raw.replace(/\D/g, '');
+    const queries = [raw, normalized];
+    let found = null;
+
+    for (const q of queries) {
+        try {
+            const { data, error } = await client
+                .from('students')
+                .select('student_id, id_number, first_name, middle_name, last_name, email, facial_dataset_path')
+                .eq('id_number', q)
+                .maybeSingle();
+
+            if (!error && data) { found = data; break; }
+        } catch(e) {}
+    }
+
+    if (!found) {
+        el.innerHTML = row('badge-fail', 'NOT FOUND',
+            `Student ID "${raw}" not found in your Supabase database`,
+            `Tried: "${raw}" and "${normalized}". Check that this student exists in your students table.`);
+        return;
+    }
+
+    const name = `${found.first_name || ''} ${found.middle_name || ''} ${found.last_name || ''}`.trim();
+    el.innerHTML = `
+        ${row('badge-ok', 'FOUND', `Student found: ${name}`, '')}
+        <table>
+            <tr><th>Field</th><th>Value</th></tr>
+            <tr><td>student_id</td><td class="mono">${found.student_id}</td></tr>
+            <tr><td>id_number</td><td>${found.id_number}</td></tr>
+            <tr><td>name</td><td>${name}</td></tr>
+            <tr><td>email</td><td>${found.email || '—'}</td></tr>
+            <tr><td>facial_dataset_path</td><td>${found.facial_dataset_path || '<span style="color:#f87171">Not set — face not enrolled yet</span>'}</td></tr>
+        </table>`;
+}
+
+// STEP 5: Summary
+function showSummary() {
+    const el = document.getElementById('summary-results');
+    const total = testsPassed + testsFailed;
+
+    if (testsFailed === 0) {
+        el.innerHTML = row('badge-ok', 'ALL OK',
+            `All ${total} tests passed — your frontend IS connected to Supabase`,
+            'If student lookup still fails on your registration page, the issue is in your config file paths, not the connection itself.');
+    } else if (testsPassed === 0) {
+        el.innerHTML = row('badge-fail', 'FAILED',
+            `All ${total} tests failed — your frontend is NOT connected to Supabase`,
+            'Check that your config/.env.js has the correct URL and anon key from your new Supabase project.');
+    } else {
+        el.innerHTML = row('badge-warn', 'PARTIAL',
+            `${testsPassed} passed, ${testsFailed} failed`,
+            'Some tables may be missing or have RLS policies blocking access. Check the failed tables above.');
+    }
+}
+
+// Run all tests
+async function runAll() {
+    const configOk = checkConfig();
+    if (!configOk) {
+        document.getElementById('connection-results').innerHTML =
+            row('badge-fail', 'SKIPPED', 'Skipped — fix config errors first', '');
+        document.getElementById('table-results').innerHTML =
+            row('badge-fail', 'SKIPPED', 'Skipped — fix config errors first', '');
+        showSummary();
+        return;
+    }
+
+    const connected = await testConnection();
+    if (!connected) {
+        document.getElementById('table-results').innerHTML =
+            row('badge-fail', 'SKIPPED', 'Skipped — fix connection errors first', '');
+        showSummary();
+        return;
+    }
+
+    await testTables();
+    showSummary();
+}
+
+// Auto-run on load
+window.addEventListener('load', () => setTimeout(runAll, 300));
+</script>
+</body>
+</html>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Attendance | Laboratory Attendance System</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+
+    <link rel="stylesheet" href="../resc/css/studentAttendance.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-clipboard-user"></i> Student Attendance</h1>
+                    <p>Track time-in / time-out records per session</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn-report btn-graph" onclick="location.href='attendanceGraphs.html'">
+                        <i class="fa-solid fa-chart-column"></i> Show Graph
+                    </button>
+                    <button class="btn-report" onclick="openReportModal()">
+                        <i class="fa-solid fa-file-chart-column"></i> Generate Report
+                    </button>
+                </div>
+            </div>
+            <hr>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="fa-solid fa-users"></i></div>
+                    <div><div class="stat-val" id="statTotal">0</div><div class="stat-lbl">Total Entries</div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="fa-solid fa-person-walking-arrow-right"></i></div>
+                    <div><div class="stat-val" id="statStillIn">0</div><div class="stat-lbl">Still Inside</div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon dark"><i class="fa-solid fa-person-walking-arrow-loop-left"></i></div>
+                    <div><div class="stat-val" id="statTimedOut">0</div><div class="stat-lbl">Timed Out</div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon amber"><i class="fa-solid fa-clock"></i></div>
+                    <div><div class="stat-val" id="statLate">0</div><div class="stat-lbl">Late Arrivals</div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="fa-solid fa-chalkboard-teacher"></i></div>
+                    <div><div class="stat-val" id="statSessions">0</div><div class="stat-lbl">Active Sessions</div></div>
+                </div>
+                <div class="stat-card" id="statAbsentCard" style="display:none">
+                    <div class="stat-icon" style="background:#fee2e2;color:#991b1b"><i class="fa-solid fa-circle-minus"></i></div>
+                    <div><div class="stat-val" id="statAbsent">0</div><div class="stat-lbl">Not Timed In</div></div>
+                </div>
+            </div>
+
+            <div class="controls-card">
+                <div class="fg-grid">
+                    <div class="fg">
+                        <label><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                        <input type="text" id="filterSearch" placeholder="Name or ID number...">
+                    </div>
+                    <div class="fg">
+                        <label><i class="fa-solid fa-calendar-day"></i> Date</label>
+                        <input type="date" id="filterDate">
+                    </div>
+                    <div class="fg">
+                        <label><i class="fa-solid fa-book"></i> Subject</label>
+                        <select id="filterSubject"><option value="">All Subjects</option></select>
+                    </div>
+                    <div class="fg">
+                        <label><i class="fa-solid fa-graduation-cap"></i> Course</label>
+                        <select id="filterCourse"><option value="">All Courses</option></select>
+                    </div>
+                    <div class="fg">
+                        <label><i class="fa-solid fa-flask"></i> Laboratory</label>
+                        <select id="filterLab"><option value="">All Labs</option></select>
+                    </div>
+                    <div class="fg">
+                        <label><i class="fa-solid fa-chalkboard-teacher"></i> Professor</label>
+                        <select id="filterProf"><option value="">All Professors</option></select>
+                    </div>
+                    <div class="fg">
+                        <label><i class="fa-solid fa-users"></i> Year &amp; Section</label>
+                        <select id="filterSection"><option value="">All Yr &amp; Sec</option></select>
+                    </div>
+                    <div class="fg">
+                        <label><i class="fa-solid fa-filter"></i> Status</label>
+                        <select id="filterStatus">
+                            <option value="">All Status</option>
+                            <option value="present">Still Inside</option>
+                            <option value="completed">Timed Out</option>
+                            <option value="late">Late</option>
+                            <option value="not_timed_in">Not Timed In</option>
+                        </select>
+                    </div>
+                    <div class="fg">
+                        <label>&nbsp;</label>
+                        <div class="fa-row">
+                            <button class="btn btn-reset btn-clear" onclick="resetFilters()"><i class="fa-solid fa-eraser"></i> Clear Filters</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div class="tw-head">
+                    <h2><i class="fa-solid fa-table-list"></i> Attendance Records</h2>
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span class="record-badge"><span id="recordCountBadge">0</span> records</span>
+                    </div>
+                </div>
+                <div style="overflow-x:auto">
+                    <table class="attendance-table" id="attendanceTable">
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Student</th><th>Subject</th><th>Course</th><th>Year &amp; Section</th>
+                                <th>Lab</th><th>Time In</th><th>Time Out</th>
+                                <th>Duration</th><th>Status</th><th>Face</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceBody">
+                            <tr><td colspan="12" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading attendance data...</p></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <div class="modal-overlay" id="detailModal" onclick="if(event.target===this)closeModal()">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-times"></i></button>
+            <h3><i class="fa-solid fa-clipboard-user" style="color:var(--green-bright)"></i> Attendance Detail</h3>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <div class="rm-overlay" id="rmOverlay" onclick="if(event.target===this)closeReportModal()">
+        <div class="rm-box">
+            <div class="rm-hd">
+                <div>
+                    <h2><i class="fa-solid fa-clipboard-user"></i> Student Attendance — Report</h2>
+                    <p>Session: <span id="rmDisplayDate"></span> &nbsp;·&nbsp; <span id="rmRecordCount">0</span> records &nbsp;·&nbsp; Generated: <span id="rmGenDate"></span></p>
+                </div>
+                <button class="rm-x" onclick="closeReportModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="rm-tb">
+                <div class="rm-chips">
+                    <span class="rm-chip green"><i class="fa-solid fa-users"></i> <span id="rmTotalChip">0</span> Records</span>
+                    <span class="rm-chip blue"><i class="fa-solid fa-person-walking-arrow-right"></i> <span id="rmStillInChip">0</span> Still Inside</span>
+                    <span class="rm-chip green"><i class="fa-solid fa-check"></i> <span id="rmTimedOutChip">0</span> Timed Out</span>
+                    <span class="rm-chip amber"><i class="fa-solid fa-clock"></i> <span id="rmLateChip">0</span> Late</span>
+                    <span class="rm-chip green"><i class="fa-solid fa-check-double"></i> <span id="rmOnTimeChip">0</span> On Time</span>
+                </div>
+                <div class="rm-tb-right">
+                    <button class="rm-btn print" onclick="printReport()"><i class="fa-solid fa-print"></i> Print</button>
+                    <button class="rm-btn pdf" onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                    <button class="rm-btn excel" onclick="exportExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                    <!-- XML generation removed -->
+                </div>
+            </div>
+            <div class="rm-body">
+                <table class="rm-table">
+                    <thead>
+                        <tr>
+                            <th>#</th><th>Student ID</th><th>Name</th><th>Course</th>
+                            <th>Section</th><th>Subject</th><th>Laboratory</th><th>Professor</th>
+                            <th>Schedule</th><th>Date</th><th>Time In</th><th>Time Out</th><th>Duration</th>
+                            <th>Status</th><th>Face</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rmTableBody">
+                        <tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">Loading report data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="graph-overlay" id="graphOverlay" onclick="if(event.target===this)closeGraphModal()">
+        <div class="graph-box">
+            <div class="graph-hd">
+                <div>
+                    <h2><i class="fa-solid fa-chart-column"></i> Attendance Graphs</h2>
+                    <p>Combined subject, professor, and semester attendance visualizations.</p>
+                </div>
+                <button class="graph-x" onclick="closeGraphModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="graph-body">
+                <div class="charts-row charts-row--modal">
+                    <div class="charts-left">
+                        <div class="chart-card">
+                            <div class="chart-card-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                                <div>
+                                    <h2><i class="fa-solid fa-book-open"></i> Subject Attendance</h2>
+                                    <p>Counts of present, late, and absent students per subject.</p>
+                                </div>
+                                <div style="min-width:220px">
+                                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Select subject</label>
+                                    <select id="chartSubjectSelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d4e6d9"></select>
+                                    <div style="height:8px"></div>
+                                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Select semester (subject)</label>
+                                    <select id="chartSubjectSemesterSelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d4e6d9"></select>
+                                </div>
+                            </div>
+                            <div class="chart-wrap chart-wrap--small">
+                                <canvas id="graphAttendanceSubjectChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="chart-card">
+                            <div class="chart-card-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                                <div>
+                                    <h2><i class="fa-solid fa-chalkboard-teacher"></i> Professor Attendance</h2>
+                                    <p>Aggregated present, late, and absent counts for each professor.</p>
+                                </div>
+                                <div style="min-width:220px">
+                                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Select professor</label>
+                                    <select id="chartProfessorSelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d4e6d9"></select>
+                                    <div style="height:8px"></div>
+                                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Select semester (professor)</label>
+                                    <select id="chartProfessorSemesterSelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d4e6d9"></select>
+                                </div>
+                            </div>
+                            <div class="chart-wrap chart-wrap--small">
+                                <canvas id="graphAttendanceProfessorChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-right">
+                        <div class="chart-card">
+                            <div class="chart-card-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                                <div>
+                                    <h2><i class="fa-solid fa-pie-chart"></i> Semester Share</h2>
+                                    <p>Percent split of present, late, and absent students per semester.</p>
+                                </div>
+                                <div style="min-width:220px">
+                                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Select semester</label>
+                                    <select id="chartSemesterSelect" style="width:100%;padding:8px;border-radius:6px;border:1px solid #d4e6d9"></select>
+                                </div>
+                            </div>
+                            <div class="chart-wrap chart-wrap--small">
+                                <canvas id="graphSemesterAttendanceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-r" id="toast-r">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg-r">Done!</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+
+    <script src="../resc/js/studentAttendance.js"></script>
+
+    <script>
+        loadHeader();
+        loadSidebar('attendance');
+    </script>
+</body>
+</html>

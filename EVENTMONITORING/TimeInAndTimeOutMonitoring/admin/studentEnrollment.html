@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Enrollment | Laboratory Attendance System</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+
+    <link rel="stylesheet" href="../resc/css/studentEnrollment.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-user-graduate"></i> Student Enrollment</h1>
+                    <p>Manage student course enrollments and subjects</p>
+                </div>
+                <div class="stats-badges">
+                    <span class="stat-badge total">
+                        <i class="fa-solid fa-users"></i> <span id="statTotal">0</span> Students
+                    </span>
+                    <span class="stat-badge enrolled">
+                        <i class="fa-solid fa-user-check"></i> <span id="statEnrolled">0</span> Enrolled
+                    </span>
+                    <span class="stat-badge enrollments">
+                        <i class="fa-solid fa-clipboard-list"></i> <span id="statEnrollments">0</span> Enrollments
+                    </span>
+                </div>
+                
+                <button class="btn-report" onclick="openReportModal()">
+                    <i class="fa-solid fa-file-chart-column"></i> Generate Report
+                </button>
+            </div>
+            <hr>
+
+            <div class="table-container">
+                <div class="controls-card">
+                    <div class="controls-header">
+                        <h2><i class="fa-solid fa-sliders-h"></i> Filters &amp; Search</h2>
+                    </div>
+                    <div class="table-controls">
+                        <div class="control-group">
+                            <label for="searchInput"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                            <div class="search-container">
+                                <input type="text" id="searchInput" placeholder="Search by ID, name, or section" />
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label for="sectionFilter"><i class="fa-solid fa-filter"></i> Filter by Section</label>
+                            <div class="filter-container">
+                                <select id="sectionFilter">
+                                    <option value="">All Sections</option>
+                                    </select>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="subjectFilter"><i class="fa-solid fa-book"></i> Filter by Subject</label>
+                            <div class="filter-container">
+                                <select id="subjectFilter">
+                                    <option value="">All Subjects</option>
+                                    </select>
+                            </div>
+                        </div>
+                         
+                        <div class="control-group">
+    <label for="courseFilter"><i class="fa-solid fa-graduation-cap"></i> Filter by Course</label>
+    <div class="filter-container">
+        <select id="courseFilter">
+            <option value="">All Courses</option>
+        </select>
+    </div>
+</div>
+<div class="control-group">
+    <label for="yearSectionFilter"><i class="fa-solid fa-users"></i> Filter by Year &amp; Section</label>
+    <div class="filter-container">
+        <select id="yearSectionFilter">
+            <option value="">All Yr &amp; Sec</option>
+        </select>
+    </div>
+</div>
+
+
+                        <div class="control-group">
+                            <label for="enrollmentFilter"><i class="fa-solid fa-filter"></i> Filter by Enrollment</label>
+                            <div class="filter-container">
+                                <select id="enrollmentFilter">
+                                    <option value="">All</option>
+                                    <option value="enrolled">Has Enrollments</option>
+                                    <option value="not-enrolled">No Enrollments</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <button id="clearFilters" class="btn-clear" style="height:40px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
+                                <i class="fa-solid fa-eraser"></i> Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <table class="students-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px"></th>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Course</th>
+                            <th>Year &amp; Section</th>
+                            <th>Email</th>
+                            <th>Face Status</th>
+                            <th>Enrollments</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentsTableBody">
+                        <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Loading enrollments...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div></main>
+
+    <div class="rm-overlay" id="rmOverlay" onclick="if(event.target===this)closeReportModal()">
+        <div class="rm-box">
+            <div class="rm-hd">
+                <div>
+                    <h2><i class="fa-solid fa-user-graduate"></i> Student Enrollment — Report</h2>
+                    <p id="rmGenDate">Generated ...</p>
+                </div>
+                <button class="rm-x" onclick="closeReportModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="rm-tb">
+                <span class="rm-chip green"><i class="fa-solid fa-users"></i> <span id="rmTotalChip">0</span> Students</span>
+                <span class="rm-chip blue"><i class="fa-solid fa-user-check"></i> <span id="rmEnrolledChip">0</span> Enrolled</span>
+                <span class="rm-chip green"><i class="fa-solid fa-clipboard-list"></i> <span id="rmEnrollmentsChip">0</span> Enrollments</span>
+                <span class="rm-chip amber"><i class="fa-solid fa-user-xmark"></i> <span id="rmNotEnrolledChip">0</span> Not Enrolled</span>
+                <div class="rm-tb-right">
+                    <button class="rm-btn print" onclick="printReport()"><i class="fa-solid fa-print"></i> Print</button>
+                    <button class="rm-btn pdf"  onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                    <button class="rm-btn excel" onclick="exportCSV()"><i class="fa-solid fa-file-excel"></i> Excel / CSV</button>
+                    <!-- XML generation removed -->
+                </div>
+            </div>
+            <div class="rm-body">
+                <table class="rm-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Student ID</th>
+                            <th>Last Name</th>
+                            <th>First Name</th>
+                            <th>Middle Name</th>
+                            <th>Course</th>
+                            <th>Year</th>
+                            <th>Section</th>
+                            <th>Email</th>
+                            <th>Face Status</th>
+                            <th>Enrolled Subjects</th>
+                            <th>Subject Codes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rmTableBody">
+                        <tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-muted)">Loading report data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+
+    <script src="../resc/js/studentEnrollment.js"></script>
+
+    <script>
+        loadHeader();
+        loadSidebar('enrollment'); // Highlights this page in the sidebar
+    </script>
+</body>
+</html>

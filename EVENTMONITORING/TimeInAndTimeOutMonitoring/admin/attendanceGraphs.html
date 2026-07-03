@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Graphs | Laboratory Attendance System</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+    <link rel="stylesheet" href="../resc/css/studentAttendance.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="attendance-graphs-page">
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-chart-column"></i> Attendance Graphs</h1>
+                    <p>Dedicated analytics page for subject, professor, and semester attendance charts</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn-report" onclick="location.href='studentAttendance.html'">
+                        <i class="fa-solid fa-arrow-left"></i> Back to Attendance
+                    </button>
+                    <button class="btn-report btn-pdf" onclick="downloadGraphsPDF()">
+                        <i class="fa-solid fa-file-pdf"></i> Download PDF
+                    </button>
+                    <button class="btn-report btn-csv" onclick="downloadGraphsCSV()">
+                        <i class="fa-solid fa-file-csv"></i> Download CSV
+                    </button>
+                    <button class="btn-report btn-graph" onclick="refreshAttendanceGraphs()">
+                        <i class="fa-solid fa-rotate"></i> Refresh Graphs
+                    </button>
+                </div>
+            </div>
+            <hr>
+
+            <div class="controls-card" style="margin-bottom:20px">
+                <div class="fg-grid">
+                    <div class="fg" style="grid-column: 1 / -1">
+                        <label><i class="fa-solid fa-circle-info"></i> Tip</label>
+                        <div style="padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--off-white);color:var(--text-body);font-size:13px;line-height:1.6">
+                            Each chart has its own filters inside the card. Changing one chart will not affect the others, so the page stays easy to understand even with lots of data.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-section">
+                <div class="charts-row charts-row--modal">
+                    <div class="charts-left">
+                        <div class="chart-card">
+                            <div class="chart-card-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                                <div>
+                                    <h2><i class="fa-solid fa-book-open"></i> Subject Attendance</h2>
+                                    <p>Counts of present, late, and absent students per subject.</p>
+                                </div>
+                                <div style="min-width:220px">
+                                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Select subject</label>
+                                    <select id="chartSubjectSelect"></select>
+                                    <div style="height:8px"></div>
+                                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Select semester (subject)</label>
+                                    <select id="chartSubjectSemesterSelect"></select>
+                                </div>
+                            </div>
+                            <div class="chart-wrap chart-wrap--small" onclick="openGraphPreview('subject')" style="cursor:pointer">
+                                <canvas id="graphAttendanceSubjectChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="chart-card">
+                            <div class="chart-card-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                                <div>
+                                    <h2><i class="fa-solid fa-chalkboard-teacher"></i> Professor Attendance</h2>
+                                    <p>Aggregated present, late, and absent counts for each professor.</p>
+                                </div>
+                                <div style="min-width:220px">
+                                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Select professor</label>
+                                    <select id="chartProfessorSelect"></select>
+                                    <div style="height:8px"></div>
+                                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Select semester (professor)</label>
+                                    <select id="chartProfessorSemesterSelect"></select>
+                                </div>
+                            </div>
+                            <div class="chart-wrap chart-wrap--small" onclick="openGraphPreview('professor')" style="cursor:pointer">
+                                <canvas id="graphAttendanceProfessorChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-right">
+                        <div class="chart-card" style="height:100%">
+                            <div class="chart-card-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                                <div>
+                                    <h2><i class="fa-solid fa-pie-chart"></i> Semester Share</h2>
+                                    <p>Percent split of present, late, and absent students per semester.</p>
+                                </div>
+                                <div style="min-width:220px">
+                                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Select semester</label>
+                                    <select id="chartSemesterSelect"></select>
+                                </div>
+                            </div>
+                            <div class="chart-wrap chart-wrap--small" onclick="openGraphPreview('semester')" style="cursor:pointer">
+                                <canvas id="graphSemesterAttendanceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="modal-overlay graph-preview-overlay" id="graphPreviewOverlay" onclick="if(event.target===this)closeGraphPreview()">
+        <div class="modal graph-preview-modal">
+            <button class="modal-close" onclick="closeGraphPreview()"><i class="fa-solid fa-times"></i></button>
+            <h3 id="graphPreviewTitle"><i class="fa-solid fa-chart-column" style="color:var(--green-bright)"></i> Graph Preview</h3>
+            <p id="graphPreviewSubtitle" style="margin-top:-10px;margin-bottom:12px;color:var(--text-muted)"></p>
+            <div class="chart-wrap chart-wrap--large" style="height:72vh;min-height:72vh">
+                <canvas id="graphPreviewCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+    <script src="../resc/js/attendanceGraphs.js"></script>
+    <script>
+        loadHeader();
+        loadSidebar('attendance');
+    </script>
+</body>
+</html>

@@ -1,0 +1,330 @@
+/* ============================================================
+   voidedSessions.css
+   TimeInAndTimeOutMonitoring / resc / css / voidedSessions.css
+   ============================================================ */
+
+:root {
+    --green-dark:   #1a4731;
+    --green-mid:    #2d6a4f;
+    --green-bright: #40916c;
+    --green-light:  #74c69d;
+    --white:        #ffffff;
+    --off-white:    #f5f8f5;
+    --surface:      #edf4ef;
+    --hover-bg:     #e2ede7;
+    --text-dark:    #0f2419;
+    --text-body:    #2a3d32;
+    --text-muted:   #5a7265;
+    --border:       #d4e6d9;
+    --red:          #dc2626;
+    --radius:       10px;
+    --radius-lg:    14px;
+    --shadow-sm:    0 2px 8px rgba(26,71,49,.07);
+    --shadow-md:    0 4px 16px rgba(26,71,49,.10);
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Nunito Sans', sans-serif;
+    background: var(--white);
+    color: var(--text-body);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+/* ── LAYOUT PATCH (SIDEBAR/HEADER) ── */
+.main-content {
+    margin-left: var(--sidebar-collapsed, 64px);
+    margin-top: 68px;
+    min-height: calc(100vh - 68px);
+    transition: margin-left 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.main-content.sidebar-open { margin-left: var(--sidebar-expanded, 240px); }
+.container { width: 100%; padding: 32px 36px 48px; }
+
+/* ── PAGE HEADER ── */
+.page-header h1 {
+    font-family: 'Nunito', sans-serif;
+    color: var(--green-dark);
+    font-size: 24px; font-weight: 800;
+    margin-bottom: 4px; display: flex; align-items: center; gap: 10px;
+}
+.page-header p { color: var(--text-muted); font-size: 14px; }
+hr {
+    height: 2px;
+    background: linear-gradient(90deg, var(--green-dark), var(--green-bright), transparent);
+    border: none; margin: 0 0 24px; border-radius: 2px;
+}
+
+
+.btn-report { 
+    padding: 9px 18px; 
+    background: #dcfce7;          /* Soft light green background */
+    color: #166534;               /* Signature dark green text for contrast */
+    border: 1.5px solid #bbf7d0;  /* Slightly darker green border */
+    border-radius: 8px; 
+    font-size: 13.5px; 
+    font-weight: 800; 
+    cursor: pointer; 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 8px; 
+    transition: all .2s ease; 
+    font-family: 'Nunito Sans', sans-serif; 
+    margin-left: auto;            /* Keeps it grouped with the Add button */
+}
+
+.btn-report:hover { 
+    background: #bbf7d0;          /* Slightly darker pastel green on hover */
+    transform: translateY(-2px); 
+    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15); /* Soft green shadow */
+}
+/* ── FILTER PILLS ── */
+.pills { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+.pill {
+    padding: 8px 18px; border-radius: 99px; font-size: 13.5px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    border: 1.5px solid var(--border); background: var(--white);
+    color: var(--text-muted); transition: all .2s; font-family: 'Nunito Sans', sans-serif;
+}
+.pill b {
+    background: var(--surface); padding: 2px 8px;
+    border-radius: 12px; font-size: 11.5px; font-weight: 800;
+    color: var(--text-dark); transition: .2s;
+}
+.pill:hover { border-color: var(--green-light); color: var(--green-dark); background: var(--off-white); }
+.pill.on { border-color: var(--green-bright); color: var(--green-dark); background: var(--surface); }
+.pill.on b { background: var(--green-bright); color: var(--white); }
+
+/* ── FILTER CONTAINER (.fc) ── */
+.fc {
+    background: var(--white); padding: 20px 24px;
+    border-radius: var(--radius-lg); border: 1.5px solid var(--border);
+    box-shadow: var(--shadow-sm); margin-bottom: 24px;
+}
+.fg-grid { display: grid; grid-template-columns: 2fr 1.5fr 1.5fr 1fr 140px 140px auto; gap: 14px; align-items: end; }
+.fg label {
+    display: block; font-size: 11.5px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .5px;
+    color: var(--text-muted); margin-bottom: 6px; font-family: 'Nunito', sans-serif;
+}
+.fg input, .fg select {
+    width: 100%; padding: 10px 13px; border: 1.5px solid var(--border);
+    border-radius: var(--radius); font-size: 14px; font-family: 'Nunito Sans', sans-serif;
+    color: var(--text-dark); background: var(--surface);
+    transition: border-color .18s, box-shadow .18s; outline: none;
+}
+.fg input:focus, .fg select:focus {
+    border-color: var(--green-bright); background: var(--white);
+    box-shadow: 0 0 0 3px rgba(64,145,108,.12);
+}
+.fa-row { display: flex; gap: 8px; }
+.btn-go {
+    background: var(--green-dark); color: var(--white);
+    padding: 10px 16px; border-radius: var(--radius); border: none;
+    font-weight: 700; cursor: pointer; transition: .2s; font-family: 'Nunito', sans-serif;
+}
+.btn-go:hover { background: var(--green-mid); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,71,49,.2); }
+.btn-reset {
+    background: var(--surface);
+    color: var(--text-body);
+    padding: 0 16px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    font-weight: 600;
+    cursor: pointer;
+    transition: .2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    height: 40px;
+    font-size: 13px;
+    font-family: 'Nunito Sans', sans-serif;
+    white-space: nowrap;
+}
+.btn-reset:hover {
+    background: var(--hover-bg);
+    border-color: var(--green-bright);
+}
+.btn-clear {
+    width: 100%;
+}
+
+/* ── RESULTS BAR (.rb) ── */
+.rb { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.rb-count { font-size: 14.5px; color: var(--text-muted); }
+.rb-count strong { color: var(--text-dark); font-weight: 800; font-family: 'Nunito', sans-serif; }
+.btn-del-all {
+    padding: 9px 16px; background: #fee2e2; color: var(--red);
+    border: 1.5px solid #fecaca; border-radius: var(--radius); font-size: 13.5px; font-weight: 700;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    transition: .2s; font-family: 'Nunito', sans-serif;
+}
+.btn-del-all:hover { background: var(--red); color: var(--white); border-color: var(--red); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220,38,38,.2); }
+
+/* ── TABLE (.tw) ── */
+.tw {
+    background: var(--white); border-radius: var(--radius-lg);
+    border: 1.5px solid var(--border); box-shadow: var(--shadow-sm); overflow-x: auto;
+}
+table { width: 100%; border-collapse: collapse; }
+thead th {
+    background: linear-gradient(90deg, #166534, #14532d); color: #fff;
+    padding: 14px 18px; text-align: left; font-size: 12.5px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .5px; font-family: 'Nunito', sans-serif;
+    border-right: 1px solid rgba(255,255,255,.2); white-space: nowrap;
+}
+thead th:last-child { border-right: none; }
+tbody td {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    font-size: 14px; color: var(--text-body); vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface); }
+
+/* Table Text Formats */
+.subj-code { font-size: 15px; font-weight: 800; color: var(--green-dark); font-family: 'Nunito', sans-serif; }
+.subj-name { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.t-sched { font-size: 13.5px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+.t-actual { font-size: 13px; color: var(--green-bright); font-weight: 800; white-space: nowrap; margin-top: 3px; font-family: 'Nunito', sans-serif;}
+.hm.mono { font-family: 'DM Mono', monospace; font-weight: 600; font-size: 13.5px; }
+
+/* Status Badges */
+.badge {
+    display: inline-flex; align-items: center; padding: 5px 14px; border-radius: 99px;
+    font-size: 12px; font-weight: 800; font-family: 'Nunito', sans-serif;
+    text-transform: uppercase; letter-spacing: .5px;
+}
+.badge.completed { background: #dcfce7; color: var(--green-dark); }
+.badge.cancelled { background: #fee2e2; color: var(--red); }
+.badge.ongoing   { background: #dbeafe; color: #1d4ed8; }
+.badge.scheduled { background: var(--surface); color: var(--text-muted); }
+
+/* Action Buttons */
+.btn-del-row {
+    width: 36px; height: 36px; border-radius: 8px; border: 1.5px solid #fecaca;
+    background: #fee2e2; color: var(--red); font-size: 14px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: .2s;
+}
+.btn-del-row:hover { background: var(--red); color: var(--white); border-color: var(--red); transform: scale(1.05); }
+
+.empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.empty i { font-size: 48px; color: var(--border); margin-bottom: 12px; }
+.empty h3 { font-family: 'Nunito', sans-serif; font-size: 18px; font-weight: 800; color: var(--green-dark); }
+
+/* ── MODALS (MATCHING LABORATORIES.CSS) ── */
+.modal-bg {
+    display: none; position: fixed; inset: 0; background: rgba(15,36,25,.55);
+    z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+}
+.modal-bg.on { display: flex; }
+
+/* Delete Modal */
+.del-modal {
+    background: var(--white); border-radius: var(--radius-lg); padding: 32px;
+    max-width: 440px; width: 92%; box-shadow: 0 20px 60px rgba(26,71,49,.2);
+    text-align: center; border: 1.5px solid var(--border);
+    animation: rmIn .22s cubic-bezier(.34,1.56,.64,1);
+}
+.del-modal-icon {
+    width: 60px; height: 60px; border-radius: 50%; background: #fee2e2; color: var(--red);
+    display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 18px;
+}
+.del-modal h3 { font-family: 'Nunito', sans-serif; font-size: 22px; font-weight: 800; color: var(--text-dark); margin-bottom: 8px; }
+.del-modal p { font-size: 15px; color: var(--text-muted); margin-bottom: 26px; }
+.del-modal-actions { display: flex; gap: 12px; justify-content: center; }
+.del-cancel-btn {
+    padding: 10px 20px; background: var(--surface); color: var(--text-muted); border: 1.5px solid var(--border);
+    border-radius: var(--radius); font-weight: 700; cursor: pointer; transition: .2s; font-family: 'Nunito', sans-serif;
+}
+.del-cancel-btn:hover { background: var(--border); color: var(--text-dark); }
+.del-confirm-btn {
+    padding: 10px 20px; background: var(--red); color: var(--white); border: none;
+    border-radius: var(--radius); font-weight: 700; cursor: pointer; transition: .2s; font-family: 'Nunito', sans-serif;
+}
+.del-confirm-btn:hover { background: #b91c1c; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220,38,38,.2); }
+
+/* Report Modal */
+@keyframes rmIn {
+    from { opacity: 0; transform: scale(.88) translateY(14px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+
+/* ── REPORT MODAL (Laboratories Theme) ── */
+.rm-box {
+    background: white; border-radius: 14px; width: 96%; max-width: 1150px; max-height: 93vh;
+    display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    animation: rmIn .22s cubic-bezier(.34,1.56,.64,1);
+    overflow: hidden; /* Added to keep the bottom corners clean when scrolling */
+}
+
+.rm-hd {
+    background: linear-gradient(135deg, #14532d, #16a34a); padding: 22px 28px;
+    border-radius: 14px 14px 0 0; display: flex; align-items: center;
+    justify-content: space-between; gap: 14px; flex-shrink: 0;
+}
+.rm-hd h2 { color: white; font-size: 19px; font-weight: 800; font-family: 'Nunito', sans-serif; display: flex; align-items: center; gap: 10px; margin: 0; }
+.rm-hd p  { color: rgba(255,255,255,.72); font-size: 13px; margin-top: 3px; font-weight: 500;}
+
+.rm-x {
+    background: rgba(255,255,255,.15); border: none; color: white; width: 34px; height: 34px;
+    border-radius: 8px; cursor: pointer; font-size: 15px; display: flex; align-items: center;
+    justify-content: center; transition: .18s; flex-shrink: 0;
+}
+.rm-x:hover { background: rgba(255,255,255,.3); }
+
+.rm-tb {
+    padding: 14px 22px; border-bottom: 1.5px solid #dcfce7; background: #fafffe;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+}
+.rm-tb-right { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
+.rm-btn {
+    padding: 9px 16px; border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; border: none;
+    display: inline-flex; align-items: center; gap: 6px; transition: .15s; font-family: 'Nunito', sans-serif; white-space: nowrap;
+}
+.rm-btn.print { background: #f0f9ff; color: #0369a1; border: 1.5px solid #bae6fd; }
+.rm-btn.print:hover { background: #0369a1; color: white; border-color: #0369a1; }
+.rm-btn.pdf   { background: #fff5f5; color: #dc2626; border: 1.5px solid #fecaca; }
+.rm-btn.pdf:hover   { background: #dc2626; color: white; border-color: #dc2626; }
+.rm-btn.excel { background: #f0fdf4; color: #166534; border: 1.5px solid #bbf7d0; }
+.rm-btn.excel:hover { background: #166534; color: white; border-color: #166534; }
+
+.rm-body { overflow-y: auto; flex: 1; background: white; }
+.rm-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.rm-table thead th {
+    background: linear-gradient(90deg, #166534, #14532d); /* ← Updated to the standard gradient */
+    color: white; 
+    padding: 11px 14px; /* Matched padding to standard modal */
+    text-align: left; 
+    font-size: 10.5px; 
+    font-weight: 800; 
+    font-family: 'Nunito', sans-serif;
+    text-transform: uppercase; 
+    letter-spacing: .6px; 
+    white-space: nowrap; 
+    position: sticky; 
+    top: 0; 
+    z-index: 2;
+    border-right: 1px solid rgba(255,255,255,.2); 
+    border-bottom: none;
+}
+.rm-table thead th:last-child { border-right: none; }
+
+.rm-table tbody tr { border-bottom: 1px solid #e5e7eb; transition: background .1s; } /* Crisp horizontal lines between rows */
+.rm-table tbody tr:nth-child(even) { background: #f9fffe; }
+.rm-table tbody tr:hover { background: #ecfdf5; }
+.rm-table td { padding: 12px 16px; vertical-align: middle; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1200px) { .fg-grid { grid-template-columns: 1fr 1fr 1fr; } }
+@media (max-width: 768px) {
+    .fg-grid { grid-template-columns: 1fr; }
+    .container { padding: 20px 16px; }
+}

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratory Sessions | Time In & Time Out Monitoring</title>
+
+    <link rel="icon" type="image/png" href="../../auth/assets/plplogo.png">
+
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=Nunito+Sans:wght@400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="../resc/css/homepage.css">
+</head>
+
+<body>
+
+    <header>
+        <a href="homepage.html" class="brand">
+            <div class="brand-logos">
+                <img src="../resc/assets/plp_logo.png" alt="PLP Logo">
+                <div class="logo-divider"></div>
+                <img src="../resc/assets/ccs_logo.png" alt="CCS Logo" onerror="this.style.display='none';this.previousElementSibling.style.display='none'">
+            </div>
+            <div class="brand-text">
+                <span class="sys-label">Monitoring System</span>
+                <h1>Time In &amp; Time Out</h1>
+            </div>
+        </a>
+        <nav>
+                <a href="homepage.html" class="active"><i class="fa-solid fa-house"></i> Home</a>
+                <a href="accountRegistration.html"><i class="fa-solid fa-camera"></i> Register</a>
+                <a href="takeAttendance.html"><i class="fa-solid fa-user-check"></i> Take Attendance</a>
+                <a href="../../auth/login.html" style="margin-left: 10px; border: 1.5px solid rgba(255,255,255,0.2);"><i class="fa-solid fa-shield-halved"></i> Admin</a>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <div class="hero-inner">
+            <div class="hero-badge">
+                <i class="fa-solid fa-circle fa-beat"></i>
+                Live Session Monitor
+            </div>
+
+            <h1>Laboratory <span>Sessions</span><br>Today</h1>
+
+            <p class="hero-sub">
+                Real-time overview of all laboratory room sessions —
+                active, scheduled, and completed.
+            </p>
+
+            <div class="hero-clock">
+                <span class="dot"></span>
+                <span id="liveClock">—</span>
+                &nbsp;·&nbsp;
+                <span id="liveDate">—</span>
+            </div>
+
+            <div class="hero-stats">
+                <div class="hero-chip">
+                    <div class="hero-chip-val yellow" id="statActive">—</div>
+                    <div class="hero-chip-lbl">Active Now</div>
+                </div>
+                <div class="hero-chip">
+                    <div class="hero-chip-val orange" id="statDismissing">—</div>
+                    <div class="hero-chip-lbl">Dismissing</div>
+                </div>
+                <div class="hero-chip">
+                    <div class="hero-chip-val" id="statScheduled">—</div>
+                    <div class="hero-chip-lbl">Scheduled</div>
+                </div>
+                <div class="hero-chip">
+                    <div class="hero-chip-val grey" id="statCompleted">0</div>
+                    <div class="hero-chip-lbl">Completed</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="wrapper">
+        
+        <div class="refresh-bar">
+            <i class="fa-solid fa-rotate" id="refreshIcon"></i>
+            <span id="refreshLabel">Auto-refreshing every 30 seconds</span>
+        </div>
+
+        <div class="sec-block">
+            <div class="sec-head">
+                <i class="fa-solid fa-circle-play" style="color:#22c55e;font-size:20px"></i>
+                <h2>Active Sessions</h2>
+                <span class="cnt" id="activeBadge">0</span>
+            </div>
+            <div class="grid" id="activeGrid">
+                <div class="spinner-wrap">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Loading sessions…</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sec-block">
+            <div class="sec-head">
+                <i class="fa-solid fa-calendar-check" style="color:#2d6a4f;font-size:20px"></i>
+                <h2>Scheduled for Today</h2>
+                <span class="cnt" id="scheduledBadge">0</span>
+            </div>
+            <div class="grid" id="scheduledGrid">
+                <div class="spinner-wrap">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Loading sessions…</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sec-block" id="completedBlock" style="display:none">
+            <div class="sec-head">
+                <i class="fa-solid fa-circle-check" style="color:#6b7280;font-size:20px"></i>
+                <h2>Completed Today</h2>
+                <span class="cnt grey" id="completedBadge">0</span>
+            </div>
+            <div class="grid" id="completedGrid"></div>
+        </div>
+
+    </div>
+
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <h2>Time In &amp; <span>Time Out</span><br>Monitoring System</h2>
+                <p>
+                    Real-time laboratory attendance tracking powered by facial recognition
+                    and machine learning — ensuring accurate, automated session monitoring.
+                </p>
+            </div>
+            <div class="footer-contact">
+                <h3>Contact</h3>
+                <p><i class="fa-solid fa-envelope"></i> ams@plpasig.edu.ph</p>
+                <p><i class="fa-solid fa-phone"></i> (02) 1234-5678</p>
+                <p><i class="fa-solid fa-location-dot"></i> Pasig City, Metro Manila</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>&copy; <span id="footerYear"></span> Time In &amp; Time Out Monitoring System. All rights reserved.</span>
+            <span>Powered by Facial Recognition &amp; ML</span>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../resc/js/homepage.js"></script>
+
+</body>
+</html>

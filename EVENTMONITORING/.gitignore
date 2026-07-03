@@ -1,0 +1,61 @@
+# Environment files with sensitive credentials
+config/.env.js
+.env
+
+# Node modules (if using any build tools later)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build outputs (if applicable)
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python compiled files
+*.pyc
+*.pyd
+__pycache__/
+*.cpython-*.pyc
+
+# Virtual environment
+pyvenv.cfg
+venv/
+.venv/
+
+# Python packages accidentally tracked
+pylab.py
+six.py
+sounddevice.py
+_sounddevice.py
+numpy*/
+scipy*/
+*.dll
+test_mp.py
+
+# Runtime log files (auto-generated, not source)
+*.txt
+
+# Face encoding cache (auto-generated binary, rebuilt at runtime)
+*.npz
+
+# Per-machine laboratory lock configuration (generated locally)
+TimeInAndTimeOutMonitoring/students/machine_lab_config.json
+
+# Markdown documentation files
+*.md

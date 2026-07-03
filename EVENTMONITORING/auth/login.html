@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>CCS Faculty Requirement Submission System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="login.css">
+</head>
+<body>
+
+<div class="login-card">
+
+    <div class="logos">
+        <img src="assets/plplogo.png" alt="PLP Logo" class="plp-logo"/>
+    </div>
+
+    <h1 class="card-title">Smart Academic<br>Management System</h1>
+    <p class="card-subtitle">Sign in to access your dashboard</p>
+
+    <div id="error-alert" class="d-none" role="alert"
+         style="border-radius:10px; padding:12px 16px; font-size:13.5px; display:flex; align-items:flex-start; gap:10px; margin-bottom:16px;">
+        <svg id="alert-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:1px;">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span id="error-message"></span>
+    </div>
+
+    <form action="#" method="POST" novalidate>
+
+    <div class="mb-field">
+        <label class="form-label" for="username">Email or ID</label>
+        <div class="input-wrapper">
+            <input
+            type="text"
+            id="username"
+            name="username"
+            class="form-control"
+            placeholder="Enter your email or ID"
+            autocomplete="username"
+            required
+        />
+        <svg class="input-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+        </svg>
+        </div>
+    </div>
+
+<div class="mb-field">
+    <label class="form-label" for="password">Password</label>
+        <div class="input-wrapper">
+            <input
+            type="password"
+            id="password"
+            name="password"
+            class="form-control"
+            placeholder="Enter your password"
+            autocomplete="current-password"
+            required
+            />
+        <svg class="input-icon" id="toggle-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="pointer-events:all;cursor:pointer;" onclick="togglePassword()">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+        </svg>
+    </div>
+</div>
+
+    <button type="submit" class="btn-signin">Sign In</button>
+
+    <p class="forgot-link">
+        <a href="#" id="forgotPasswordLink">Forgot your password?</a>
+    </p>
+    
+    </form>
+
+    <p class="register-link">Don't have an account? <a href="register.html">Register here</a></p>
+</div>
+
+<button class="help-btn" title="Help">?</button>
+
+<!-- Forgot Password Modal -->
+<div id="forgotModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:16px; padding:36px 32px; width:100%; max-width:420px; margin:16px; box-shadow:0 8px 32px rgba(0,0,0,0.18); animation:slideUp 0.25s ease;">
+
+        <div style="text-align:center; margin-bottom:22px;">
+            <div style="background:#eef3f9; border-radius:50%; width:56px; height:56px; display:flex; align-items:center; justify-content:center; margin:0 auto 14px;">
+                <svg width="26" height="26" fill="none" stroke="#1a3a5c" stroke-width="2" viewBox="0 0 24 24">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+            </div>
+            <h2 style="font-family:'Merriweather',serif; font-size:18px; color:#1a3a5c; margin:0 0 6px;">Forgot Password?</h2>
+            <p style="color:#666; font-size:13.5px; margin:0; line-height:1.5;">Enter your institutional email and we'll send you a reset link.</p>
+        </div>
+
+        <div id="modal-error" style="display:none; background:#fef2f2; border:1px solid #fecaca; color:#dc2626; font-size:13px; padding:10px 14px; border-radius:8px; margin-bottom:14px; align-items:center; gap:8px;">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span id="modal-error-text"></span>
+        </div>
+
+        <div id="modal-success" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; color:#16a34a; font-size:13px; padding:10px 14px; border-radius:8px; margin-bottom:14px; align-items:center; gap:8px;">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 13.01 9 10.01"/>
+            </svg>
+            <span id="modal-success-text"></span>
+        </div>
+
+        <div style="margin-bottom:18px;">
+            <label style="font-size:13px; font-weight:600; color:#374151; display:block; margin-bottom:6px;">Email Address</label>
+            <div style="position:relative;">
+                <input
+                    type="email"
+                    id="forgotEmailInput"
+                    placeholder="yourname@plpasig.edu.ph"
+                    style="width:100%; padding:11px 14px 11px 40px; border:1.5px solid #d1d5db; border-radius:9px; font-size:14px; outline:none; font-family:'Source Sans 3',sans-serif; transition:border-color 0.2s; box-sizing:border-box;"
+                    onfocus="this.style.borderColor='#1a3a5c'"
+                    onblur="this.style.borderColor='#d1d5db'"
+                />
+                <svg style="position:absolute; left:13px; top:50%; transform:translateY(-50%); pointer-events:none;" width="16" height="16" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <button id="cancelForgotBtn"
+                style="flex:1; padding:11px; border:1.5px solid #d1d5db; background:#fff; border-radius:9px; font-size:14px; font-weight:600; color:#374151; cursor:pointer; font-family:'Source Sans 3',sans-serif; transition:all 0.2s;"
+                onmouseover="this.style.background='#f3f4f6'"
+                onmouseout="this.style.background='#fff'">
+                Cancel
+            </button>
+            <button id="sendResetBtn"
+                style="flex:1; padding:11px; border:none; background:#1a3a5c; border-radius:9px; font-size:14px; font-weight:600; color:#fff; cursor:pointer; font-family:'Source Sans 3',sans-serif; transition:all 0.2s;"
+                onmouseover="this.style.background='#15304d'"
+                onmouseout="this.style.background='#1a3a5c'">
+                Send Reset Link
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<style>
+@keyframes slideUp {
+    from { opacity:0; transform:translateY(24px); }
+    to   { opacity:1; transform:translateY(0); }
+}
+.forgot-link { text-align:center; margin-top:10px; font-size:13px; }
+.forgot-link a { color:#1a3a5c; text-decoration:none; }
+.forgot-link a:hover { text-decoration:underline; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config/.env.js"></script>
+<script src="../config/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="login.js?v=7"></script>
+</body>
+</html>

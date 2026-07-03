@@ -1,0 +1,141 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Laboratory Sessions | Laboratory Attendance System</title>
+
+        <!-- Fonts -->
+        <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+        <!-- Font Awesome -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+        <!-- Shared component styles -->
+        <link rel="stylesheet" href="../resc/css/header.css">
+        <link rel="stylesheet" href="../resc/css/nav.css">
+
+        <!-- Page-specific styles -->
+        <link rel="stylesheet" href="../resc/css/laboratorySessions.css">
+    </head>
+    <body>
+
+        <!-- Shared header injected by sidebar.js -->
+        <div id="header-container"></div>
+
+        <!-- Shared sidebar injected by sidebar.js -->
+        <div id="sidebar-container"></div>
+
+        <!-- Main content -->
+        <main class="main-content">
+            <div class="container">
+
+                <div class="page-header">
+                    <h1><i class="fa-solid fa-desktop"></i> Laboratory Sessions</h1>
+                    <p>Today's session activity across all laboratory rooms</p>
+                </div>
+                <hr>
+
+                <!-- Auto-operation notice bars (populated by JS) -->
+                <div id="noticeContainer"></div>
+
+                <!-- Stats bar -->
+                <div class="stats">
+                    <div class="stat active">
+                        <i class="fa-solid fa-circle-play"></i>
+                        <span id="activeCnt">0</span> Active
+                    </div>
+                    <div class="stat dismissing" id="dismissingStat" style="display:none">
+                        <i class="fa-solid fa-door-open"></i>
+                        <span id="dismissingCnt">0</span> Dismissing
+                    </div>
+                    <div class="stat scheduled">
+                        <i class="fa-solid fa-calendar-check"></i>
+                        <span id="scheduledCnt">0</span> Scheduled
+                    </div>
+                    <div class="stat completed">
+                        <i class="fa-solid fa-check-circle"></i>
+                        <span id="completedCnt">0</span> Completed
+                    </div>
+                    <div class="stat cancelled" id="cancelledStat" style="display:none">
+                        <i class="fa-solid fa-ban"></i>
+                        <span id="cancelledCnt">0</span> Voided
+                    </div>
+                    <a href="voidedSessions.html" class="btn-history">
+                        <i class="fa-solid fa-clock-rotate-left"></i> View All Sessions History
+                    </a>
+                </div>
+
+                <!-- ── ACTIVE SESSIONS ── -->
+                <div class="section">
+                    <i class="fa-solid fa-circle-play" style="color:#22c55e;font-size:24px"></i>
+                    <h2>Active Sessions</h2>
+                    <span class="cnt" id="activeCountBadge">0</span>
+                </div>
+                <div class="grid" id="activeGrid">
+                    <div class="empty">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <h3>Loading...</h3>
+                        <p>Fetching active sessions</p>
+                    </div>
+                </div>
+
+                <!-- ── SCHEDULED SESSIONS ── -->
+                <div class="section" style="margin-top:40px">
+                    <i class="fa-solid fa-calendar-check" style="color:#16a34a;font-size:24px"></i>
+                    <h2>Scheduled for Today</h2>
+                    <span class="cnt" id="scheduledCountBadge">0</span>
+                </div>
+                <div class="grid" id="scheduledGrid">
+                    <div class="empty">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <h3>Loading...</h3>
+                        <p>Fetching scheduled sessions</p>
+                    </div>
+                </div>
+
+                <!-- ── COMPLETED SESSIONS (shown only when data exists) ── -->
+                <div id="completedSection" style="display:none">
+                    <div class="section" style="margin-top:40px">
+                        <i class="fa-solid fa-check-circle" style="color:#6c757d;font-size:24px"></i>
+                        <h2>Completed Today</h2>
+                        <span class="cnt" id="completedCountBadge">0</span>
+                    </div>
+                    <div class="grid" id="completedGrid"></div>
+                </div>
+
+                <!-- ── CANCELLED / VOIDED SESSIONS (shown only when data exists) ── -->
+                <div id="cancelledSection" style="display:none">
+                    <div class="section" style="margin-top:40px">
+                        <i class="fa-solid fa-ban" style="color:#dc3545;font-size:24px"></i>
+                        <h2>Cancelled / Voided</h2>
+                        <span class="cnt red" id="cancelledCountBadge">0</span>
+                        <a href="voidedSessions.html" class="btn-voided">
+                            <i class="fa-solid fa-clock-rotate-left"></i> View All Sessions
+                        </a>
+                    </div>
+                    <div class="grid" id="cancelledGrid"></div>
+                </div>
+
+            </div><!-- /.container -->
+        </main>
+
+        <!-- Supabase -->
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script src="../../config/.env.js"></script>
+        <script src="../../config/config.js"></script>
+
+        <!-- Shared header + sidebar loader -->
+        <script src="../includes/sidebar.js"></script>
+
+        <!-- Page logic -->
+        <script src="../resc/js/laboratorySessions.js"></script>
+
+        <!-- Inject header & sidebar, mark Laboratories as active -->
+        <script>
+            loadHeader();   
+            loadSidebar('sessions');
+        </script>
+
+    </body>
+    </html>

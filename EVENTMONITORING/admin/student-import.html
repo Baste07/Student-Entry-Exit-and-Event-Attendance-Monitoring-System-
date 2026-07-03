@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Student Import — Smart Academic Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="../shared/global.css"/>
+    <link rel="stylesheet" href="../Gemma/gemma.css"/>
+    <link rel="stylesheet" href="admin-specific.css"/>
+    <link rel="stylesheet" href="student-import.css"/>
+</head>
+<body>
+
+<div id="header-container"></div>
+<div id="sidebar-container"></div>
+
+<!--Gemma Chat-->
+<div id="chat-widget">
+    <div id="chat-header" onclick="toggleChat()">
+        <span>Gemma Chat</span>
+        <button id="toggle-btn" type="button">–</button>
+    </div>
+    <iframe id="chat-frame" src="../Gemma/index.html"></iframe>
+</div>
+<script>
+    const widget = document.getElementById("chat-widget");
+    const btn = document.getElementById("toggle-btn");
+    function toggleChat() {
+        widget.classList.toggle("collapsed");
+        btn.textContent = widget.classList.contains("collapsed") ? "+" : "–";
+    }
+    btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleChat();
+    });
+</script>
+
+<main class="main-content">
+
+    <!-- Page Header -->
+    <div class="page-header anim anim-1" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+        <div>
+            <h1>Student Import</h1>
+            <p>Bulk import student accounts via Excel or CSV file</p>
+        </div>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+            <button type="button" class="btn-download-template" id="addSingleStudentBtn">
+                <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                Add Single Student
+            </button>
+            <a href="student-import-template.xlsx" class="btn-download-template" id="downloadTemplateBtn" download>
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Template
+            </a>
+        </div>
+    </div>
+
+    <!-- Step 1: Department + File Upload -->
+    <div class="import-card anim anim-2" id="stepUpload">
+        <div class="step-badge">Step 1 of 3</div>
+        <h2 class="step-title">Select Department & Upload File</h2>
+        <p class="step-desc">Choose the department these students belong to, then upload your filled Excel or CSV template.</p>
+
+        <div class="row g-4 mt-1">
+            <div class="col-md-5">
+                <label class="form-label-custom" for="departmentSelect">
+                    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Department <span class="required">*</span>
+                </label>
+                <select class="form-select-custom" id="departmentSelect">
+                    <option value="">Loading departments...</option>
+                </select>
+            </div>
+
+            <div class="col-md-7">
+                <label class="form-label-custom">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Upload File <span class="required">*</span>
+                </label>
+                <div class="file-drop-zone" id="fileDropZone">
+                    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden/>
+                    <div class="drop-icon">
+                        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </div>
+                    <p class="drop-text">Drag & drop your file here, or <span class="drop-link">browse</span></p>
+                    <p class="drop-hint">Supports .xlsx, .xls, .csv — Max 10MB</p>
+                    <div class="file-selected" id="fileSelected" style="display:none;">
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span id="fileSelectedName"></span>
+                        <button class="file-remove" id="fileRemoveBtn" title="Remove">
+                            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="step-footer">
+            <div></div>
+            <button class="btn-next" id="parseFileBtn" disabled>
+                Parse & Preview
+                <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Step 2: Preview -->
+    <div class="import-card anim anim-3" id="stepPreview" style="display:none;">
+        <div class="step-badge">Step 2 of 3</div>
+        <h2 class="step-title">Review Import Data</h2>
+        <p class="step-desc">Verify the data below before importing. Rows with errors are highlighted — fix them in your file and re-upload if needed.</p>
+
+        <!-- Summary Bar -->
+        <div class="preview-summary" id="previewSummary">
+            <div class="summary-item valid">
+                <span class="summary-count" id="validCount">0</span>
+                <span class="summary-label">Ready to Import</span>
+            </div>
+            <div class="summary-item duplicate" id="duplicateSummaryCard" title="Rows skipped due to duplicate Student IDs in the file or existing records in the database">
+                <span class="summary-count" id="duplicatedCount">0</span>
+                <span class="summary-label">Duplicated</span>
+            </div>
+            <div class="summary-item warning">
+                <span class="summary-count" id="warningCount">0</span>
+                <span class="summary-label">Warnings</span>
+            </div>
+            <div class="summary-item error">
+                <span class="summary-count" id="errorCount">0</span>
+                <span class="summary-label">Errors</span>
+            </div>
+            <div class="summary-item total">
+                <span class="summary-count" id="totalCount">0</span>
+                <span class="summary-label">Total Rows</span>
+            </div>
+        </div>
+
+        <!-- Preview Table -->
+        <div class="preview-table-wrap">
+            <table class="preview-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Student ID</th>
+                        <th>Last Name</th>
+                        <th>First Name</th>
+                        <th>Middle Name</th>
+                        <th>Suffix</th>
+                        <th>Course</th>
+                        <th>Year Level</th>
+                        <th>Section</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="previewTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="step-footer">
+            <button class="btn-back" id="backToUploadBtn">
+                <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Back
+            </button>
+            <button class="btn-next" id="proceedImportBtn">
+                Proceed to Import
+                <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Step 3: Import Progress -->
+    <div class="import-card anim anim-2" id="stepImport" style="display:none;">
+        <div class="step-badge">Step 3 of 3</div>
+        <h2 class="step-title">Importing Students</h2>
+        <p class="step-desc">Please do not close this page while the import is in progress.</p>
+
+        <div class="progress-wrap">
+            <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="progressBarFill" style="width:0%"></div>
+            </div>
+            <div class="progress-labels">
+                <span id="progressText">0 of 0 students imported</span>
+                <span id="progressPct">0%</span>
+            </div>
+        </div>
+
+        <div class="import-log" id="importLog"></div>
+
+        <div class="step-footer" id="importFooter" style="display:none;">
+            <button class="btn-back" id="importAnotherBtn">
+                <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Import Another File
+            </button>
+        </div>
+    </div>
+
+    <!-- Info Card -->
+    <div class="info-card anim anim-4">
+        <div class="info-card-header">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Template & Format Guide
+        </div>
+        <div class="info-grid">
+            <div class="info-col">
+                <h4>Required Columns</h4>
+                <ul>
+                    <li><strong>Student ID</strong> — School ID in format <code>NN-NNNNN</code> (e.g. <code>23-00269</code>). Also used as default password.</li>
+                    <li><strong>First Name</strong> — Student's first name</li>
+                    <li><strong>Last Name</strong> — Student's last name</li>
+                </ul>
+            </div>
+            <div class="info-col">
+                <h4>Optional Columns</h4>
+                <ul>
+                    <li><strong>Middle Name</strong> — May be left blank</li>
+                    <li><strong>Suffix</strong> — e.g. Jr., Sr., III — May be left blank</li>
+                    <li><strong>Course</strong> — e.g. Computer Science</li>
+                    <li><strong>Year Level</strong> — Number from 1–5</li>
+                    <li><strong>Section</strong> — e.g. CS3A</li>
+                    <li><strong>Email</strong> — Auto-generated if blank: <code>lastname_firstname@plpasig.edu.ph</code></li>
+                </ul>
+            </div>
+            <div class="info-col">
+                <h4>Notes</h4>
+                <ul>
+                    <li>Default password = Student ID (e.g. <code>23-00269</code>)</li>
+                        <li>Student IDs that already exist in the database are <strong>skipped</strong> from preview and import</li>
+                    <li>Do not delete the header row</li>
+                    <li>Remove sample data before importing</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="import-card anim anim-4" id="studentsListSection">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <div>
+                <h2 class="step-title" style="margin-bottom:.2rem;">All Students</h2>
+                <p class="step-desc" style="margin-bottom:0;">Live student records currently stored in the database</p>
+            </div>
+            <button type="button" class="btn-back" id="refreshStudentsBtn">Refresh List</button>
+        </div>
+
+        <div class="students-filters">
+            <div class="students-filter-item students-filter-search">
+                <label for="studentSearchInput" class="form-label">Search</label>
+                <input type="text" id="studentSearchInput" class="form-control" placeholder="Name, Student ID, or Email">
+            </div>
+            <div class="students-filter-item">
+                <label for="studentDeptFilter" class="form-label">Department</label>
+                <select id="studentDeptFilter" class="form-select">
+                    <option value="">All Departments</option>
+                </select>
+            </div>
+            <div class="students-filter-item">
+                <label for="studentCourseFilter" class="form-label">Course</label>
+                <select id="studentCourseFilter" class="form-select">
+                    <option value="">All Courses</option>
+                </select>
+            </div>
+            <div class="students-filter-item">
+                <label for="studentYearFilter" class="form-label">Year</label>
+                <select id="studentYearFilter" class="form-select">
+                    <option value="">All Years</option>
+                </select>
+            </div>
+            <div class="students-filter-item">
+                <label class="form-label" style="opacity:0;">Clear</label>
+                <button type="button" class="btn-back" id="clearStudentFiltersBtn">Clear Filters</button>
+            </div>
+        </div>
+
+        <div class="preview-summary" style="margin-top:1rem;margin-bottom:1rem;">
+            <div class="summary-item total">
+                <span class="summary-count" id="allStudentsCount">0</span>
+                <span class="summary-label">Filtered Students</span>
+            </div>
+        </div>
+
+        <div class="students-table-wrap">
+            <table class="students-table">
+                <thead>
+                    <tr>
+                        <th>Student ID</th>
+                        <th>Name</th>
+                        <th>Department</th>
+                        <th>Course</th>
+                        <th>Year</th>
+                        <th>Section</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="allStudentsTableBody">
+                    <tr>
+                        <td colspan="9" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</main>
+
+<div class="modal fade" id="duplicateRowsModal" tabindex="-1" aria-labelledby="duplicateRowsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="duplicateRowsModalLabel">Duplicated / Skipped Rows</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3" id="duplicateRowsSummaryText">Rows skipped due to duplicate Student IDs.</p>
+                <div class="table-responsive duplicate-rows-table-wrap">
+                    <table class="table table-sm align-middle mb-0 duplicate-rows-table">
+                        <thead>
+                            <tr>
+                                <th>Source Row</th>
+                                <th>Student ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody id="duplicateRowsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="singleStudentModal" tabindex="-1" aria-labelledby="singleStudentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form id="singleStudentForm" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="singleStudentModalLabel">Single Student Registration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="singleDepartment" class="form-label">Department <span class="text-danger">*</span></label>
+                            <select id="singleDepartment" class="form-select" required>
+                                <option value="">Select department...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="singleStudentId" class="form-label">Student ID <span class="text-danger">*</span></label>
+                            <input type="text" id="singleStudentId" class="form-control" placeholder="23-00269" maxlength="8" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="singleFirstName" class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input type="text" id="singleFirstName" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="singleMiddleName" class="form-label">Middle Name</label>
+                            <input type="text" id="singleMiddleName" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="singleLastName" class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" id="singleLastName" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="singleSuffix" class="form-label">Suffix</label>
+                            <input type="text" id="singleSuffix" class="form-control" placeholder="e.g. Sr, Jr">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="singleCourse" class="form-label">Course</label>
+                            <input type="text" id="singleCourse" class="form-control" placeholder="e.g. BSCS" maxlength="10">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="singleYearLevel" class="form-label">Year Level</label>
+                            <input type="number" id="singleYearLevel" class="form-control" min="1" max="5" placeholder="1-5">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="singleSection" class="form-label">Section</label>
+                           <input type="text" id="singleSection" class="form-control   placeholder="e.g. A" maxlength="1">
+
+                        </div>
+                        <div class="col-12">
+                            <label for="singleEmail" class="form-label">Email <span class="text-danger">*</span></label>
+                            <input type="email" id="singleEmail" class="form-control" placeholder="name@plpasig.edu.ph" required>
+                            <div class="form-text">A valid email address is required.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="singleStudentSubmitBtn">Save Student</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editStudentModal" tabindex="-1" aria-labelledby="editStudentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form id="editStudentForm" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editStudentModalLabel">Edit Student</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editStudentUid">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="editStudentId" class="form-label">Student ID</label>
+                            <input type="text" id="editStudentId" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editDepartment" class="form-label">Department <span class="text-danger">*</span></label>
+                            <select id="editDepartment" class="form-select" required></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="editFirstName" class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input type="text" id="editFirstName" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="editMiddleName" class="form-label">Middle Name</label>
+                            <input type="text" id="editMiddleName" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="editLastName" class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" id="editLastName" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="editSuffix" class="form-label">Suffix</label>
+                            <input type="text" id="editSuffix" class="form-control" placeholder="e.g. Sr, Jr">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="editCourse" class="form-label">Course</label>
+                            <input type="text" id="editCourse" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="editYearLevel" class="form-label">Year Level</label>
+                            <input type="number" id="editYearLevel" class="form-control" min="1" max="5" placeholder="1-5">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="editSection" class="form-label">Section</label>
+                            <input type="text" id="editSection" class="form-control">
+                        </div>
+                        <div class="col-md-8">
+                            <label for="editEmail" class="form-label">Email <span class="text-danger">*</span></label>
+                            <input type="email" id="editEmail" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="editStatus" class="form-label">Status</label>
+                            <select id="editStatus" class="form-select">
+                                <option value="active">active</option>
+                                <option value="inactive">inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="saveStudentEditBtn">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config/.env.js"></script>
+<script src="../config/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- SheetJS for Excel parsing -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="../shared/global.js"></script>
+<script src="admin-specific.js"></script>
+<script src="student-import.js"></script>
+
+<script>
+    requireSuperAdmin();
+    loadHeader();
+    loadSidebar('student-import');
+</script>
+
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Send QR Codes | Laboratory Attendance System</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+    <link rel="stylesheet" href="../resc/css/sendQrCodes.css">
+</head>
+<body>
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-qrcode"></i> Send QR Codes</h1>
+                    <p>Select students and send their updated QR code by email</p>
+                </div>
+
+                <div class="stats-badges">
+                    <span class="stat-badge total"><i class="fa-solid fa-users"></i> <span id="statTotal">0</span> Students</span>
+                    <span class="stat-badge selected"><i class="fa-solid fa-square-check"></i> <span id="statSelected">0</span> Selected</span>
+                    <span class="stat-badge sent"><i class="fa-solid fa-paper-plane"></i> <span id="statSent">0</span> Sent</span>
+                </div>
+
+                <div class="header-actions">
+                    <button class="btn-ghost" id="btnRefresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                    <button class="btn-primary" id="btnSendSelected" disabled><i class="fa-solid fa-paper-plane"></i> Send Selected</button>
+                </div>
+            </div>
+            <hr>
+
+            <section class="controls-card">
+                <div class="controls-header">
+                    <h2><i class="fa-solid fa-filter"></i> Search & Filters</h2>
+                    <p>Use these controls to narrow the list before sending QR codes.</p>
+                </div>
+                <div class="controls-grid">
+                    <div class="control-group wide">
+                        <label for="searchInput"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                        <input type="text" id="searchInput" placeholder="Search by ID, name, course, or email">
+                    </div>
+                    <div class="control-group">
+                        <label for="statusFilter"><i class="fa-solid fa-filter"></i> Status</label>
+                        <select id="statusFilter">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="graduated">Graduated</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="faceFilter"><i class="fa-solid fa-camera"></i> Face Data</label>
+                        <select id="faceFilter">
+                            <option value="">All Students</option>
+                            <option value="registered">Registered</option>
+                            <option value="not-registered">Not Registered</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="courseFilter"><i class="fa-solid fa-graduation-cap"></i> Course</label>
+                        <select id="courseFilter"><option value="">All Courses</option></select>
+                    </div>
+                    <div class="control-group">
+                        <label for="yearFilter"><i class="fa-solid fa-layer-group"></i> Year & Section</label>
+                        <select id="yearFilter"><option value="">All Yr & Sec</option></select>
+                    </div>
+                    <div class="control-group actions">
+                        <button class="btn-ghost" id="btnSelectVisible"><i class="fa-solid fa-square-check"></i> Select Visible</button>
+                        <button class="btn-ghost" id="btnClearSelection"><i class="fa-solid fa-square"></i> Clear Selection</button>
+                        <button class="btn-ghost" id="btnClearFilters"><i class="fa-solid fa-eraser"></i> Clear Filters</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="table-card">
+                <div class="table-topbar">
+                    <div>
+                        <h2><i class="fa-solid fa-list-check"></i> Students</h2>
+                        <p id="tableHint">Choose one or more students, then send the QR code email.</p>
+                    </div>
+                    <div class="table-pill" id="tableCount">0 shown</div>
+                </div>
+
+                <div class="table-container">
+                    <table class="students-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40px"><input type="checkbox" id="selectAllVisible" aria-label="Select all visible students"></th>
+                                <th>Student ID</th>
+                                <th>Name</th>
+                                <th>Course</th>
+                                <th>Year & Section</th>
+                                <th>Email</th>
+                                <th>Face</th>
+                                <th>Status</th>
+                                <th style="width:140px">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentsTableBody">
+                            <tr><td colspan="9" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading students...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <div class="toast" id="toast" aria-live="polite">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <div class="bulk-modal" id="bulkSendModal" aria-hidden="true">
+        <div class="bulk-modal__panel" role="dialog" aria-modal="true" aria-labelledby="bulkSendTitle">
+            <div class="bulk-modal__header">
+                <div>
+                    <h3 id="bulkSendTitle">Sending QR codes</h3>
+                    <p id="bulkFinalStatus">Preparing selected students...</p>
+                </div>
+                <button type="button" class="bulk-modal__close" id="btnCloseBulkModal" aria-label="Close modal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="bulk-modal__summary">
+                <span><strong id="bulkTotal">0</strong> selected</span>
+                <span><strong id="bulkDone">0</strong> processed</span>
+                <span><strong id="bulkFailed">0</strong> failed</span>
+            </div>
+
+            <div class="bulk-progress">
+                <div class="bulk-progress__bar" id="bulkProgressBar"></div>
+            </div>
+            <div class="bulk-progress__label" id="bulkProgressLabel">0% complete</div>
+
+            <div class="bulk-modal__table-wrap">
+                <table class="bulk-modal__table">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bulkSendBody"></tbody>
+                </table>
+            </div>
+
+            <div class="bulk-modal__footer">
+                <div class="bulk-legend">
+                    <span><i class="bulk-dot pending"></i> Pending</span>
+                    <span><i class="bulk-dot success"></i> Sent</span>
+                    <span><i class="bulk-dot failed"></i> Failed</span>
+                </div>
+                <div class="bulk-actions">
+                    <button type="button" class="btn-ghost bulk-stop-btn" id="btnStopSending" style="display:none;">
+                        <i class="fa-solid fa-ban"></i> Stop Sending QR Code
+                    </button>
+                    <button type="button" class="btn-primary bulk-retry-btn" id="btnRetryFailed" style="display:none;">
+                        <i class="fa-solid fa-rotate-right"></i> Retry Failed Only
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button type="button" class="bulk-open-btn" id="btnShowBulkModal" style="display:none;">
+        <i class="fa-solid fa-eye"></i> Show Sending Queue
+    </button>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+    <script src="../resc/js/sendQrCodes.js"></script>
+    <script>
+        loadHeader();
+        loadSidebar('qr-codes');
+    </script>
+</body>
+</html>

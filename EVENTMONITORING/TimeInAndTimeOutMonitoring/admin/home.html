@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home | Laboratory Attendance System</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+    <link rel="stylesheet" href="../resc/css/studentHome.css">
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <!-- Page Header -->
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-house"></i> Home</h1>
+                    <p id="greetingText">Welcome back! Here's today's lab session activity.</p>
+                </div>
+                <div class="header-date">
+                    <i class="fa-solid fa-calendar-day"></i>
+                    <span id="todayLabel">—</span>
+                </div>
+            </div>
+            <hr>
+
+            <!-- Student Info Banner -->
+            <div class="student-banner" id="studentBanner" style="display:none">
+                <div class="banner-avatar" id="bannerAvatar">
+                    <i class="fa-solid fa-user-graduate"></i>
+                </div>
+                <div class="banner-info">
+                    <div class="banner-name" id="bannerName">Loading...</div>
+                    <div class="banner-meta" id="bannerMeta">—</div>
+                </div>
+                <div class="banner-enrolled">
+                    <div class="banner-stat-val" id="bannerEnrolledCount">0</div>
+                    <div class="banner-stat-lbl">Enrolled Subjects</div>
+                </div>
+            </div>
+
+            <!-- Notice Area -->
+            <div id="noticeContainer"></div>
+
+            <!-- Stats Bar -->
+            <div class="stats">
+                <div class="stat active">
+                    <i class="fa-solid fa-circle-play"></i>
+                    <span id="activeCnt">0</span> Active
+                </div>
+                <div class="stat dismissing" id="dismissingStat" style="display:none">
+                    <i class="fa-solid fa-door-open"></i>
+                    <span id="dismissingCnt">0</span> Dismissing
+                </div>
+                <div class="stat scheduled">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <span id="scheduledCnt">0</span> Scheduled
+                </div>
+                <div class="stat completed">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <span id="completedCnt">0</span> Completed
+                </div>
+                <div class="stat my-sessions" id="mySessionsStat" style="display:none">
+                    <i class="fa-solid fa-star"></i>
+                    <span id="mySessionsCnt">0</span> My Sessions
+                </div>
+            </div>
+
+            <!-- MY SESSIONS (enrolled & active today) -->
+            <div id="mySessionsSection" style="display:none">
+                <div class="section">
+                    <i class="fa-solid fa-star" style="color:#f59e0b;font-size:22px"></i>
+                    <h2>My Sessions Today</h2>
+                    <span class="cnt amber" id="mySessionsBadge">0</span>
+                </div>
+                <div class="grid" id="mySessionsGrid"></div>
+            </div>
+
+            <!-- ACTIVE SESSIONS -->
+            <div class="section" style="margin-top:32px">
+                <i class="fa-solid fa-circle-play" style="color:#22c55e;font-size:22px"></i>
+                <h2>Active Sessions</h2>
+                <span class="cnt" id="activeCountBadge">0</span>
+            </div>
+            <div class="grid" id="activeGrid">
+                <div class="empty">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <h3>Loading...</h3>
+                    <p>Fetching active sessions</p>
+                </div>
+            </div>
+
+            <!-- SCHEDULED SESSIONS -->
+            <div class="section" style="margin-top:40px">
+                <i class="fa-solid fa-calendar-check" style="color:#16a34a;font-size:22px"></i>
+                <h2>Scheduled for Today</h2>
+                <span class="cnt" id="scheduledCountBadge">0</span>
+            </div>
+            <div class="grid" id="scheduledGrid">
+                <div class="empty">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <h3>Loading...</h3>
+                    <p>Fetching scheduled sessions</p>
+                </div>
+            </div>
+
+            <!-- COMPLETED SESSIONS -->
+            <div id="completedSection" style="display:none">
+                <div class="section" style="margin-top:40px">
+                    <i class="fa-solid fa-check-circle" style="color:#6b7280;font-size:22px"></i>
+                    <h2>Completed Today</h2>
+                    <span class="cnt grey" id="completedCountBadge">0</span>
+                </div>
+                <div class="grid" id="completedGrid"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+    <script src="../resc/js/studentHome.js"></script>
+
+    <script>
+        loadHeader();
+        loadSidebar('home');
+    </script>
+</body>
+</html>

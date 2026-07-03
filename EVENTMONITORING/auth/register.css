@@ -1,0 +1,394 @@
+:root {
+    font-size: 125%;
+    --green-dark:  #0d3b1e;
+    --green-mid:   #145a2e;
+    --green-btn:   #1a6b36;
+    --green-hover: #12522a;
+    --card-shadow: 0 20px 60px rgba(0,0,0,0.35);
+}
+
+html {
+    font-size: 125%;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(13, 59, 30, 0.85) 0%, rgba(8, 28, 14, 0.85) 100%), url('assets/plpbackground.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    font-family: 'Source Sans 3', sans-serif;
+    padding: 1.5rem;
+}
+
+.register-card {
+    position: relative;
+    z-index: 1;
+    background: #ffffff;
+    border-radius: 1.25rem;
+    padding: 2.75rem 2.5rem 2.5rem;
+    width: 100%;
+    max-width: 640px;
+    box-shadow: var(--card-shadow);
+    animation: fadeUp .55s cubic-bezier(.22,.68,0,1.2) both;
+}
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(28px) scale(.97); }
+    to   { opacity: 1; transform: translateY(0)    scale(1);   }
+}
+
+.logos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    margin-bottom: 1.6rem;
+}
+
+.plp-logo {
+    height: 110px;
+    width: 110px;
+    object-fit: contain;
+    transition: transform .25s ease;
+}
+
+.plp-logo:hover { transform: scale(1.06); }
+    
+.ccs-logo {
+    height: 110px;
+    width: 110px;
+    object-fit: contain;
+    transition: transform .25s ease;
+}
+
+.ccs-logo:hover { transform: scale(1.06); }
+
+.logo-divider {
+    width: 1px;
+    height: 95px;
+    background: #d4ddd6;
+    align-self: center;
+}
+
+.card-title {
+    font-family: 'Merriweather', serif;
+    font-weight: 700;
+    font-size: 1.35rem;
+    line-height: 1.35;
+    color: var(--green-mid);
+    text-align: center;
+    margin-bottom: .45rem;
+}
+
+.card-subtitle {
+    font-size: .875rem;
+    color: #6b7f6e;
+    text-align: center;
+    margin-bottom: 1.75rem;
+    letter-spacing: .01em;
+}
+
+/* Step Indicator */
+.step-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2rem;
+    gap: .75rem;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    transition: all .3s ease;
+}
+
+.step-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #e8ede9;
+    color: #8faa93;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: .875rem;
+    transition: all .3s ease;
+}
+
+.step.active .step-number {
+    background: var(--green-mid);
+    color: #fff;
+}
+
+.step-label {
+    font-size: .875rem;
+    font-weight: 500;
+    color: #8faa93;
+    transition: color .3s ease;
+}
+
+.step.active .step-label {
+    color: var(--green-mid);
+    font-weight: 600;
+}
+
+.step-divider {
+    width: 60px;
+    height: 2px;
+    background: #d4ddd6;
+}
+
+/* Form Fields */
+.form-label {
+    font-size: .8rem;
+    font-weight: 600;
+    color: #2d4a32;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    margin-bottom: .35rem;
+    display: block;
+}
+
+.required {
+    color: #dc3545;
+}
+
+.form-control, .form-select {
+    border: 1.5px solid #d4ddd6;
+    border-radius: .6rem;
+    padding: .65rem 1rem;
+    font-size: .925rem;
+    color: #1a2e1c;
+    background-color: #f7faf8;
+    transition: border-color .2s, box-shadow .2s, background-color .2s;
+    width: 100%;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--green-mid);
+    box-shadow: 0 0 0 3.5px rgba(20,90,46,.14);
+    background-color: #fff;
+    outline: none;
+}
+
+.form-control::placeholder { color: #a5b8a8; }
+
+.input-wrapper {
+    position: relative;
+}
+
+.input-icon {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #8faa93;
+    pointer-events: none;
+}
+
+.toggle-password {
+    pointer-events: all;
+    cursor: pointer;
+    transition: color .2s;
+}
+
+.toggle-password:hover {
+    color: var(--green-mid);
+}
+
+.mb-field { margin-bottom: 1.15rem; }
+
+.field-hint {
+    display: block;
+    font-size: .75rem;
+    color: #6b7f6e;
+    margin-top: .35rem;
+}
+
+/* Form Steps */
+.form-step {
+    display: none;
+    animation: fadeIn .4s ease-in-out;
+}
+
+.form-step.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Info Note */
+.info-note {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    background: #e3f2fd;
+    border: 1px solid #90caf9;
+    border-radius: .6rem;
+    padding: .875rem 1rem;
+    margin-top: 1.5rem;
+    font-size: .85rem;
+    color: #1565c0;
+    line-height: 1.5;
+}
+
+.info-note svg {
+    flex-shrink: 0;
+    margin-top: .1rem;
+}
+
+/* Navigation Buttons */
+.form-navigation {
+    display: flex;
+    gap: .75rem;
+    margin-top: 1.75rem;
+}
+
+.btn-primary, .btn-secondary {
+    flex: 1;
+    padding: .75rem 1.25rem;
+    font-size: .95rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    border: none;
+    border-radius: .6rem;
+    cursor: pointer;
+    transition: all .2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+}
+
+.btn-primary {
+    background: var(--green-btn);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(20,90,46,.35);
+}
+
+.btn-primary:hover {
+    background: var(--green-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(20,90,46,.45);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(20,90,46,.3);
+}
+
+.btn-secondary {
+    background: #f7faf8;
+    color: #2d4a32;
+    border: 1.5px solid #d4ddd6;
+}
+
+.btn-secondary:hover {
+    background: #e8ede9;
+    border-color: #c1cec4;
+}
+
+.btn-secondary svg {
+    width: 14px;
+    height: 14px;
+}
+
+.btn-primary svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Sign In Link */
+.signin-link {
+    text-align: center;
+    font-size: .875rem;
+    color: #6b7f6e;
+    margin-top: 1.5rem;
+}
+
+.signin-link a {
+    color: var(--green-mid);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color .2s;
+}
+
+.signin-link a:hover {
+    color: var(--green-btn);
+    text-decoration: underline;
+}
+
+/* Help Button */
+.help-btn {
+    position: fixed;
+    bottom: 1.4rem;
+    right: 1.4rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.18);
+    border: 1.5px solid rgba(255,255,255,.3);
+    color: #fff;
+    font-size: .85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: background .2s;
+    z-index: 10;
+}
+
+.help-btn:hover { background: rgba(255,255,255,.28); }
+
+/* Validation Styles */
+.form-control.is-invalid, .form-select.is-invalid {
+    border-color: #dc3545;
+}
+
+.form-control.is-valid, .form-select.is-valid {
+    border-color: #28a745;
+}
+
+.invalid-feedback {
+    display: block;
+    font-size: .75rem;
+    color: #dc3545;
+    margin-top: .35rem;
+}
+
+/* Responsive Design */
+@media (max-width: 576px) {
+    .register-card {
+        padding: 2rem 1.5rem;
+    }
+
+    .step-label {
+        display: none;
+    }
+
+    .step-divider {
+        width: 40px;
+    }
+
+    .form-navigation {
+        flex-direction: column;
+    }
+
+    .btn-primary svg, .btn-secondary svg {
+        width: 16px;
+        height: 16px;
+    }
+}

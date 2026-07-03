@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Engine Logs | Laboratory Attendance System</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../../config/.env.js"></script>
+  <script src="../../config/config.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+  <link rel="stylesheet" href="../resc/css/header.css">
+  <link rel="stylesheet" href="../resc/css/nav.css">
+  <link rel="stylesheet" href="../resc/css/studentEnrollment.css">
+
+  <style>
+    :root {
+      --text-main: #1f2937;
+      --text-muted: #6b7280;
+      --panel: #ffffff;
+      --border: #e5e7eb;
+      --green: #1a4731;
+      --green-soft: #edf6f0;
+      --blue-soft: #eef4ff;
+      --amber-soft: #fff7ed;
+      --red-soft: #fef2f2;
+      --shadow: 0 10px 30px rgba(16, 24, 40, .06);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Nunito Sans', sans-serif;
+      background: #f5f7f5;
+      color: var(--text-main);
+    }
+
+    .main-content {
+      margin-left: 64px;
+      padding-top: 20px; /* reduced to bring header up */
+      transition: margin-left .35s ease;
+    }
+
+    .main-content.sidebar-open { margin-left: 240px; }
+
+    .page-shell {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 12px 24px; /* reduce top/bottom padding to tighten spacing */
+    }
+
+    /* Header styles removed to use shared Student Enrollment header CSS */
+
+    .section-card {
+      margin-top: 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .controls-card {
+      display: grid;
+      grid-template-columns: 2.2fr 1fr 1fr 1fr 1fr auto;
+      gap: 14px;
+      align-items: end;
+    }
+
+    .control-group label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #374151;
+    }
+
+    .control-group input,
+    .control-group select {
+      width: 100%;
+      border: 1px solid #d7ddd8;
+      border-radius: 12px;
+      padding: 12px 13px;
+      font: inherit;
+      background: #fff;
+      outline: none;
+    }
+
+    .control-group input:focus,
+    .control-group select:focus {
+      border-color: #86b89a;
+      box-shadow: 0 0 0 4px rgba(26, 71, 49, .08);
+    }
+
+    .table-wrap {
+      margin-top: 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 16px 18px;
+      border-bottom: 1px solid #edf0ed;
+      background: #fafdfb;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-family: 'Nunito', sans-serif;
+      font-size: 1.18rem;
+    }
+
+    .section-head p {
+      margin: 4px 0 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .section-pill {
+      padding: 8px 11px;
+      border-radius: 999px;
+      background: #edf6f0;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .log-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .log-table thead th {
+      text-align: left;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: #fff;
+      background: linear-gradient(90deg, #166534, #14532d); /* match reports table */
+      padding: 14px 16px;
+      border-bottom: none;
+      white-space: nowrap;
+    }
+
+    .log-table tbody td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(34, 77, 54, 0.06);
+      vertical-align: top;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    .log-table tbody tr:hover { background: #fcfdfc; }
+
+    .log-table .hint {
+      font-weight: 800;
+      color: #173a28;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .log-table .subtext {
+      color: var(--text-muted);
+      font-size: 12px;
+      display: block;
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .badge.info { background: var(--blue-soft); color: #1d4ed8; }
+    .badge.warn { background: linear-gradient(135deg,#fff8e6,#fff5e6); color:#b45309; border:1px solid #fde3a8 }
+    .badge.error { background: linear-gradient(135deg,#fff1f1,#fff1f1); color:#b91c1c; border:1px solid #fecaca }
+    .badge.ok { background: linear-gradient(135deg,#ecfdf3,#d1fae5); color: #166534; border:1px solid #bbf7d0 }
+
+    /* Alternate row colors similar to reports table */
+    .log-table tbody tr:nth-child(even) { background: #f6fbf7; }
+    .log-table tbody tr:nth-child(odd)  { background: #ffffff; }
+    .log-table tbody tr:hover { background: #eef7ef; }
+
+    .session-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .session-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .session-toggle {
+      width: 100%;
+      border: 0;
+      background: linear-gradient(180deg, #ffffff, #f9fcfa);
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .session-toggle:hover { background: #f2faf4; }
+
+    .session-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #166534;
+      background: #e8f6ee;
+      flex: 0 0 auto;
+    }
+
+    .session-title-wrap { flex: 1; min-width: 0; }
+
+    .session-title {
+      margin: 0;
+      font-family: 'Nunito', sans-serif;
+      font-size: 1.02rem;
+      color: #173a28;
+    }
+
+    .session-subtitle {
+      margin-top: 3px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .session-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+      align-items: center;
+      margin-left: auto;
+    }
+
+    .session-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      background: #edf6f0;
+      color: var(--green);
+      border: 1px solid #d5eadb;
+      white-space: nowrap;
+    }
+
+    .session-body {
+      display: none;
+      border-top: 1px solid #edf0ed;
+      background: #fff;
+    }
+
+    .session-card.open .session-body { display: block; }
+
+    .session-card.open .session-toggle {
+      background: linear-gradient(180deg, #f7fcf8, #eef8f2);
+    }
+
+    .session-body .log-table thead th { position: sticky; top: 0; }
+
+    .session-row-summary {
+      font-weight: 800;
+      color: #173a28;
+    }
+
+    .session-row-details {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-top: 4px;
+      line-height: 1.45;
+    }
+
+    /* Type badges matching reports.css style */
+    .type-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: none; }
+    .type-rebuild-summary { background: linear-gradient(135deg,#ecfdf3,#d1fae5); color:#166534; border:1px solid #bbf7d0; }
+    .type-registration-complete, .type-registration-started { background: linear-gradient(135deg,#ecfdf3,#d1fae5); color:#166534; border:1px solid #bbf7d0; }
+    .type-upload-start { background: linear-gradient(135deg,#eff6ff,#dbeafe); color:#1d4ed8; border:1px solid #bfdbfe; }
+    .type-trigger-rebuild-response { background: linear-gradient(135deg,#eff6ff,#dbeafe); color:#1d4ed8; border:1px solid #bfdbfe; }
+    .type-startup { background: linear-gradient(135deg,#ecfdf3,#d1fae5); color:#166534; border:1px solid #bbf7d0; }
+    .type-error { background: linear-gradient(135deg,#fff1f1,#fff1f1); color:#b91c1c; border:1px solid #fecaca; }
+
+    .empty-state {
+      text-align: center;
+      padding: 34px 18px;
+      color: var(--text-muted);
+    }
+
+    .empty-state i {
+      display: block;
+      font-size: 28px;
+      margin-bottom: 10px;
+      color: #9aa7a0;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .footer-links a {
+      font-weight: 800;
+      color: var(--green);
+      text-decoration: none;
+    }
+
+    .hint-note {
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .table-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .mini-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #d5dfd7;
+      background: #fff;
+      color: var(--green);
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .mini-btn + .mini-btn { margin-left: 6px; }
+
+    /* Per-row delete button style to match other pages */
+    .btn-del-row {
+      width: 36px; height: 36px; border-radius: 8px; border: 1.5px solid #fecaca;
+      background: #fee2e2; color: #dc2626; font-size: 14px;
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: .18s; margin-left:6px;
+      font-family: 'Nunito Sans', sans-serif;
+      font-weight: 800;
+    }
+    .btn-del-row:hover { background: #dc2626; color: #fff; border-color: #dc2626; transform: scale(1.05); }
+
+    /* Print (blue) and PDF (pink) button variants to match design */
+    .btn-print {
+      padding: 9px 18px;
+      background: #eff6ff;
+      color: #1e40af;
+      border: 1.5px solid #bfdbfe;
+      border-radius: 8px;
+      display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+      font-family: 'Nunito Sans', sans-serif;
+      font-weight: 800;
+      font-size: 13.5px;
+    }
+    .btn-print:hover { background: #dbeafe; box-shadow: 0 8px 18px rgba(59,130,246,0.06); transform: translateY(-2px); }
+
+    .btn-pdf {
+      padding: 9px 18px;
+      background: linear-gradient(135deg,#fff1f2,#fee2e2);
+      color: #b91c1c;
+      border: 1.5px solid #fecaca;
+      border-radius: 8px;
+      display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+      font-family: 'Nunito Sans', sans-serif;
+      font-weight: 800;
+      font-size: 13.5px;
+    }
+    .btn-pdf:hover { background: #fecaca; color: #7f1d1d; box-shadow: 0 8px 18px rgba(220,38,38,0.06); transform: translateY(-2px); }
+
+    /* Delete-all button style (red) to match other pages */
+    .btn-del-all {
+      padding: 9px 16px; background: #fee2e2; color: var(--red);
+      border: 1.5px solid #fecaca; border-radius: 10px; font-size: 13.5px; font-weight: 700;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: .18s; font-family: 'Nunito Sans', sans-serif;
+    }
+    .btn-del-all:hover { background: var(--red); color: #fff; border-color: var(--red); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220,38,38,.2); }
+
+    @media (max-width: 1100px) {
+      .controls-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 900px) {
+      .main-content, .main-content.sidebar-open { margin-left: 0; }
+      .page-shell { padding: 16px; }
+    }
+
+    @media (max-width: 640px) {
+      .controls-card { grid-template-columns: 1fr; }
+      .log-table thead { display: none; }
+      .log-table, .log-table tbody, .log-table tr, .log-table td { display: block; width: 100%; }
+      .log-table tbody tr { border-bottom: 1px solid #edf0ed; }
+      .log-table tbody td { border-bottom: none; padding: 10px 16px; }
+      .log-table tbody td::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 800; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="header-container"></div>
+  <div id="sidebar-container"></div>
+
+  <main class="main-content">
+    <div class="page-shell">
+            <div class="page-header">
+              <div class="header-titles">
+                <h1><i class="fa-solid fa-shield-halved"></i> Engine Logs</h1>
+                <p>Simple, table-based log viewer for admins. Recent entries are shown first, older entries are shown below, and filters help you find what you need quickly.</p>
+              </div>
+
+              <div class="stats-badges" style="margin-left:14px; align-self:flex-start;">
+                <span class="stat-badge total">
+                  <i class="fa-solid fa-list"></i> <span id="statTotal">0</span> Entries
+                </span>
+                <span class="stat-badge enrolled">
+                  <i class="fa-solid fa-bolt"></i> <span id="statRecent">0</span> Groups
+                </span>
+                <span class="stat-badge enrollments">
+                  <i class="fa-solid fa-triangle-exclamation"></i> <span id="statWarnings">0</span> Warnings
+                </span>
+                <span class="stat-badge errors">
+                  <i class="fa-solid fa-circle-xmark"></i> <span id="statErrors">0</span> Errors
+                </span>
+              </div>
+
+              <button class="btn-report" style="margin-left:auto" onclick="refreshLogs()">
+                <i class="fa-solid fa-rotate"></i> Refresh Logs
+              </button>
+              <button class="btn-pdf" style="margin-left:8px" onclick="downloadFilteredPdf()">
+                <i class="fa-solid fa-file-pdf"></i> PDF
+              </button>
+              <button class="btn-del-all" style="margin-left:8px" onclick="confirmDeleteAll()">
+                <i class="fa-solid fa-trash-can"></i> Delete All
+              </button>
+
+              <div style="margin-left:12px; display:flex; align-items:center; gap:12px;">
+                <div class="section-pill" id="filterSummary">Loading logs...</div>
+              </div>
+            </div>
+            <hr>
+
+      <div class="section-card">
+        <div class="controls-card">
+          <div class="control-group">
+            <label for="filterSearch"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+            <input type="text" id="filterSearch" placeholder="Hint, type, field name, or message...">
+          </div>
+          <div class="control-group">
+            <label for="filterType"><i class="fa-solid fa-filter"></i> Type</label>
+            <select id="filterType">
+              <option value="">All Types</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="filterEngine"><i class="fa-solid fa-layer-group"></i> Engine</label>
+            <select id="filterEngine">
+              <option value="">All Engines</option>
+              <option value="face_capture">Face Capture Only</option>
+              <option value="attendance">Attendance Engine Only</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="filterFrom"><i class="fa-solid fa-calendar-day"></i> From</label>
+            <input type="date" id="filterFrom">
+          </div>
+          <div class="control-group">
+            <label for="filterTo"><i class="fa-solid fa-calendar-day"></i> To</label>
+            <input type="date" id="filterTo">
+          </div>
+          <div class="table-actions">
+            <button class="mini-btn" onclick="resetFilters()"><i class="fa-solid fa-eraser"></i> Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <section class="table-wrap">
+        <div class="section-head">
+          <div>
+            <h2><i class="fa-solid fa-layer-group"></i> Engine Sessions</h2>
+            <p>Logs are grouped by engine session so the face capture flow and attendance engine events stay together.</p>
+          </div>
+          <div class="section-pill" id="sessionCountPill">0 groups</div>
+        </div>
+        <div class="session-list" id="sessionList">
+          <div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading logs...</div>
+        </div>
+      </section>
+
+      <!-- Download links hidden for non-IT admins to keep the UI simple -->
+    </div>
+  </main>
+
+  <script src="../includes/sidebar.js"></script>
+  <script>
+    const RECENT_LIMIT = 8;
+    const ENGINE_LOG_REPORT_TYPE = 'engine_logs';
+    let allEntries = [];
+    let autoRefreshTimer = null;
+    let sessionOpenKeys = new Set();
+    let sessionStateInitialized = false;
+    let existingReportsToday = [];
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function getDeptLogos() {
+      try {
+        const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+        return {
+          deptLogo: user.departmentLogo || '../resc/assets/ccs_logo.png',
+          deptName: user.department || 'College of Computer Studies',
+          deptCode: user.departmentCode || 'CCS',
+        };
+      } catch (error) {
+        return {
+          deptLogo: '../resc/assets/ccs_logo.png',
+          deptName: 'College of Computer Studies',
+          deptCode: 'CCS',
+        };
+      }
+    }
+
+    function parseEntry(eventNode) {
+      const fields = Array.from(eventNode.querySelectorAll('Field')).reduce((acc, field) => {
+        const name = field.getAttribute('name') || 'field';
+        const value = (field.textContent || '').trim();
+        acc[name] = acc[name] ? `${acc[name]}\n${value}` : value;
+        return acc;
+      }, {});
+
+      const type = eventNode.getAttribute('type') || 'unknown';
+      const ts = eventNode.getAttribute('ts') || '';
+      const hint = fields.hint || 'Check the details below.';
+      const hintText = String(hint || '').toLowerCase();
+      const messageText = String(fields.message || fields.error || '').toLowerCase();
+      const explicitGroupKey = fields.group_key || fields.group || fields.flow_id || fields.session_id || '';
+
+      let engine = fields.engine || '';
+      if (!engine) {
+        if (['registration_started', 'upload_start', 'registration_complete', 'trigger_rebuild_response'].includes(type)) {
+          engine = 'face_capture';
+        } else if (type === 'rebuild_summary' || hintText.includes('attendance engine') || messageText.includes('attendance engine')) {
+          engine = 'attendance';
+        } else if (hintText.includes('face capture') || messageText.includes('registration')) {
+          engine = 'face_capture';
+        } else if (type === 'startup') {
+          engine = hintText.includes('registration service') ? 'face_capture' : 'attendance';
+        } else if (fields.phase === 'trigger_rebuild' || fields.phase === 'db_update') {
+          engine = 'face_capture';
+        } else if (fields.phase === 'save_face_cache' || fields.phase === 'load_all_faces') {
+          engine = 'attendance';
+        } else {
+          engine = 'attendance';
+        }
+      }
+
+      let groupLabel = fields.group_label || fields.flow_label || fields.session_label || '';
+      if (!groupLabel) {
+        if (engine === 'face_capture') {
+          const idNumber = fields.id_number || 'Unknown Student';
+          groupLabel = type === 'startup' ? 'Face Capture Engine Started' : `Face Capture Registration ${idNumber}`;
+        } else {
+          groupLabel = type === 'startup' ? 'Attendance Engine Started' : 'Attendance Engine';
+        }
+      }
+
+      const searchBlob = [type, ts, hint, engine, explicitGroupKey, groupLabel, ...Object.entries(fields).map(([k, v]) => `${k}:${v}`)].join(' ').toLowerCase();
+
+      return {
+        type,
+        ts,
+        fields,
+        hint,
+        engine,
+        groupKey: explicitGroupKey,
+        groupLabel,
+        searchBlob,
+        dateKey: ts ? ts.slice(0, 10) : ''
+      };
+    }
+
+    function formatTime(ts) {
+      if (!ts) return 'Unknown time';
+      const date = new Date(ts);
+      if (Number.isNaN(date.getTime())) return ts;
+      return date.toLocaleString('en-PH', {
+        timeZone: 'Asia/Manila',
+        year: 'numeric', month: 'short', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: true
+      });
+    }
+
+    function getSeverity(entry) {
+      const text = `${entry.type} ${entry.hint} ${entry.fields.error || ''} ${entry.fields.message || ''}`.toLowerCase();
+      if (entry.type === 'error' || text.includes('failed') || text.includes('cannot reach') || text.includes('not running')) return 'error';
+      if (text.includes('409') || text.includes('already in progress') || text.includes('warning') || text.includes('skipped')) return 'warn';
+      return 'ok';
+    }
+
+    function typeLabel(type) {
+      return String(type || '').replaceAll('_', ' ');
+    }
+
+    function isTechnicalField(key) {
+      const name = String(key || '').toLowerCase();
+      return [
+        'timestamp',
+        'engine',
+        'engine_label',
+        'engine_instance',
+        'group_key',
+        'group_label',
+        'flow_id',
+        'flow_label',
+        'status_code',
+        'text',
+        'raw',
+        'raw_text',
+        'stack',
+        'trace',
+        'exception',
+        'code'
+      ].includes(name) || name.startsWith('debug') || name.startsWith('internal');
+    }
+
+    function formatFieldLabel(key) {
+      const name = String(key || '').toLowerCase();
+      const labels = {
+        id_number: 'Student ID',
+        role: 'Account Type',
+        uploaded: 'Files Uploaded',
+        duration_ms: 'Duration',
+        added: 'Records Added',
+        updated: 'Records Updated',
+        removed: 'Records Removed',
+        kept: 'Records Kept',
+        message: 'Message',
+        error: 'Error',
+        details: 'Details',
+        count: 'Count',
+        files: 'Files',
+        folder: 'Folder',
+        paths: 'Files',
+        path: 'File',
+        status: 'Status'
+      };
+      if (labels[name]) return labels[name];
+      return String(key || '')
+        .replaceAll('_', ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function formatFieldValue(key, value) {
+      const name = String(key || '').toLowerCase();
+      if (name === 'duration_ms') {
+        const num = Number(value);
+        if (!Number.isNaN(num)) {
+          const seconds = num / 1000;
+          return `${Math.round(seconds)} second${Math.round(seconds) === 1 ? '' : 's'}`;
+        }
+      }
+      if (name === 'kept' || name === 'updated' || name === 'removed' || name === 'added' || name === 'count') {
+        return String(value);
+      }
+      if (name === 'paths' || name === 'path') {
+        return String(value).replaceAll(',', ', ');
+      }
+      return String(value);
+    }
+
+    function formatDetailFields(fields) {
+      return Object.entries(fields)
+        .filter(([key]) => key !== 'hint' && !isTechnicalField(key))
+        .map(([key, value]) => `<div><strong>${escapeHtml(formatFieldLabel(key))}:</strong> ${escapeHtml(formatFieldValue(key, value)).replaceAll('\n', '<br>')}</div>`)
+        .join('');
+    }
+
+    function groupEntries(entries) {
+      const ordered = entries
+        .map((entry, index) => ({ ...entry, sourceIndex: index }))
+        .sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+
+      const explicitBuckets = new Map();
+      const sequenceBuckets = [];
+      let currentSequenceBucket = null;
+
+      const startSequenceBucket = (entry) => {
+        const label = entry.groupLabel || (entry.engine === 'face_capture' ? 'Face Capture Session' : 'Attendance Engine');
+        const bucket = {
+          key: `seq::${entry.sourceIndex}`,
+          engine: entry.engine || 'attendance',
+          label,
+          items: [],
+          latestTs: entry.ts || '',
+        };
+        sequenceBuckets.push(bucket);
+        currentSequenceBucket = bucket;
+        return bucket;
+      };
+
+      ordered.forEach(entry => {
+        if (entry.groupKey) {
+          const key = `${entry.engine || 'attendance'}::${entry.groupKey}`;
+          if (!explicitBuckets.has(key)) {
+            explicitBuckets.set(key, {
+              key,
+              engine: entry.engine || 'attendance',
+              label: entry.groupLabel || 'Engine Session',
+              items: [],
+              latestTs: entry.ts || '',
+            });
+          }
+          const bucket = explicitBuckets.get(key);
+          bucket.items.push(entry);
+          if (!bucket.latestTs || (entry.ts && new Date(entry.ts).getTime() > new Date(bucket.latestTs).getTime())) {
+            bucket.latestTs = entry.ts;
+          }
+          return;
+        }
+
+        const shouldStartNew =
+          !currentSequenceBucket ||
+          (entry.engine === 'face_capture' && entry.type === 'registration_started') ||
+          (entry.engine === 'attendance' && entry.type === 'startup') ||
+          (currentSequenceBucket && currentSequenceBucket.engine !== entry.engine);
+
+        const bucket = shouldStartNew ? startSequenceBucket(entry) : currentSequenceBucket;
+        bucket.items.push(entry);
+        if (!bucket.latestTs || (entry.ts && new Date(entry.ts).getTime() > new Date(bucket.latestTs).getTime())) {
+          bucket.latestTs = entry.ts;
+        }
+      });
+
+      const allBuckets = [
+        ...explicitBuckets.values(),
+        ...sequenceBuckets
+      ];
+
+      for (const bucket of allBuckets) {
+        bucket.items.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+      }
+
+      return allBuckets.sort((a, b) => new Date(b.latestTs).getTime() - new Date(a.latestTs).getTime());
+    }
+
+    function groupHeaderText(group) {
+      const engineLabel = group.items[0]?.fields?.engine_label;
+      if (engineLabel) return engineLabel;
+      if (group.engine === 'face_capture') return 'Face Capture Engine';
+      if (group.engine === 'attendance') return 'Attendance Engine';
+      return typeLabel(group.engine);
+    }
+
+    function groupEntrySummary(group) {
+      const types = [...new Set(group.items.map(item => typeLabel(item.type)))].slice(0, 4);
+      return types.join(' · ');
+    }
+
+    function renderGroupedLogs(entries) {
+      const container = document.getElementById('sessionList');
+      const groups = groupEntries(entries);
+
+      if (!groups.length) {
+        container.innerHTML = '<div class="empty-state"><i class="fa-solid fa-filter-circle-xmark"></i>No logs match the current filters.</div>';
+        document.getElementById('sessionCountPill').textContent = '0 groups';
+        return;
+      }
+
+      document.getElementById('sessionCountPill').textContent = `${groups.length} group(s)`;
+      container.innerHTML = groups.map((group, groupIndex) => {
+        const firstTime = formatTime(group.latestTs);
+        const summary = groupEntrySummary(group) || 'Log session';
+        const rows = group.items.map((entry, entryIndex) => {
+          const severity = getSeverity(entry);
+          const statusLabel = severity === 'error' ? 'Needs attention' : (severity === 'warn' ? 'Review' : 'OK');
+          const details = formatDetailFields(entry.fields);
+          return `
+            <tr data-search="${escapeHtml(entry.searchBlob)}" data-type="${escapeHtml(entry.type)}" data-date="${escapeHtml(entry.dateKey)}" data-index="${entry.sourceIndex}">
+              <td data-label="Timestamp">
+                ${escapeHtml(formatTime(entry.ts))}
+                <span class="subtext">Philippine Time</span>
+              </td>
+              <td data-label="Event">
+                <div class="session-row-summary">${escapeHtml(typeLabel(entry.type))}</div>
+                <div class="session-row-details">${escapeHtml(entry.engine === 'face_capture' ? 'Face Capture' : 'Attendance Engine')}</div>
+              </td>
+              <td data-label="Details">
+                <span class="hint">${escapeHtml(entry.hint)}</span>
+                <div class="subtext">${details || '<div><strong>Details:</strong> No additional data.</div>'}</div>
+              </td>
+              <td data-label="Status"><span class="badge ${severity}"><i class="fa-solid fa-circle"></i> ${statusLabel}</span></td>
+              <td data-label="Action" style="text-align:center">
+                <button class="btn-del-row" onclick="confirmDelete(${entry.sourceIndex})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+              </td>
+            </tr>`;
+        }).join('');
+
+        const cardId = `session-card-${groupIndex}`;
+        const isOpen = sessionStateInitialized ? sessionOpenKeys.has(group.key) : true;
+        return `
+          <div class="session-card ${isOpen ? 'open' : ''}" id="${cardId}" data-group-key="${escapeHtml(group.key)}">
+            <button class="session-toggle" type="button" onclick="toggleSessionCard('${cardId}')">
+              <span class="session-icon"><i class="fa-solid fa-layer-group"></i></span>
+              <div class="session-title-wrap">
+                <div class="session-title">${escapeHtml(group.label)}</div>
+                <div class="session-subtitle">${escapeHtml(groupHeaderText(group))} · ${escapeHtml(summary)}</div>
+              </div>
+              <div class="session-meta">
+                <span class="session-pill"><i class="fa-solid fa-clock"></i> ${escapeHtml(firstTime)}</span>
+                <span class="session-pill"><i class="fa-solid fa-list"></i> ${group.items.length} event(s)</span>
+              </div>
+            </button>
+            <div class="session-body">
+              <table class="log-table">
+                <thead>
+                  <tr>
+                    <th style="width:180px">Timestamp</th>
+                    <th style="width:180px">Event</th>
+                    <th>Details</th>
+                    <th style="width:170px">Status</th>
+                    <th style="width:120px; text-align:center;">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows}
+                </tbody>
+              </table>
+            </div>
+          </div>`;
+      }).join('');
+    }
+    function updateStats(entries) {
+      document.getElementById('statTotal').textContent = entries.length;
+      document.getElementById('statRecent').textContent = groupEntries(entries).length;
+      document.getElementById('statWarnings').textContent = entries.filter(entry => getSeverity(entry) === 'warn').length;
+      document.getElementById('statErrors').textContent = entries.filter(entry => getSeverity(entry) === 'error').length;
+    }
+
+    function populateTypeFilter(entries) {
+      const select = document.getElementById('filterType');
+      const currentValue = select.value || '';
+      select.innerHTML = '<option value="">All Types</option>';
+      const uniqueTypes = [...new Set(entries.map(entry => entry.type).filter(Boolean))].sort();
+      uniqueTypes.forEach(type => {
+        const option = document.createElement('option');
+        option.value = type;
+        option.textContent = typeLabel(type);
+        select.appendChild(option);
+      });
+      if ([...select.options].some(option => option.value === currentValue)) {
+        select.value = currentValue;
+      }
+    }
+
+    function applyFilters() {
+      const search = (document.getElementById('filterSearch').value || '').trim().toLowerCase();
+      const type = (document.getElementById('filterType').value || '').trim().toLowerCase();
+      const engine = (document.getElementById('filterEngine').value || '').trim().toLowerCase();
+      const from = document.getElementById('filterFrom').value;
+      const to = document.getElementById('filterTo').value;
+
+      const filtered = allEntries.filter(entry => {
+        if (search && !entry.searchBlob.includes(search)) return false;
+        if (type && entry.type.toLowerCase() !== type) return false;
+        if (engine && entry.engine.toLowerCase() !== engine) return false;
+        if (from && entry.dateKey && entry.dateKey < from) return false;
+        if (to && entry.dateKey && entry.dateKey > to) return false;
+        return true;
+      });
+
+      updateStats(filtered);
+      renderGroupedLogs(filtered);
+      document.getElementById('filterSummary').textContent = `${filtered.length} log(s) shown`;
+    }
+
+    function resetFilters() {
+      document.getElementById('filterSearch').value = '';
+      document.getElementById('filterType').value = '';
+      document.getElementById('filterEngine').value = '';
+      document.getElementById('filterFrom').value = '';
+      document.getElementById('filterTo').value = '';
+      applyFilters();
+    }
+
+    function toggleSessionCard(cardId) {
+      const card = document.getElementById(cardId);
+      if (!card) return;
+      card.classList.toggle('open');
+      const groupKey = card.dataset.groupKey;
+      if (!groupKey) return;
+      if (card.classList.contains('open')) {
+        sessionOpenKeys.add(groupKey);
+      } else {
+        sessionOpenKeys.delete(groupKey);
+      }
+    }
+
+    function printEntry(index) {
+      const entry = allEntries[index];
+      if (!entry) return;
+
+      const details = formatDetailFields(entry.fields);
+
+      const html = `
+        <html>
+        <head>
+          <title>Engine Log - ${escapeHtml(entry.type)}</title>
+          <style>body{font-family:Segoe UI,Roboto,sans-serif;padding:20px;color:#111} h1{font-size:18px} .meta{margin-top:8px;color:#555} .details{margin-top:14px;border-top:1px solid #eee;padding-top:10px}</style>
+        </head>
+        <body>
+          <h1>Engine Log Entry</h1>
+          <div class="meta"><strong>Type:</strong> ${escapeHtml(entry.type)}<br><strong>Timestamp:</strong> ${escapeHtml(formatTime(entry.ts))} (Philippine Time)</div>
+          <div style="margin-top:12px"><strong>Hint:</strong> ${escapeHtml(entry.hint)}</div>
+          <div class="details">${details || '<div>No additional data</div>'}</div>
+        </body>
+        </html>`;
+
+      const w = window.open('', '_blank');
+      if (!w) { alert('Unable to open print window (popup blocked)'); return; }
+      w.document.write(html);
+      w.document.close();
+      // allow a short time for the content to render
+      setTimeout(() => { w.print(); }, 250);
+    }
+
+    async function loadLogs() {
+      const summary = document.getElementById('filterSummary');
+      try {
+        summary.textContent = 'Loading logs...';
+        const currentOpenKeys = new Set();
+        document.querySelectorAll('.session-card.open[data-group-key]').forEach(card => {
+          if (card.dataset.groupKey) currentOpenKeys.add(card.dataset.groupKey);
+        });
+        if (currentOpenKeys.size > 0 || sessionStateInitialized) {
+          sessionOpenKeys = currentOpenKeys;
+        }
+        const response = await fetch('../students/engine_log.xml', { cache: 'no-store' });
+        if (!response.ok) {
+          summary.textContent = 'No engine log file found.';
+          document.getElementById('sessionList').innerHTML = '<div class="empty-state"><i class="fa-solid fa-file-circle-xmark"></i>No log file found.</div>';
+          sessionStateInitialized = true;
+          return;
+        }
+
+        const xmlText = await response.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
+
+        if (xmlDoc.querySelector('parsererror')) {
+          summary.textContent = 'The XML log could not be parsed.';
+          return;
+        }
+
+        allEntries = Array.from(xmlDoc.querySelectorAll('EngineLog > Event'))
+          .map(parseEntry)
+          .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+
+        const searchEl = document.getElementById('filterSearch');
+        const typeEl = document.getElementById('filterType');
+        const fromEl = document.getElementById('filterFrom');
+        const toEl = document.getElementById('filterTo');
+        const savedFilters = {
+          search: searchEl ? searchEl.value : '',
+          type: typeEl ? typeEl.value : '',
+          from: fromEl ? fromEl.value : '',
+          to: toEl ? toEl.value : ''
+        };
+
+        populateTypeFilter(allEntries);
+
+        if (searchEl) searchEl.value = savedFilters.search;
+        if (typeEl) typeEl.value = savedFilters.type;
+        if (fromEl) fromEl.value = savedFilters.from;
+        if (toEl) toEl.value = savedFilters.to;
+
+        applyFilters();
+        sessionStateInitialized = true;
+        summary.textContent = `${allEntries.length} log(s) loaded`;
+      } catch (error) {
+        summary.textContent = 'Error loading logs.';
+        document.getElementById('sessionList').innerHTML = '<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>Error loading log data.</div>';
+        sessionStateInitialized = true;
+        console.error(error);
+      }
+    }
+
+    function refreshLogs() {
+      loadLogs();
+    }
+
+    function toggleSessionCard(cardId) {
+      const card = document.getElementById(cardId);
+      if (!card) return;
+      card.classList.toggle('open');
+    }
+
+    // Delete single entry by timestamp
+    async function deleteEntryByTs(ts) {
+      try {
+        const form = new URLSearchParams();
+        form.append('timestamp', ts);
+        const res = await fetch('../students/delete_engine_log.php', { method: 'POST', body: form });
+        const data = await res.json();
+        if (data.ok) {
+          loadLogs();
+        } else {
+          alert('Could not delete log: ' + (data.error || 'Unknown error'));
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Error deleting log entry');
+      }
+    }
+
+    function confirmDelete(index) {
+      const entry = allEntries[index];
+      if (!entry) return alert('Log entry not found');
+      if (!confirm('Delete this log entry? This action cannot be undone.')) return;
+      deleteEntryByTs(entry.ts);
+    }
+
+    // Delete all entries
+    async function deleteAllEntries() {
+      try {
+        if (!confirm('Delete ALL log entries? This will clear the engine log file.')) return;
+        const form = new URLSearchParams();
+        form.append('all', '1');
+        const res = await fetch('../students/delete_engine_log.php', { method: 'POST', body: form });
+        const data = await res.json();
+        if (data.ok) {
+          loadLogs();
+        } else {
+          alert('Could not clear logs: ' + (data.error || 'Unknown error'));
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Error clearing logs');
+      }
+    }
+
+    function confirmDeleteAll() { deleteAllEntries(); }
+
+    function getFilteredEntries() {
+      const search = (document.getElementById('filterSearch').value || '').trim().toLowerCase();
+      const type = (document.getElementById('filterType').value || '').trim().toLowerCase();
+      const engine = (document.getElementById('filterEngine').value || '').trim().toLowerCase();
+      const from = document.getElementById('filterFrom').value;
+      const to = document.getElementById('filterTo').value;
+
+      return allEntries.filter(entry => {
+        if (search && !entry.searchBlob.includes(search)) return false;
+        if (type && entry.type.toLowerCase() !== type) return false;
+        if (engine && entry.engine.toLowerCase() !== engine) return false;
+        if (from && entry.dateKey && entry.dateKey < from) return false;
+        if (to && entry.dateKey && entry.dateKey > to) return false;
+        return true;
+      });
+    }
+
+    function getEngineLogsReportState(exportType, entries) {
+      const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      return {
+        reportName: `Engine Logs Report — ${dateStr} (${exportType})`,
+        dataString: JSON.stringify((entries || []).map((entry) => ({
+          type: entry.type,
+          ts: entry.ts,
+          engine: entry.engine,
+          groupKey: entry.groupKey,
+          groupLabel: entry.groupLabel,
+          hint: entry.hint,
+          fields: entry.fields,
+        }))),
+      };
+    }
+
+    async function fetchTodayReports() {
+      if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+        existingReportsToday = [];
+        return;
+      }
+
+      const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+      try {
+        const { data } = await supabaseClient
+          .from('las_reports')
+          .select('report_name, report_data')
+          .eq('report_type', ENGINE_LOG_REPORT_TYPE)
+          .like('report_name', `%${dateStr}%`);
+
+        existingReportsToday = data
+          ? data.map((item) => ({
+              name: item.report_name,
+              dataString: typeof item.report_data === 'string' ? item.report_data : JSON.stringify(item.report_data),
+            }))
+          : [];
+      } catch (error) {
+        existingReportsToday = [];
+      }
+    }
+
+    function checkDuplicateWarning(exportType, entries) {
+      const { reportName, dataString } = getEngineLogsReportState(exportType, entries);
+      const isExactDuplicate = existingReportsToday.some((item) => item.name === reportName && item.dataString === dataString);
+
+      if (isExactDuplicate) {
+        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+      }
+
+      return true;
+    }
+
+    async function autoSaveReport(exportType, entries) {
+      if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+
+      const { reportName, dataString } = getEngineLogsReportState(exportType, entries);
+      const payload = {
+        report_type: ENGINE_LOG_REPORT_TYPE,
+        report_name: reportName,
+        filters: JSON.stringify({
+          search: document.getElementById('filterSearch').value || '',
+          type: document.getElementById('filterType').value || '',
+          engine: document.getElementById('filterEngine').value || '',
+          from: document.getElementById('filterFrom').value || '',
+          to: document.getElementById('filterTo').value || '',
+        }),
+        report_data: dataString,
+      };
+
+      try {
+        const { error } = await supabaseClient.from('las_reports').insert([payload]);
+        if (error) throw error;
+
+        existingReportsToday.push({
+          name: payload.report_name,
+          dataString: payload.report_data,
+        });
+      } catch (error) {
+        console.error('Auto-save error:', error);
+      }
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(null);
+              return;
+            }
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          } catch (error) {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = src;
+      });
+    }
+
+    async function downloadFilteredPdf() {
+      const entries = getFilteredEntries();
+      if (!entries.length) return alert('No log entries match the current filters');
+      if (!checkDuplicateWarning('PDF', entries)) return;
+
+      if (!window.jspdf) {
+        alert('PDF library not loaded yet. Please try again.');
+        return;
+      }
+
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const pageW = doc.internal.pageSize.width;
+        const pageH = doc.internal.pageSize.height;
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const nowStr = `${dateStr} at ${timeStr}`;
+        const { deptLogo, deptName } = getDeptLogos();
+        const [plpData, ccsData] = await Promise.all([
+          loadImage('../resc/assets/plp_logo.png'),
+          loadImage(deptLogo),
+        ]);
+
+        const centerX = pageW / 2;
+        const headerHeight = 45;
+
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.1);
+        doc.rect(10, 5, pageW - 20, headerHeight, 'S');
+
+        const logoSize = 18;
+        if (plpData) doc.addImage(plpData, 'PNG', centerX - 85, 10, logoSize, logoSize);
+        if (ccsData) doc.addImage(ccsData, 'PNG', centerX + 67, 10, logoSize, logoSize);
+
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PAMANTASAN NG LUNGSOD NG PASIG', centerX, 18, { align: 'center' });
+
+        doc.setFontSize(9);
+        doc.setTextColor(60, 60, 60);
+        doc.setFont('helvetica', 'normal');
+        doc.text(deptName.toUpperCase(), centerX, 23, { align: 'center' });
+
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ENGINE LOGS REPORT', centerX, 33, { align: 'center' });
+
+        doc.setFontSize(8);
+        doc.setTextColor(80, 80, 80);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Generated: ${nowStr}  ·  Total Entries: ${entries.length}  ·  Groups: ${groupEntries(entries).length}`, centerX, 39, { align: 'center' });
+
+        doc.autoTable({
+          head: [['#', 'Timestamp', 'Event', 'Engine', 'Hint', 'Status']],
+          body: entries.map((entry, index) => [
+            index + 1,
+            formatTime(entry.ts),
+            typeLabel(entry.type),
+            entry.engine === 'face_capture' ? 'Face Capture' : 'Attendance',
+            entry.hint,
+            getSeverity(entry).toUpperCase(),
+          ]),
+          startY: headerHeight + 10,
+          margin: { left: 10, right: 10 },
+          theme: 'grid',
+          headStyles: {
+            fillColor: [255, 255, 255],
+            fontSize: 7.5,
+            fontStyle: 'bold',
+            textColor: [0, 0, 0],
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1,
+            halign: 'center',
+            valign: 'middle',
+          },
+          styles: {
+            fontSize: 7.5,
+            cellPadding: 2.5,
+            valign: 'middle',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1,
+            textColor: [0, 0, 0],
+          },
+          columnStyles: {
+            0: { cellWidth: 8, halign: 'center' },
+            1: { cellWidth: 36, halign: 'center' },
+            2: { cellWidth: 28, halign: 'left', fontStyle: 'bold' },
+            3: { cellWidth: 26, halign: 'center' },
+            4: { cellWidth: 'auto', halign: 'left' },
+            5: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+          },
+          didParseCell(data) {
+            if (data.column.index === 5 && data.section === 'body') {
+              const severity = (data.cell.text[0] || '').toLowerCase();
+              if (severity === 'error') data.cell.styles.textColor = [185, 28, 28];
+              else if (severity === 'warn') data.cell.styles.textColor = [180, 83, 9];
+              else data.cell.styles.textColor = [22, 101, 52];
+            }
+          },
+        });
+
+        const pages = doc.internal.getNumberOfPages();
+        for (let page = 1; page <= pages; page++) {
+          doc.setPage(page);
+          doc.setFontSize(7);
+          doc.setTextColor(156, 163, 175);
+          doc.text(`Laboratory Attendance System  ·  Page ${page} of ${pages}  ·  ${nowStr}`, pageW / 2, pageH - 8, { align: 'center' });
+        }
+
+        doc.save(`Engine_Logs_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+        await autoSaveReport('PDF', entries);
+      } catch (error) {
+        console.error('PDF generation error:', error);
+        alert('There was an error generating the PDF. Check the console.');
+      }
+    }
+
+    function printAllEntries() {
+      const entries = getFilteredEntries();
+      if (!entries.length) return alert('No log entries match the current filters');
+
+      const { deptLogo, deptName } = getDeptLogos();
+      const rowsHtml = entries.map(entry => {
+        const details = formatDetailFields(entry.fields);
+        return `
+          <div style="margin-bottom:18px;border-bottom:1px solid #eee;padding-bottom:10px">
+            <div><strong>Type:</strong> ${escapeHtml(entry.type)}</div>
+            <div><strong>Timestamp:</strong> ${escapeHtml(formatTime(entry.ts))} (Philippine Time)</div>
+            <div style="margin-top:6px"><strong>Hint:</strong> ${escapeHtml(entry.hint)}</div>
+            <div style="margin-top:8px">${details || '<div>No additional data</div>'}</div>
+          </div>`;
+      }).join('');
+
+      const html = `
+        <html>
+        <head>
+          <title>Engine Logs Export</title>
+          <style>
+            body{font-family:Segoe UI,Roboto,sans-serif;padding:20px;color:#111}
+            h1{font-size:18px;margin-bottom:10px}
+            .header{border:2px solid #000;border-radius:8px;padding:16px 14px;margin-bottom:18px;text-align:center}
+            .logo-row{display:flex;justify-content:center;align-items:center;gap:22px;margin-bottom:8px}
+            .logo-row img{height:48px;width:auto;object-fit:contain}
+            .school{font-size:16px;font-weight:700}
+            .college{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:1px}
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo-row">
+              <img src="../resc/assets/plp_logo.png" alt="PLP Logo">
+              <div>
+                <div class="school">PAMANTASAN NG LUNGSOD NG PASIG</div>
+                <div class="college">${escapeHtml(deptName)}</div>
+              </div>
+              <img src="${escapeHtml(deptLogo)}" alt="Department Logo">
+            </div>
+            <h1>Engine Logs Export (${entries.length} entries)</h1>
+          </div>
+          ${rowsHtml}
+        </body>
+        </html>`;
+
+      const w = window.open('', '_blank');
+      if (!w) { alert('Unable to open window (popup blocked)'); return; }
+      w.document.write(html);
+      w.document.close();
+      setTimeout(() => { w.print(); }, 300);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadHeader();
+      loadSidebar('engine-logs');
+      fetchTodayReports();
+      loadLogs();
+
+      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+      autoRefreshTimer = setInterval(() => {
+        loadLogs();
+      }, 10000);
+
+      document.getElementById('filterSearch').addEventListener('input', applyFilters);
+      document.getElementById('filterType').addEventListener('change', applyFilters);
+      document.getElementById('filterEngine').addEventListener('change', applyFilters);
+      document.getElementById('filterFrom').addEventListener('change', applyFilters);
+      document.getElementById('filterTo').addEventListener('change', applyFilters);
+    });
+  </script>
+</body>
+</html>

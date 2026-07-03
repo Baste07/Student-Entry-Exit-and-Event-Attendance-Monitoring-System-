@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professors | Laboratory Attendance System</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+    <link rel="stylesheet" href="../resc/css/professor.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-chalkboard-teacher"></i> Professors</h1>
+                    <p>View professor profiles, department assignments, and session status</p>
+                </div>
+
+                <span class="total-badge"><span id="statTotal">0</span> Total</span>
+
+                <div class="stats-mini">
+                    <div class="stat-mini in-session">
+                        <i class="fa-solid fa-chalkboard"></i>
+                        <strong><span id="statInSession">0</span></strong> In Session
+                    </div>
+                    <div class="stat-mini schedules">
+                        <i class="fa-solid fa-calendar-alt"></i>
+                        <strong><span id="statSchedules">0</span></strong> Schedules
+                    </div>
+                    <div class="stat-mini face-registered">
+                        <i class="fa-solid fa-camera"></i>
+                        <strong><span id="statFaceReg">0</span></strong> Face Registered
+                    </div>
+                </div>
+
+                <button class="btn-report" onclick="openReportModal()">
+                    <i class="fa-solid fa-file-chart-column"></i> Generate Report
+                </button>
+                <button class="btn-add-prof btn-add--amber" onclick="openModal('faceRegModal')">
+                    <i class="fa-solid fa-camera"></i> Register Face
+                </button>
+            </div>
+            <hr>
+
+            <div class="table-container">
+                <div class="controls-card">
+                    <div class="controls-header">
+                        <h2><i class="fa-solid fa-sliders-h"></i> Filters &amp; Search</h2>
+                    </div>
+                    <div class="table-controls">
+                        <div class="control-group">
+                            <label for="searchInput"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                            <div class="search-container">
+                                <input type="text" id="searchInput" placeholder="Search by name, ID, or email" />
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label for="deptFilter"><i class="fa-solid fa-building"></i> Department</label>
+                            <div class="filter-container">
+                                <select id="deptFilter">
+                                    <option value="">All Departments</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="subjectFilter"><i class="fa-solid fa-book"></i> Subject</label>
+                            <div class="filter-container">
+                                <select id="subjectFilter">
+                                    <option value="">All Subjects</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="statusFilter"><i class="fa-solid fa-filter"></i> Status</label>
+                            <div class="filter-container">
+                                <select id="statusFilter">
+                                    <option value="">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label for="sessionFilter"><i class="fa-solid fa-filter"></i> Session</label>
+                            <div class="filter-container">
+                                <select id="sessionFilter">
+                                    <option value="">All</option>
+                                    <option value="in-session">In Session Now</option>
+                                    <option value="available">Available</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label for="faceFilter"><i class="fa-solid fa-filter"></i> Face</label>
+                            <div class="filter-container">
+                                <select id="faceFilter">
+                                    <option value="">All</option>
+                                    <option value="registered">Registered</option>
+                                    <option value="not-registered">Not Registered</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <button id="clearFilters" class="btn btn-clear"
+                                style="height:40px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
+                                <i class="fa-solid fa-eraser"></i> Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <table class="employees-table">
+                    <thead>
+                        <tr>
+                            <th>Employee ID</th>
+                            <th>Last Name</th>
+                            <th>First Name</th>
+                            <th>Middle Name</th>
+                            <th>Suffix</th>
+                            <th>Department</th>
+                            <th>Email</th>
+                            <th>Subjects Teaching</th>
+                            <th>Face Status</th>
+                            <th>Session Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="professorsTableBody">
+                        <tr>
+                            <td colspan="7" style="text-align:center;padding:40px;color:#6b7280">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading professors...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ══ FACE REG MODAL ══ -->
+    <div id="faceRegModal" class="prof-modal">
+        <div class="prof-modal-card" style="max-width:560px">
+            <div class="prof-modal-header">
+                <h2><i class="fa-solid fa-camera"></i> Register Facial Data</h2>
+                <button class="prof-modal-close" onclick="closeModal('faceRegModal')">&times;</button>
+            </div>
+            <div class="prof-modal-body" style="padding-bottom:20px">
+                <div class="pm-group">
+                    <label for="profIdSearch">Enter Employee ID</label>
+                    <input type="text" id="profIdSearch" placeholder="e.g., EMP2024001"
+                        style="width:100%;padding:12px;border:2px solid #dcfce7;border-radius:8px;font-size:14px;box-sizing:border-box">
+                </div>
+                <button type="button" id="profSearchBtn" onclick="searchProfessor()"
+                    style="width:100%;padding:12px;background:#166534;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px">
+                    <i class="fa-solid fa-search"></i> Search Professor
+                </button>
+                <div id="profSearchResult" class="prof-search-result">
+                    <div id="profFaceStatus" class="face-status"></div>
+                    <div id="profStudentInfo" class="student-info"></div>
+                    <button type="button" id="profRegisterFaceBtn" onclick="redirectToProfFaceReg()"
+                        style="display:none;width:100%;padding:12px;background:#166534;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;align-items:center;justify-content:center;gap:8px">
+                        <i class="fa-solid fa-camera"></i> Register Face Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ REPORT MODAL ══ -->
+    <div class="rm-overlay" id="rmOverlay" onclick="if(event.target===this)closeReportModal()">
+        <div class="rm-box">
+            <div class="rm-hd">
+                <div>
+                    <h2><i class="fa-solid fa-chalkboard-teacher"></i> Professors — Report</h2>
+                    <p id="rmGenDate">Generated ...</p>
+                </div>
+                <button class="rm-x" onclick="closeReportModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="rm-tb">
+                <span class="rm-chip green"><i class="fa-solid fa-chalkboard-teacher"></i> <span id="rmTotalChip">0</span> Active</span>
+                <span class="rm-chip blue"><i class="fa-solid fa-calendar-alt"></i> <span id="rmSchedulesChip">0</span> Schedules</span>
+                <span class="rm-chip green"><i class="fa-solid fa-camera"></i> <span id="rmFaceChip">0</span> Face Registered</span>
+                <div class="rm-tb-right">
+                    <button class="rm-btn print" onclick="printReport()"><i class="fa-solid fa-print"></i> Print</button>
+                    <button class="rm-btn pdf"   onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                    <button class="rm-btn excel" onclick="exportCSV()"><i class="fa-solid fa-file-excel"></i> Excel / CSV</button>
+                    <!-- XML generation removed -->
+                </div>
+            </div>
+            <div class="rm-body">
+                <table class="rm-table">
+                    <thead>
+                        <tr>
+                            <th>#</th><th>Employee ID</th><th>Last Name</th><th>First Name</th><th>Middle Name</th>
+                            <th>Department</th><th>Email</th><th>Face Status</th><th>Account Status</th>
+                            <th>Active Schedules</th><th>Sessions Done</th><th>Subjects</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rmTableBody">
+                        <tr>
+                            <td colspan="12" style="text-align:center;padding:40px;color:#9ca3af">
+                                Loading report data...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+    <script src="../resc/js/professor.js"></script>
+
+    <script>
+        loadHeader();
+        loadSidebar('professors');
+    </script>
+</body>
+</html>

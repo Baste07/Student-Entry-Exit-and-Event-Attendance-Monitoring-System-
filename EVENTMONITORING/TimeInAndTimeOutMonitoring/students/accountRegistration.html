@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Registration | Time In & Time Out Monitoring System</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/accountRegistration.css">
+</head>
+<body>
+
+    <header>
+        <a href="homepage.html" class="brand">
+            <div class="brand-logos">
+                <img src="../resc/assets/plp_logo.png" alt="PLP Logo">
+                <div class="logo-divider"></div>
+                <img src="../resc/assets/ccs_logo.png" alt="CCS Logo" onerror="this.style.display='none';this.previousElementSibling.style.display='none'">
+            </div>
+            <div class="brand-text">
+                <span class="sys-label">Monitoring System</span>
+                <h1>Time In &amp; Time Out</h1>
+            </div>
+        </a>
+
+ <nav>
+    <a href="homepage.html"><i class="fa-solid fa-house"></i> Home</a>
+    <a href="accountRegistration.html" class="active"><i class="fa-solid fa-camera"></i> Register</a>
+    
+    <button id="startEngineNavBtn" onclick="bootRegistrationEngine()" style="background:#2563eb; color:#fff; border:none; padding: 8px 16px; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; gap:6px; align-items:center; display:inline-flex;">
+        <i class="fa-solid fa-power-off"></i> Start Engine
+    </button>
+
+    <button id="stopEngineBtn" onclick="stopEngine()" style="display:none; background:#c0392b; color:#fff; border:none; padding: 8px 16px; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; gap:6px; align-items:center;">
+        <i class="fa-solid fa-power-off"></i> Stop Engine
+    </button>
+</nav>
+
+
+    </header>
+
+   <div id="cameraContainer">
+        <div class="camera-modal">
+            <div class="cam-icon"><i class="fa-solid fa-camera"></i></div>
+            <h3 id="cameraTitle">Live Face Capture</h3>
+            <p id="cameraSubtitle">Position your face clearly within the frame</p>
+            
+           <div class="flask-stream-wrapper" style="width: 100%; min-height: 400px; display: flex; align-items: center; justify-content: center; background: #000; border-radius: 12px; margin: 15px 0; overflow: hidden; border: 2px solid var(--green-bright);">
+    
+    <div id="cameraLoading" style="text-align: center; color: #fff;">
+        <i class="fa-solid fa-spinner fa-spin fa-2x" style="color: var(--green-bright); margin-bottom: 10px;"></i>
+        <p style="font-family: 'DM Sans', sans-serif; font-size: 14px;">Connecting to Lab System...</p>
+    </div>
+
+    <img id="opencvFeed" src="" style="display: none; width: 100%; height: auto; max-height: 480px; object-fit: contain;">
+    
+</div>
+            <div id="captureStatus"></div>
+            <div class="capture-progress">
+                <div class="capture-dot" id="dot1"></div>
+                <div class="capture-dot" id="dot2"></div>
+                <div class="capture-dot" id="dot3"></div>
+                <div class="capture-dot" id="dot4"></div>
+                <div class="capture-dot" id="dot5"></div>
+            </div>
+            <p class="camera-close-hint">Click outside to cancel</p>
+        </div>
+    </div>
+
+    <section class="page-hero">
+        <div class="page-hero-inner">
+            <div class="page-hero-badge"><i class="fa-solid fa-camera"></i> Face Registration</div>
+            <h2 id="heroTitle">Register Your <span>Face</span></h2>
+            <p id="heroSub">Look up your Student ID, then scan your face to enable automatic time tracking.</p>
+        </div>
+    </section>
+
+    <div class="main-wrapper">
+
+        <div class="role-toggle">
+            <button class="role-btn active" id="btnStudent" onclick="switchRole('student')">
+                <i class="fa-solid fa-user-graduate"></i>
+                Student <span class="role-accent">Registration</span>
+            </button>
+            <button class="role-btn" id="btnProfessor" onclick="switchRole('professor')">
+                <i class="fa-solid fa-chalkboard-teacher"></i>
+                Professor <span class="role-accent">Registration</span>
+            </button>
+        </div>
+
+      <div id="studentSection">
+    <div class="form-card">
+        <div class="form-card-header">
+            <div class="hicon"><i class="fa-solid fa-user-graduate"></i></div>
+            <div>
+                <h3>Student Face Registration</h3>
+                <p>Enter your Student ID to retrieve information.</p>
+            </div>
+        </div>
+        <div class="form-card-body">
+
+            <div id="studentInfoCard" class="info-card student">
+                <div class="info-card-head">
+                    <h4><i class="fa-solid fa-circle-check"></i> Student Found</h4>
+                    <span id="studentFaceBadge" class="status-badge"></span>
+                </div>
+                <div class="info-grid">
+                    <div class="info-item"><strong>Full Name</strong><span id="displayName"></span></div>
+                    <div class="info-item"><strong>Course</strong><span id="displayCourse"></span></div>
+                    <div class="info-item"><strong>Year & Section</strong><span id="displayYearSection"></span></div>
+                    <div class="info-item"><strong>Email</strong><span id="displayEmail"></span></div>
+                </div>
+            </div>
+
+            <form id="studentForm" autocomplete="off">
+                <p class="form-section-label">Student Lookup</p>
+                <div class="form-row cols-1">
+                    <div class="form-group">
+                        <label><i class="fa-solid fa-id-card"></i> Student ID Number</label>
+                        <input type="text" id="studentIdInput" placeholder="XX-XXXXX" maxlength="8">
+                        <span class="field-msg success" id="idSuccess"></span>
+                        <span class="field-msg error" id="idError"></span>
+                    </div>
+                </div>
+
+                <p class="form-section-label">Personal Information</p>
+                <div class="form-row cols-3">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" id="s_firstName" readonly placeholder="Auto-filled">
+                    </div>
+                    <div class="form-group">
+                        <label>Middle Name</label>
+                        <input type="text" id="s_middleName" readonly placeholder="Auto-filled">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" id="s_lastName" readonly placeholder="Auto-filled">
+                    </div>
+                </div>
+                <div class="form-row cols-3">
+                    <div class="form-group">
+                        <label>Course</label>
+                        <input type="text" id="s_course" readonly placeholder="Auto-filled">
+                    </div>
+                    <div class="form-group">
+                        <label>Year Level</label>
+                        <input type="text" id="s_yearLevel" readonly placeholder="Auto-filled">
+                    </div>
+                    <div class="form-group">
+                        <label>Section</label>
+                        <input type="text" id="s_section" readonly placeholder="Auto-filled">
+                    </div>
+                </div>
+                <div class="form-row cols-1">
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" id="s_email" readonly placeholder="Auto-filled">
+                    </div>
+                </div>
+
+                <div class="button-row">
+                    <button type="button" class="btn-primary" id="studentScanBtn" disabled>
+                        <i class="fa-solid fa-camera"></i> Scan & Register Face
+                    </button>
+                    <button type="button" class="btn-outline" id="studentClearBtn">
+                        <i class="fa-solid fa-eraser"></i> Clear
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+        <div id="professorSection" style="display:none;">
+            <div class="form-card">
+                <div class="form-card-header">
+                    <div class="hicon"><i class="fa-solid fa-chalkboard-teacher"></i></div>
+                    <div>
+                        <h3>Professor Face Registration</h3>
+                        <p>Enter your Employee ID to retrieve your information, then scan your face.</p>
+                    </div>
+                </div>
+                <div class="form-card-body">
+
+                    <div id="professorInfoCard" class="info-card professor">
+                        <div class="info-card-head">
+                            <h4><i class="fa-solid fa-circle-check"></i> Professor Found</h4>
+                            <span id="professorFaceBadge" class="status-badge"></span>
+                        </div>
+                        <div class="info-grid">
+                            <div class="info-item"><strong>Full Name</strong><span id="p_displayName"></span></div>
+                            <div class="info-item"><strong>Department</strong><span id="p_displayDept"></span></div>
+                            <div class="info-item"><strong>Employee ID</strong><span id="p_displayEmpId"></span></div>
+                            <div class="info-item"><strong>Email</strong><span id="p_displayEmail"></span></div>
+                        </div>
+                    </div>
+
+                    <form id="professorForm" autocomplete="off">
+                        <p class="form-section-label">Employee Lookup</p>
+                        <div class="form-row cols-1">
+                            <div class="form-group">
+                                <label><i class="fa-solid fa-id-badge"></i> Employee ID</label>
+                                <input type="text" id="employeeIdInput" placeholder="e.g. EMP2024001" autocomplete="off">
+                                <span class="field-msg error"   id="p_idError"></span>
+                                <span class="field-msg success" id="p_idSuccess"></span>
+                            </div>
+                        </div>
+
+                        <p class="form-section-label">Personal Information</p>
+                        <div class="form-row cols-3">
+                            <div class="form-group">
+                                <label><i class="fa-solid fa-user"></i> First Name</label>
+                                <input type="text" id="p_firstName" readonly placeholder="Auto-filled">
+                            </div>
+                            <div class="form-group">
+                                <label>Middle Name</label>
+                                <input type="text" id="p_middleName" readonly placeholder="Auto-filled">
+                            </div>
+                            <div class="form-group">
+                                <label>Last Name</label>
+                                <input type="text" id="p_lastName" readonly placeholder="Auto-filled">
+                            </div>
+                        </div>
+                        <div class="form-row cols-2">
+                            <div class="form-group">
+                                <label><i class="fa-solid fa-building"></i> Department</label>
+                                <input type="text" id="p_department" readonly placeholder="Auto-filled">
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fa-solid fa-envelope"></i> Email Address</label>
+                                <input type="email" id="p_email" readonly placeholder="Auto-filled">
+                            </div>
+                        </div>
+
+                        <div class="button-row">
+                            <button type="button" class="btn-primary" id="professorScanBtn" disabled>
+                                <i class="fa-solid fa-camera"></i> <span class="btn-accent">Scan</span> &amp; Register Face
+                            </button>
+                            <button type="button" class="btn-outline" id="professorClearBtn">
+                                <i class="fa-solid fa-eraser"></i> Clear
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <h2>Time In &amp; <span>Time Out</span><br>Monitoring System</h2>
+                <p>Developed by a dedicated team of software engineers and IT professionals committed to enhancing laboratory management through innovative facial recognition and machine learning technology.</p>
+            </div>
+            <div class="footer-contact">
+                <h3>Contact Us</h3>
+                <p><i class="fa-solid fa-envelope"></i> ams@plpasig.edu.ph</p>
+                <p><i class="fa-solid fa-location-dot"></i> Pasig City, Metro Manila</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>&copy; <span id="currentYear"></span> Time In &amp; Time Out Monitoring System. All rights reserved.</span>
+            <span>Powered by Facial Recognition &amp; ML<a/span>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+
+    <script>
+        const supabaseClient = supabase.createClient(
+            ENV.SUPABASE_PROJECT_URL, 
+            ENV.SUPABASE_ANON_KEY
+        );
+    </script>
+    
+    <script src="../resc/js/accountRegistration.js"></script>
+
+    <script>
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+    </script>
+</body>
+</html>
