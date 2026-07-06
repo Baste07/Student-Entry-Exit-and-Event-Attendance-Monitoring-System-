@@ -1,9 +1,11 @@
 document.addEventListener('DOMContentLoaded', function () {
     const AUTH_DISABLED = true;
+    const DEFAULT_ADMIN_PASSWORD = 'Admin123!';
+    const DEFAULT_SUPER_ADMIN_PASSWORD = 'SuperAdmin123!';
     const HARDCODED_USERS = [
         {
-            username: 'superadmin@plpasig.edu.ph',
-            password: 'SuperAdmin123!',
+            usernames: ['superadmin', 'super admin', 'superadmin@plpasig.edu.ph'],
+            password: DEFAULT_SUPER_ADMIN_PASSWORD,
             profile: {
                 id: 'hc-super-admin',
                 employeeId: 'SA-001',
@@ -20,8 +22,8 @@ document.addEventListener('DOMContentLoaded', function () {
             redirect: '../admin/usermanagement.html'
         },
         {
-            username: 'admin@plpasig.edu.ph',
-            password: 'Admin123!',
+            usernames: ['admin', 'admin@plpasig.edu.ph'],
+            password: DEFAULT_ADMIN_PASSWORD,
             profile: {
                 id: 'hc-admin',
                 employeeId: 'AD-001',
@@ -93,11 +95,11 @@ document.addEventListener('DOMContentLoaded', function () {
     function bypassLogin(username, password) {
         const normalizedUsername = String(username || '').trim().toLowerCase();
         const match = HARDCODED_USERS.find(user => {
-            return user.username === normalizedUsername && user.password === password;
+            return user.usernames.includes(normalizedUsername) && user.password === password;
         });
 
         if (!match) {
-            showError('Invalid hardcoded credentials.');
+            showError('Invalid credentials. Use admin or superadmin with the default password.');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Sign In';
             return;
