@@ -57,20 +57,20 @@
         </div>
     </div>
 
-    <!-- Step 1: Department + File Upload -->
+    <!-- Step 1: Section + File Upload -->
     <div class="import-card anim anim-2" id="stepUpload">
         <div class="step-badge">Step 1 of 3</div>
-        <h2 class="step-title">Select Department & Upload File</h2>
-        <p class="step-desc">Choose the department these students belong to, then upload your filled Excel or CSV template.</p>
+        <h2 class="step-title">Select Grade/Section & Upload File</h2>
+        <p class="step-desc">Choose the section these students belong to, then upload your filled Excel or CSV template.</p>
 
         <div class="row g-4 mt-1">
             <div class="col-md-5">
                 <label class="form-label-custom" for="departmentSelect">
                     <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                    Department <span class="required">*</span>
+                    Grade Level / Section <span class="required">*</span>
                 </label>
                 <select class="form-select-custom" id="departmentSelect">
-                    <option value="">Loading departments...</option>
+                    <option value="">Loading sections...</option>
                 </select>
             </div>
 
@@ -142,15 +142,15 @@
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>Student ID</th>
+                        <th>LRN</th>
                         <th>Last Name</th>
                         <th>First Name</th>
                         <th>Middle Name</th>
                         <th>Suffix</th>
-                        <th>Course</th>
-                        <th>Year Level</th>
+                        <th>Birth Date</th>
+                        <th>Gender</th>
                         <th>Section</th>
-                        <th>Email</th>
+                        <th>Email (Optional)</th>
                         <th>Status</th>
                     </tr>
                 </thead>
@@ -206,7 +206,7 @@
             <div class="info-col">
                 <h4>Required Columns</h4>
                 <ul>
-                    <li><strong>Student ID</strong> — School ID in format <code>NN-NNNNN</code> (e.g. <code>23-00269</code>). Also used as default password.</li>
+                    <li><strong>LRN</strong> — Learner Reference Number (12 digits)</li>
                     <li><strong>First Name</strong> — Student's first name</li>
                     <li><strong>Last Name</strong> — Student's last name</li>
                 </ul>
@@ -216,17 +216,16 @@
                 <ul>
                     <li><strong>Middle Name</strong> — May be left blank</li>
                     <li><strong>Suffix</strong> — e.g. Jr., Sr., III — May be left blank</li>
-                    <li><strong>Course</strong> — e.g. Computer Science</li>
-                    <li><strong>Year Level</strong> — Number from 1–5</li>
-                    <li><strong>Section</strong> — e.g. CS3A</li>
-                    <li><strong>Email</strong> — Auto-generated if blank: <code>lastname_firstname@plpasig.edu.ph</code></li>
+                    <li><strong>Birth Date</strong> — YYYY-MM-DD (if available)</li>
+                    <li><strong>Gender</strong> — male, female, or other</li>
+                    <li><strong>Email</strong> — Optional, only used for QR notification</li>
                 </ul>
             </div>
             <div class="info-col">
                 <h4>Notes</h4>
                 <ul>
-                    <li>Default password = Student ID (e.g. <code>23-00269</code>)</li>
-                        <li>Student IDs that already exist in the database are <strong>skipped</strong> from preview and import</li>
+                    <li>Section is taken from Step 1 selection for all imported rows</li>
+                    <li>LRNs that already exist in the database are <strong>skipped</strong> from preview and import</li>
                     <li>Do not delete the header row</li>
                     <li>Remove sample data before importing</li>
                 </ul>
@@ -246,24 +245,24 @@
         <div class="students-filters">
             <div class="students-filter-item students-filter-search">
                 <label for="studentSearchInput" class="form-label">Search</label>
-                <input type="text" id="studentSearchInput" class="form-control" placeholder="Name, Student ID, or Email">
+                <input type="text" id="studentSearchInput" class="form-control" placeholder="Name or LRN">
             </div>
             <div class="students-filter-item">
-                <label for="studentDeptFilter" class="form-label">Department</label>
+                <label for="studentDeptFilter" class="form-label">Grade Level</label>
                 <select id="studentDeptFilter" class="form-select">
-                    <option value="">All Departments</option>
+                    <option value="">All Grade Levels</option>
                 </select>
             </div>
             <div class="students-filter-item">
-                <label for="studentCourseFilter" class="form-label">Course</label>
+                <label for="studentCourseFilter" class="form-label">Section</label>
                 <select id="studentCourseFilter" class="form-select">
-                    <option value="">All Courses</option>
+                    <option value="">All Sections</option>
                 </select>
             </div>
             <div class="students-filter-item">
-                <label for="studentYearFilter" class="form-label">Year</label>
+                <label for="studentYearFilter" class="form-label">Gender</label>
                 <select id="studentYearFilter" class="form-select">
-                    <option value="">All Years</option>
+                    <option value="">All Genders</option>
                 </select>
             </div>
             <div class="students-filter-item">
@@ -283,20 +282,19 @@
             <table class="students-table">
                 <thead>
                     <tr>
-                        <th>Student ID</th>
+                        <th>LRN</th>
                         <th>Name</th>
-                        <th>Department</th>
-                        <th>Course</th>
-                        <th>Year</th>
+                        <th>Grade Level</th>
                         <th>Section</th>
-                        <th>Email</th>
+                        <th>Birth Date</th>
+                        <th>Gender</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="allStudentsTableBody">
                     <tr>
-                        <td colspan="9" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
+                        <td colspan="8" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
                     </tr>
                 </tbody>
             </table>
@@ -313,13 +311,13 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted mb-3" id="duplicateRowsSummaryText">Rows skipped due to duplicate Student IDs.</p>
+                <p class="text-muted mb-3" id="duplicateRowsSummaryText">Rows skipped due to duplicate LRNs.</p>
                 <div class="table-responsive duplicate-rows-table-wrap">
                     <table class="table table-sm align-middle mb-0 duplicate-rows-table">
                         <thead>
                             <tr>
                                 <th>Source Row</th>
-                                <th>Student ID</th>
+                                <th>LRN</th>
                                 <th>Name</th>
                                 <th>Email</th>
                                 <th>Reason</th>
@@ -344,14 +342,14 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label for="singleDepartment" class="form-label">Department <span class="text-danger">*</span></label>
+                            <label for="singleDepartment" class="form-label">Section <span class="text-danger">*</span></label>
                             <select id="singleDepartment" class="form-select" required>
-                                <option value="">Select department...</option>
+                                <option value="">Select section...</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label for="singleStudentId" class="form-label">Student ID <span class="text-danger">*</span></label>
-                            <input type="text" id="singleStudentId" class="form-control" placeholder="23-00269" maxlength="8" required>
+                            <label for="singleStudentId" class="form-label">LRN <span class="text-danger">*</span></label>
+                            <input type="text" id="singleStudentId" class="form-control" placeholder="12-digit LRN" maxlength="12" required>
                         </div>
                         <div class="col-md-4">
                             <label for="singleFirstName" class="form-label">First Name <span class="text-danger">*</span></label>
@@ -369,23 +367,23 @@
                             <label for="singleSuffix" class="form-label">Suffix</label>
                             <input type="text" id="singleSuffix" class="form-control" placeholder="e.g. Sr, Jr">
                         </div>
-                        <div class="col-md-3">
-                            <label for="singleCourse" class="form-label">Course</label>
-                            <input type="text" id="singleCourse" class="form-control" placeholder="e.g. BSCS" maxlength="10">
+                        <div class="col-md-4">
+                            <label for="singleYearLevel" class="form-label">Birth Date</label>
+                            <input type="date" id="singleYearLevel" class="form-control">
                         </div>
                         <div class="col-md-4">
-                            <label for="singleYearLevel" class="form-label">Year Level</label>
-                            <input type="number" id="singleYearLevel" class="form-control" min="1" max="5" placeholder="1-5">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="singleSection" class="form-label">Section</label>
-                           <input type="text" id="singleSection" class="form-control   placeholder="e.g. A" maxlength="1">
-
+                            <label for="singleSection" class="form-label">Gender</label>
+                            <select id="singleSection" class="form-select">
+                                <option value="">Select gender...</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
                         </div>
                         <div class="col-12">
-                            <label for="singleEmail" class="form-label">Email <span class="text-danger">*</span></label>
-                            <input type="email" id="singleEmail" class="form-control" placeholder="name@plpasig.edu.ph" required>
-                            <div class="form-text">A valid email address is required.</div>
+                            <label for="singleEmail" class="form-label">Email (Optional for QR Notification)</label>
+                            <input type="text" id="singleEmail" class="form-control" placeholder="Any email text">
+                            <div class="form-text">No strict format required. QR email is sent only when the value looks deliverable.</div>
                         </div>
                     </div>
                 </div>
@@ -410,11 +408,11 @@
                     <input type="hidden" id="editStudentUid">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label for="editStudentId" class="form-label">Student ID</label>
+                            <label for="editStudentId" class="form-label">LRN</label>
                             <input type="text" id="editStudentId" class="form-control" readonly>
                         </div>
                         <div class="col-md-6">
-                            <label for="editDepartment" class="form-label">Department <span class="text-danger">*</span></label>
+                            <label for="editDepartment" class="form-label">Section <span class="text-danger">*</span></label>
                             <select id="editDepartment" class="form-select" required></select>
                         </div>
                         <div class="col-md-4">
@@ -433,21 +431,18 @@
                             <label for="editSuffix" class="form-label">Suffix</label>
                             <input type="text" id="editSuffix" class="form-control" placeholder="e.g. Sr, Jr">
                         </div>
-                        <div class="col-md-3">
-                            <label for="editCourse" class="form-label">Course</label>
-                            <input type="text" id="editCourse" class="form-control">
+                        <div class="col-md-4">
+                            <label for="editYearLevel" class="form-label">Birth Date</label>
+                            <input type="date" id="editYearLevel" class="form-control">
                         </div>
                         <div class="col-md-4">
-                            <label for="editYearLevel" class="form-label">Year Level</label>
-                            <input type="number" id="editYearLevel" class="form-control" min="1" max="5" placeholder="1-5">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="editSection" class="form-label">Section</label>
-                            <input type="text" id="editSection" class="form-control">
-                        </div>
-                        <div class="col-md-8">
-                            <label for="editEmail" class="form-label">Email <span class="text-danger">*</span></label>
-                            <input type="email" id="editEmail" class="form-control" required>
+                            <label for="editSection" class="form-label">Gender</label>
+                            <select id="editSection" class="form-select">
+                                <option value="">Select gender...</option>
+                                <option value="male">male</option>
+                                <option value="female">female</option>
+                                <option value="other">other</option>
+                            </select>
                         </div>
                         <div class="col-md-4">
                             <label for="editStatus" class="form-label">Status</label>
