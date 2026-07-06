@@ -11,6 +11,7 @@ let duplicateRowsInFile = [];
 let duplicateRowsInDatabase = [];
 let allStudents = [];
 const QR_EMAIL_ENDPOINT = 'send-student-qr-email.php';
+const EMAIL_LIKE_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -34,24 +35,24 @@ async function loadDepartments() {
     try {
         if (!supabaseClient) return;
 
-        const { data: departments, error } = await supabaseClient
-            .from('departments')
-            .select('id, department_name, department_code')
-            .eq('is_active', true)
-            .order('department_name', { ascending: true });
+        const { data: sections, error } = await supabaseClient
+            .from('sections')
+            .select('section_id, grade_level, section_name')
+            .order('grade_level', { ascending: true })
+            .order('section_name', { ascending: true });
 
         if (error) throw error;
 
-        departmentsCache = departments || [];
+        departmentsCache = sections || [];
 
         const select = document.getElementById('departmentSelect');
-        select.innerHTML = '<option value="">Select a department...</option>';
+        select.innerHTML = '<option value="">Select a section...</option>';
 
         departmentsCache.forEach(dept => {
             const opt = document.createElement('option');
-            opt.value = dept.id;
-            opt.textContent = `${dept.department_name} (${dept.department_code})`;
-            opt.dataset.name = dept.department_name;
+            opt.value = dept.section_id;
+            opt.textContent = `${dept.grade_level} - ${dept.section_name}`;
+            opt.dataset.name = `${dept.grade_level} - ${dept.section_name}`;
             select.appendChild(opt);
         });
 
@@ -202,25 +203,16 @@ function setupEventListeners() {
         }
     });
 
-    // ── Auto-format Student ID (inserts dash after 2 digits) ──
+    // LRN: allow digits only (up to 12).
 const singleIdInput = document.getElementById('singleStudentId');
 singleIdInput?.addEventListener('input', (e) => {
-    let digits = e.target.value.replace(/\D/g, '').slice(0, 7);
-    e.target.value = digits.length > 2
-        ? digits.slice(0, 2) + '-' + digits.slice(2)
-        : digits;
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 12);
 });
 
-// ── Course: uppercase acronyms only (letters, no spaces) ──
-const singleCourseInput = document.getElementById('singleCourse');
-singleCourseInput?.addEventListener('input', (e) => {
-    e.target.value = e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase();
-});
-
-// ── Section: single letter A–Z only ──
-const singleSectionInput = document.getElementById('singleSection');
-singleSectionInput?.addEventListener('input', (e) => {
-    e.target.value = e.target.value.replace(/[^A-Za-z]/g, '').slice(0, 1).toUpperCase();
+// Normalize gender values.
+const singleGenderInput = document.getElementById('singleSection');
+singleGenderInput?.addEventListener('change', (e) => {
+    e.target.value = String(e.target.value || '').trim().toLowerCase();
 });
 
 // ── Suffix: auto-format with first letter uppercase (e.g. Sr, Jr, III) ──
@@ -240,6 +232,11 @@ editSuffixInput?.addEventListener('input', (e) => {
         value = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
     }
     e.target.value = value;
+});
+
+const editGenderInput = document.getElementById('editSection');
+editGenderInput?.addEventListener('change', (e) => {
+    e.target.value = String(e.target.value || '').trim().toLowerCase();
 });
 }
 
@@ -329,8 +326,8 @@ async function parseFile() {
                 firstName:   String(r[2] || '').trim(),
                 middleName:  String(r[3] || '').trim(),
                 suffix:      String(r[4] || '').trim(),
-                course:      String(r[5] || '').trim(),
-                yearLevel:   String(r[6] || '').trim(),
+                birthDate:   String(r[5] || '').trim(),
+                gender:      String(r[6] || '').trim(),
                 section:     String(r[7] || '').trim(),
                 email:       String(r[8] || '').trim(),
             }));
@@ -371,8 +368,8 @@ function parseCSV(text) {
             firstName:  cols[2] || '',
             middleName: cols[3] || '',
             suffix:     cols[4] || '',
-            course:     cols[5] || '',
-            yearLevel:  cols[6] || '',
+            birthDate:  cols[5] || '',
+            gender:     cols[6] || '',
             section:    cols[7] || '',
             email:      cols[8] || '',
         };
@@ -383,36 +380,47 @@ function parseCSV(text) {
 function validateRow(row, index) {
     const errors   = [];
     const warnings = [];
-    const normalizedId = String(row.studentId || '').trim();
+    const normalizedId = String(row.studentId || '').replace(/\D/g, '').trim();
 
     if (!normalizedId) {
-        errors.push('Student ID is required');
-    } else if (!/^\d{2}-\d{5}$/.test(normalizedId)) {
-        errors.push('Student ID must be in format NN-NNNNN (e.g. 23-00269)');
+        errors.push('LRN is required');
+    } else if (!/^\d{12}$/.test(normalizedId)) {
+        errors.push('LRN must be exactly 12 digits');
     }
 
     if (!row.firstName)  errors.push('First Name is required');
     if (!row.lastName)   errors.push('Last Name is required');
 
-    if (row.yearLevel && (isNaN(row.yearLevel) || +row.yearLevel < 1 || +row.yearLevel > 5)) {
-        errors.push('Year Level must be between 1 and 5');
+    if (row.birthDate && Number.isNaN(Date.parse(row.birthDate))) {
+        errors.push('Birth Date must be valid (YYYY-MM-DD)');
     }
 
-    if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
-        warnings.push('Email format looks invalid');
+    const normalizedGender = String(row.gender || '').trim().toLowerCase();
+    if (normalizedGender && !['male', 'female', 'other'].includes(normalizedGender)) {
+        warnings.push('Gender value is uncommon (recommended: male, female, other)');
     }
 
-    let email = row.email;
-    if (!email && row.firstName && row.lastName) {
-        email = `${row.lastName.toLowerCase()}_${row.firstName.toLowerCase()}@plpasig.edu.ph`;
-        warnings.push('Email auto-generated');
+    const email = String(row.email || '').trim();
+    if (email && !EMAIL_LIKE_PATTERN.test(email)) {
+        warnings.push('Email may not be deliverable; QR email can be skipped');
     }
 
     const status = errors.length > 0 ? 'error'
                  : warnings.length > 0 ? 'warning'
                  : 'ok';
 
-    return { ...row, studentId: normalizedId, email, errors, warnings, status, rowIndex: index + 2 };
+    return {
+        ...row,
+        studentId: normalizedId,
+        birthDate: String(row.birthDate || '').trim(),
+        gender: normalizedGender,
+        section: selectedDepartmentName || String(row.section || '').trim(),
+        email,
+        errors,
+        warnings,
+        status,
+        rowIndex: index + 2,
+    };
 }
 
 function renderPreview() {
@@ -495,8 +503,8 @@ function renderPreview() {
                 ${cell(row.firstName)}
                 ${cell(row.middleName)}
                 ${cell(row.suffix)}
-                ${cell(row.course)}
-                ${cell(row.yearLevel)}
+                ${cell(row.birthDate)}
+                ${cell(row.gender)}
                 ${cell(row.section)}
                 <td style="font-size:0.82rem;">${escapeHtml(row.email)}${warnNote}</td>
                 <td>${statusBadge}</td>
@@ -529,9 +537,9 @@ async function startImport() {
     const studentIds = validRows.map(r => r.studentId);
     const { data: existing } = await supabaseClient
         .from('students')
-        .select('id_number')
-        .in('id_number', studentIds);
-    const existingIds = new Set((existing || []).map(e => e.id_number));
+        .select('lrn')
+        .in('lrn', studentIds);
+    const existingIds = new Set((existing || []).map(e => e.lrn));
 
     for (let i = 0; i < validRows.length; i++) {
         const row = validRows[i];
@@ -540,17 +548,14 @@ async function startImport() {
 
         try {
             const studentData = {
-                id_number:    row.studentId,
+                lrn:          row.studentId,
                 first_name:   row.firstName,
                 middle_name:  row.middleName || null,
                 last_name:    row.lastName,
                 suffix:       row.suffix || null,
-                email:        row.email,
-                course:       row.course || null,
-                year_level:   row.yearLevel ? parseInt(row.yearLevel) : null,
-                section:      row.section || null,
-                department_id: selectedDepartmentId,
-                password:     row.studentId,  
+                birth_date:   row.birthDate || null,
+                gender:       row.gender || null,
+                section_id:   selectedDepartmentId,
                 status:       'active',
                 updated_at:   new Date().toISOString(),
             };
@@ -561,7 +566,7 @@ async function startImport() {
                 const res = await supabaseClient
                     .from('students')
                     .update(studentData)
-                    .eq('id_number', row.studentId);
+                    .eq('lrn', row.studentId);
                 error = res.error;
             } else {
                 // Insert new record
@@ -584,9 +589,9 @@ async function startImport() {
                 firstName: row.firstName,
                 middleName: row.middleName,
                 lastName: row.lastName,
-                course: row.course,
-                yearLevel: row.yearLevel,
-                section: row.section,
+                birthDate: row.birthDate,
+                gender: row.gender,
+                sectionLabel: selectedDepartmentName,
                 email: row.email,
             });
 
@@ -632,7 +637,7 @@ async function loadAllStudentsTable() {
     try {
         const { data, error } = await supabaseClient
             .from('students')
-            .select('student_id, id_number, first_name, middle_name, last_name, suffix, department_id, course, year_level, section, email, status')
+            .select('student_id, lrn, first_name, middle_name, last_name, suffix, birth_date, gender, section_id, status, sections:section_id(grade_level, section_name)')
             .order('last_name', { ascending: true })
             .order('first_name', { ascending: true });
 
@@ -668,11 +673,13 @@ function renderAllStudentsTable() {
         const fullName = student.last_name ? (student.last_name + ', ' + nameParts.join(' ')).toLowerCase() : nameParts.join(' ').toLowerCase();
         const matchesSearch = !search
             || fullName.includes(search)
-            || String(student.id_number || '').toLowerCase().includes(search)
-            || String(student.email || '').toLowerCase().includes(search);
-        const matchesDept = !dept || String(student.department_id || '') === dept;
-        const matchesCourse = !course || String(student.course || '').toLowerCase() === course.toLowerCase();
-        const matchesYear = !year || String(student.year_level || '') === year;
+            || String(student.lrn || '').toLowerCase().includes(search);
+        const gradeLevel = String(student.sections?.grade_level || '').trim();
+        const sectionName = String(student.sections?.section_name || '').trim();
+        const gender = String(student.gender || '').trim().toLowerCase();
+        const matchesDept = !dept || gradeLevel === dept;
+        const matchesCourse = !course || sectionName.toLowerCase() === course.toLowerCase();
+        const matchesYear = !year || gender === year.toLowerCase();
         return matchesSearch && matchesDept && matchesCourse && matchesYear;
     });
 
@@ -681,36 +688,34 @@ function renderAllStudentsTable() {
     if (filteredStudents.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" style="text-align:center;padding:1rem;color:var(--text-muted);">No students found with current filters.</td>
+                <td colspan="8" style="text-align:center;padding:1rem;color:var(--text-muted);">No students found with current filters.</td>
             </tr>
         `;
         return;
     }
 
-    const deptMap = new Map(departmentsCache.map(d => [String(d.id), `${d.department_name} (${d.department_code})`]));
-
     tbody.innerHTML = filteredStudents.map((student) => {
         // Format: lastName, firstName middleName suffix
         const nameParts = [student.first_name, student.middle_name, student.suffix].filter(Boolean);
         const fullName = student.last_name ? (student.last_name + ', ' + nameParts.join(' ')) : nameParts.join(' ');
-        const departmentName = deptMap.get(String(student.department_id)) || 'N/A';
+        const gradeLevel = student.sections?.grade_level || 'N/A';
+        const sectionName = student.sections?.section_name || 'N/A';
         const status = student.status || 'inactive';
         return `
             <tr>
-                <td><strong>${escapeHtml(student.id_number || 'N/A')}</strong></td>
+                <td><strong>${escapeHtml(student.lrn || 'N/A')}</strong></td>
                 <td>${escapeHtml(fullName || 'N/A')}</td>
-                <td>${escapeHtml(departmentName)}</td>
-                <td>${escapeHtml(student.course || '—')}</td>
-                <td>${escapeHtml(student.year_level ?? '—')}</td>
-                <td>${escapeHtml(student.section || '—')}</td>
-                <td>${escapeHtml(student.email || '—')}</td>
+                <td>${escapeHtml(gradeLevel)}</td>
+                <td>${escapeHtml(sectionName)}</td>
+                <td>${escapeHtml(student.birth_date || '—')}</td>
+                <td>${escapeHtml(student.gender || '—')}</td>
                 <td>${escapeHtml(status)}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn-icon" title="Edit" data-action="edit" data-id="${escapeHtml(student.id_number || '')}">
+                        <button class="btn-icon" title="Edit" data-action="edit" data-id="${escapeHtml(student.lrn || '')}">
                             <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
-                        <button class="btn-icon danger" title="Delete" data-action="delete" data-id="${escapeHtml(student.id_number || '')}">
+                        <button class="btn-icon danger" title="Delete" data-action="delete" data-id="${escapeHtml(student.lrn || '')}">
                             <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
                     </div>
@@ -730,17 +735,19 @@ function populateStudentsFilterOptions() {
     const selectedCourse = courseFilter.value;
     const selectedYear = yearFilter.value;
 
-    deptFilter.innerHTML = '<option value="">All Departments</option>';
-    departmentsCache.forEach(dept => {
+    const uniqueGrades = [...new Set(allStudents.map(s => String(s.sections?.grade_level || '').trim()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    deptFilter.innerHTML = '<option value="">All Grade Levels</option>';
+    uniqueGrades.forEach(grade => {
         const option = document.createElement('option');
-        option.value = String(dept.id);
-        option.textContent = `${dept.department_name} (${dept.department_code})`;
+        option.value = grade;
+        option.textContent = grade;
         deptFilter.appendChild(option);
     });
 
-    const uniqueCourses = [...new Set(allStudents.map(s => String(s.course || '').trim()).filter(Boolean))]
+    const uniqueCourses = [...new Set(allStudents.map(s => String(s.sections?.section_name || '').trim()).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b));
-    courseFilter.innerHTML = '<option value="">All Courses</option>';
+    courseFilter.innerHTML = '<option value="">All Sections</option>';
     uniqueCourses.forEach(course => {
         const option = document.createElement('option');
         option.value = course;
@@ -748,13 +755,13 @@ function populateStudentsFilterOptions() {
         courseFilter.appendChild(option);
     });
 
-    const uniqueYears = [...new Set(allStudents.map(s => String(s.year_level || '').trim()).filter(Boolean))]
-        .sort((a, b) => Number(a) - Number(b));
-    yearFilter.innerHTML = '<option value="">All Years</option>';
+    const uniqueYears = [...new Set(allStudents.map(s => String(s.gender || '').trim().toLowerCase()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b));
+    yearFilter.innerHTML = '<option value="">All Genders</option>';
     uniqueYears.forEach(year => {
         const option = document.createElement('option');
         option.value = year;
-        option.textContent = `Year ${year}`;
+        option.textContent = year;
         yearFilter.appendChild(option);
     });
 
@@ -793,7 +800,7 @@ function handleStudentsTableActions(event) {
 }
 
 function openEditStudentModal(idNumber) {
-    const student = allStudents.find(s => String(s.id_number) === String(idNumber));
+    const student = allStudents.find(s => String(s.lrn) === String(idNumber));
     if (!student || !editStudentModal) return;
 
     const editDepartment = document.getElementById('editDepartment');
@@ -801,23 +808,21 @@ function openEditStudentModal(idNumber) {
         editDepartment.innerHTML = '';
         departmentsCache.forEach(dept => {
             const option = document.createElement('option');
-            option.value = String(dept.id);
-            option.textContent = `${dept.department_name} (${dept.department_code})`;
+            option.value = String(dept.section_id);
+            option.textContent = `${dept.grade_level} - ${dept.section_name}`;
             editDepartment.appendChild(option);
         });
     }
 
     document.getElementById('editStudentUid').value = student.student_id || '';
-    document.getElementById('editStudentId').value = student.id_number || '';
-    document.getElementById('editDepartment').value = String(student.department_id || '');
+    document.getElementById('editStudentId').value = student.lrn || '';
+    document.getElementById('editDepartment').value = String(student.section_id || '');
     document.getElementById('editFirstName').value = student.first_name || '';
     document.getElementById('editMiddleName').value = student.middle_name || '';
     document.getElementById('editLastName').value = student.last_name || '';
     document.getElementById('editSuffix').value = student.suffix || '';
-    document.getElementById('editCourse').value = student.course || '';
-    document.getElementById('editYearLevel').value = student.year_level || '';
-    document.getElementById('editSection').value = student.section || '';
-    document.getElementById('editEmail').value = student.email || '';
+    document.getElementById('editYearLevel').value = student.birth_date || '';
+    document.getElementById('editSection').value = (student.gender || '').toLowerCase();
     document.getElementById('editStatus').value = student.status || 'inactive';
 
     editStudentModal.show();
@@ -829,30 +834,27 @@ async function submitEditStudentForm(event) {
     const saveBtn = document.getElementById('saveStudentEditBtn');
     const studentUid = String(document.getElementById('editStudentUid')?.value || '').trim();
     const idNumber = String(document.getElementById('editStudentId')?.value || '').trim();
-    const departmentId = String(document.getElementById('editDepartment')?.value || '').trim();
+    const sectionId = String(document.getElementById('editDepartment')?.value || '').trim();
     const firstName = String(document.getElementById('editFirstName')?.value || '').trim();
     const middleName = String(document.getElementById('editMiddleName')?.value || '').trim();
     const lastName = String(document.getElementById('editLastName')?.value || '').trim();
     const suffix = String(document.getElementById('editSuffix')?.value || '').trim();
-    const course = String(document.getElementById('editCourse')?.value || '').trim();
-    const yearLevelRaw = String(document.getElementById('editYearLevel')?.value || '').trim();
-    const section = String(document.getElementById('editSection')?.value || '').trim();
-    const email = String(document.getElementById('editEmail')?.value || '').trim();
+    const birthDate = String(document.getElementById('editYearLevel')?.value || '').trim();
+    const gender = String(document.getElementById('editSection')?.value || '').trim().toLowerCase();
     const status = String(document.getElementById('editStatus')?.value || 'inactive').trim();
 
-    if (!departmentId || !firstName || !lastName || !email) {
-        showImportAlert('Department, First Name, Last Name, and Email are required.', 'warning');
+    if (!sectionId || !firstName || !lastName) {
+        showImportAlert('Section, First Name, and Last Name are required.', 'warning');
         return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showImportAlert('Please provide a valid email address.', 'warning');
+    if (birthDate && Number.isNaN(Date.parse(birthDate))) {
+        showImportAlert('Birth Date must be valid.', 'warning');
         return;
     }
 
-    const yearLevel = yearLevelRaw ? Number(yearLevelRaw) : null;
-    if (yearLevelRaw && (!Number.isInteger(yearLevel) || yearLevel < 1 || yearLevel > 5)) {
-        showImportAlert('Year Level must be an integer from 1 to 5.', 'warning');
+    if (gender && !['male', 'female', 'other'].includes(gender)) {
+        showImportAlert('Gender must be male, female, or other.', 'warning');
         return;
     }
 
@@ -861,11 +863,9 @@ async function submitEditStudentForm(event) {
         middle_name: middleName || null,
         last_name: lastName,
         suffix: suffix || null,
-        email,
-        course: course || null,
-        year_level: yearLevel,
-        section: section || null,
-        department_id: departmentId,
+        birth_date: birthDate || null,
+        gender: gender || null,
+        section_id: sectionId,
         status,
         updated_at: new Date().toISOString(),
     };
@@ -880,7 +880,7 @@ async function submitEditStudentForm(event) {
         if (studentUid) {
             query = query.eq('student_id', studentUid);
         } else {
-            query = query.eq('id_number', idNumber);
+            query = query.eq('lrn', idNumber);
         }
 
         const { error } = await query;
@@ -901,7 +901,7 @@ async function submitEditStudentForm(event) {
 }
 
 async function deleteStudentRow(idNumber) {
-    const student = allStudents.find(s => String(s.id_number) === String(idNumber));
+    const student = allStudents.find(s => String(s.lrn) === String(idNumber));
     // Format: lastName, firstName middleName suffix
     const displayName = student
         ? (student.last_name ? (student.last_name + ', ' + [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' ')) : [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' '))
@@ -916,7 +916,7 @@ async function deleteStudentRow(idNumber) {
         if (student?.student_id) {
             query = query.eq('student_id', student.student_id);
         } else {
-            query = query.eq('id_number', idNumber);
+            query = query.eq('lrn', idNumber);
         }
 
         const { error } = await query;
@@ -963,11 +963,11 @@ function populateSingleStudentDepartments() {
     const select = document.getElementById('singleDepartment');
     if (!select) return;
 
-    select.innerHTML = '<option value="">Select department...</option>';
+    select.innerHTML = '<option value="">Select section...</option>';
     departmentsCache.forEach(dept => {
         const option = document.createElement('option');
-        option.value = dept.id;
-        option.textContent = `${dept.department_name} (${dept.department_code})`;
+        option.value = dept.section_id;
+        option.textContent = `${dept.grade_level} - ${dept.section_name}`;
         select.appendChild(option);
     });
 }
@@ -990,49 +990,37 @@ async function submitSingleStudentForm(event) {
     event.preventDefault();
 
     const submitBtn = document.getElementById('singleStudentSubmitBtn');
-    const departmentId = document.getElementById('singleDepartment')?.value || '';
-    const studentId = String(document.getElementById('singleStudentId')?.value || '').trim();
+    const sectionId = document.getElementById('singleDepartment')?.value || '';
+    const studentId = String(document.getElementById('singleStudentId')?.value || '').replace(/\D/g, '').trim();
     const firstName = String(document.getElementById('singleFirstName')?.value || '').trim();
     const middleName = String(document.getElementById('singleMiddleName')?.value || '').trim();
     const lastName = String(document.getElementById('singleLastName')?.value || '').trim();
     const suffix = String(document.getElementById('singleSuffix')?.value || '').trim();
-    const course = String(document.getElementById('singleCourse')?.value || '').trim();
-    const yearLevelRaw = String(document.getElementById('singleYearLevel')?.value || '').trim();
-    const section = String(document.getElementById('singleSection')?.value || '').trim();
+    const birthDate = String(document.getElementById('singleYearLevel')?.value || '').trim();
+    const gender = String(document.getElementById('singleSection')?.value || '').trim().toLowerCase();
     const emailRaw = String(document.getElementById('singleEmail')?.value || '').trim();
 
-    if (!departmentId || !studentId || !firstName || !lastName || !emailRaw) {
-        showImportAlert('Please fill in Department, Student ID, First Name, Last Name, and Email.', 'warning');
+    if (!sectionId || !studentId || !firstName || !lastName) {
+        showImportAlert('Please fill in Section, LRN, First Name, and Last Name.', 'warning');
         return;
     }
 
-    if (!/^\d{2}-\d{5}$/.test(studentId)) {
-        showImportAlert('Student ID must be in format NN-NNNNN (example: 23-00269).', 'warning');
+    if (!/^\d{12}$/.test(studentId)) {
+        showImportAlert('LRN must be exactly 12 digits.', 'warning');
         return;
     }
 
-    if (course && !/^[A-Z]{2,10}$/.test(course)) {
-    showImportAlert('Course must be an uppercase acronym (letters only, e.g. BSCS, IT).', 'warning');
-    return;
-}
+    if (birthDate && Number.isNaN(Date.parse(birthDate))) {
+        showImportAlert('Birth Date must be valid.', 'warning');
+        return;
+    }
 
-if (section && !/^[A-Z]$/.test(section)) {
-    showImportAlert('Section must be a single letter (A–Z).', 'warning');
-    return;
-}
-
-    const yearLevel = yearLevelRaw ? Number(yearLevelRaw) : null;
-    if (yearLevelRaw && (!Number.isInteger(yearLevel) || yearLevel < 1 || yearLevel > 5)) {
-        showImportAlert('Year Level must be an integer from 1 to 5.', 'warning');
+    if (gender && !['male', 'female', 'other'].includes(gender)) {
+        showImportAlert('Gender must be male, female, or other.', 'warning');
         return;
     }
 
     const email = emailRaw;
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showImportAlert('Please provide a valid email address.', 'warning');
-        return;
-    }
 
     try {
         submitBtn.disabled = true;
@@ -1042,41 +1030,26 @@ if (section && !/^[A-Z]$/.test(section)) {
 
         const { data: existingStudent, error: existingError } = await supabaseClient
             .from('students')
-            .select('id_number')
-            .eq('id_number', studentId)
+            .select('lrn')
+            .eq('lrn', studentId)
             .maybeSingle();
 
         if (existingError) throw existingError;
         if (existingStudent) {
-            showImportAlert(`Student ID ${studentId} already exists. Use import to update existing records.`, 'warning');
-            return;
-        }
-
-        // Also check for duplicate email
-        const { data: existingEmail, error: emailCheckError } = await supabaseClient
-            .from('students')
-            .select('id_number')
-            .eq('email', email)
-            .maybeSingle();
-        if (emailCheckError) throw emailCheckError;
-        if (existingEmail) {
-            showImportAlert(`A student with email "${email}" already exists (ID: ${existingEmail.id_number}).`, 'warning');
+            showImportAlert(`LRN ${studentId} already exists. Use import to update existing records.`, 'warning');
             return;
         }
 
         const payload = {
             student_id: crypto.randomUUID(),
-            id_number: studentId,
+            lrn: studentId,
             first_name: firstName,
             middle_name: middleName || null,
             last_name: lastName,
             suffix: suffix || null,
-            email,
-            course: course || null,
-            year_level: yearLevel,
-            section: section || null,
-            department_id: departmentId,
-            password: studentId,
+            birth_date: birthDate || null,
+            gender: gender || null,
+            section_id: sectionId,
             status: 'active',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -1094,16 +1067,19 @@ if (section && !/^[A-Z]$/.test(section)) {
             middleName,
             lastName,
             suffix,
-            course,
-            yearLevel,
-            section,
+            birthDate,
+            gender,
+            sectionLabel: departmentsCache.find(s => String(s.section_id) === String(sectionId))
+                ? `${departmentsCache.find(s => String(s.section_id) === String(sectionId)).grade_level} - ${departmentsCache.find(s => String(s.section_id) === String(sectionId)).section_name}`
+                : '',
             email,
         });
 
         if (emailResult.sent) {
             showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully. QR code was emailed to ${email}.`, 'success');
         } else {
-            showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully, but QR email failed: ${emailResult.message}.`, 'warning');
+            const level = email ? 'warning' : 'info';
+            showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully. QR email status: ${emailResult.message}.`, level);
         }
 
         document.getElementById('singleStudentForm')?.reset();
@@ -1141,7 +1117,7 @@ function renderDuplicateRowsTable() {
 
     const mergedRows = [
         ...duplicateRowsInFile.map(row => ({ ...row, reason: 'Duplicate in uploaded file' })),
-        ...duplicateRowsInDatabase.map(row => ({ ...row, reason: 'Student ID already exists in database' }))
+        ...duplicateRowsInDatabase.map(row => ({ ...row, reason: 'LRN already exists in database' }))
     ].sort((a, b) => (a.rowIndex || 0) - (b.rowIndex || 0));
 
     summaryText.textContent = `${mergedRows.length} row(s) were skipped during import validation.`;
@@ -1199,24 +1175,27 @@ function getStudentQrPayload(student) {
         .replace(/\s+/g, ' ')
         .trim();
 
-    const course = String(student.course || '').trim() || 'N/A';
-    const yearLevel = String(student.yearLevel ?? '').trim() || 'N/A';
-    const section = String(student.section || '').trim() || 'N/A';
+    const birthDate = String(student.birthDate || '').trim() || 'N/A';
+    const gender = String(student.gender || '').trim() || 'N/A';
+    const sectionLabel = String(student.sectionLabel || '').trim() || 'N/A';
 
     return [
         'PLP Laboratory Attendance QR',
         `Name: ${fullName || 'N/A'}`,
-        `Student ID: ${student.studentId}`,
-        `Course: ${course}`,
-        `Year: ${yearLevel}`,
-        `Section: ${section}`,
+        `LRN: ${student.studentId}`,
+        `Birth Date: ${birthDate}`,
+        `Gender: ${gender}`,
+        `Section: ${sectionLabel}`,
     ].join('\n');
 }
 
 async function sendStudentQrEmail(student) {
     const email = String(student.email || '').trim();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return { sent: false, message: 'invalid email address' };
+    if (!email) {
+        return { sent: false, message: 'no email provided' };
+    }
+    if (!EMAIL_LIKE_PATTERN.test(email)) {
+        return { sent: false, message: 'email format not deliverable' };
     }
 
     const payload = {
@@ -1225,9 +1204,9 @@ async function sendStudentQrEmail(student) {
         firstName: String(student.firstName || '').trim(),
         middleName: String(student.middleName || '').trim(),
         lastName: String(student.lastName || '').trim(),
-        course: String(student.course || '').trim(),
-        yearLevel: String(student.yearLevel ?? '').trim(),
-        section: String(student.section || '').trim(),
+        course: String(student.sectionLabel || '').trim(),
+        yearLevel: String(student.birthDate ?? '').trim(),
+        section: String(student.gender || '').trim(),
         qrPayload: getStudentQrPayload(student),
     };
 
@@ -1283,26 +1262,26 @@ function escapeHtml(text) {
 
 function downloadStudentTemplate() {
     const headers = [
-        'Student ID',
+        'LRN',
         'Last Name',
         'First Name',
         'Middle Name',
         'Suffix',
-        'Course',
-        'Year Level',
+        'Birth Date',
+        'Gender',
         'Section',
         'Email'
     ];
 
     const sampleRow = [
-        '23-00221',
+        '123456789012',
         'Dela Cruz',
         'Juan',
         'Santos',
         '',
-        'BSCS',
-        '3',
-        'A',
+        '2012-06-14',
+        'male',
+        'Grade 3 - A',
         'delacruz_juan@plpasig.edu.ph'
     ];
 
@@ -1359,7 +1338,7 @@ async function removeExistingStudentIdsFromParsedRows() {
     const queryableIds = [...new Set(
         parsedRows
             .map(row => String(row.studentId || '').trim())
-            .filter(id => /^\d{2}-\d{5}$/.test(id))
+            .filter(id => /^\d{12}$/.test(id))
     )];
 
     if (queryableIds.length === 0) {
@@ -1368,12 +1347,12 @@ async function removeExistingStudentIdsFromParsedRows() {
 
     const { data: existingStudents, error } = await supabaseClient
         .from('students')
-        .select('id_number')
-        .in('id_number', queryableIds);
+        .select('lrn')
+        .in('lrn', queryableIds);
 
     if (error) throw error;
 
-    const existingIds = new Set((existingStudents || []).map(row => row.id_number));
+    const existingIds = new Set((existingStudents || []).map(row => row.lrn));
     const originalLength = parsedRows.length;
     const removedRows = [];
     parsedRows = parsedRows.filter(row => {
