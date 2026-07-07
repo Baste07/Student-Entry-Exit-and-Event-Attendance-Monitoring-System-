@@ -17,27 +17,6 @@
 
 <div id="sidebar-container"></div>
 
-<!--Gemma Chat-->
-<div id="chat-widget">
-    <div id="chat-header" onclick="toggleChat()">
-        <span>Gemma Chat</span>
-        <button id="toggle-btn" type="button">–</button>
-    </div>
-    <iframe id="chat-frame" src="../Gemma/index.html"></iframe>
-</div>
-<script>
-    const widget = document.getElementById("chat-widget");
-    const btn = document.getElementById("toggle-btn");
-    function toggleChat() {
-        widget.classList.toggle("collapsed");
-        btn.textContent = widget.classList.contains("collapsed") ? "+" : "–";
-    }
-    btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        toggleChat();
-    });
-</script>
-
 <main class="main-content">
 
     <div class="page-header anim anim-1" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;width:100%;">

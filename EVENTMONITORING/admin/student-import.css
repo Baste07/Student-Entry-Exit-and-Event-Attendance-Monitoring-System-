@@ -598,6 +598,7 @@
     font-size: 0.75rem;
     font-weight: 600;
     white-space: nowrap;
+    transition: all 0.2s ease;
 }
 
 .status-badge.valid {
@@ -605,9 +606,21 @@
     color: #28a745;
 }
 
+.status-badge.valid:hover {
+    background: rgba(40, 167, 69, 0.25);
+    transform: translateY(-1px);
+    cursor: pointer;
+}
+
 .status-badge.warning {
     background: rgba(255, 193, 7, 0.15);
     color: #ffc107;
+}
+
+.status-badge.warning:hover {
+    background: rgba(255, 193, 7, 0.25);
+    transform: translateY(-1px);
+    cursor: pointer;
 }
 
 .status-badge.error {
@@ -921,4 +934,208 @@
     padding: 0;
     line-height: 1;
     font-size: 1rem;
+}
+
+#guardianLookupStatus.found { color: #166534; font-weight: 600; }
+#guardianLookupStatus.searching { color: var(--text-muted); }
+
+/* ===== FORM STEPS ===== */
+.form-step {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.form-step.active {
+    display: block;
+}
+
+@keyframes fadeInSlide {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ===== GUARDIAN MANAGEMENT ===== */
+.guardian-form-section {
+    display: block;
+}
+
+.guardian-count-badge {
+    display: inline-block;
+    background: rgba(26, 107, 54, 0.15);
+    border: 1px solid rgba(26, 107, 54, 0.3);
+    padding: 0.65rem 1rem;
+    border-radius: 0.5rem;
+    color: #1a6b36;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.guardian-count-text {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.guardians-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+}
+.form-label-sm {
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 0.35rem;
+}
+
+.form-control-sm {
+    padding: 0.45rem 0.65rem;
+    font-size: 0.85rem;
+}
+
+.form-select-sm {
+    padding: 0.45rem 0.65rem;
+    font-size: 0.85rem;
+}
+
+.guardians-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.guardian-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.guardian-card:hover {
+    box-shadow: var(--shadow-sm);
+}
+
+.guardian-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.guardian-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 0.2rem;
+}
+
+.guardian-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+}
+
+.guardian-badge {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    background: rgba(26, 107, 54, 0.1);
+    color: #1a6b36;
+    border-radius: 0.3rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.guardian-remove-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #dc3545;
+    padding: 0.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.3rem;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.guardian-remove-btn:hover {
+    background: rgba(220, 53, 69, 0.1);
+    transform: scale(1.1);
+}
+
+.guardian-remove-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+}
+
+.add-guardian-section {
+    background: var(--body-bg);
+    border: 1px dashed var(--border);
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.add-guardian-section:focus-within {
+    border-color: var(--green-btn);
+    background: rgba(26, 107, 54, 0.03);
+}
+
+#addGuardianBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+#addGuardianBtn:hover:not(:disabled) {
+    background: var(--green-btn);
+    color: white;
+    border-color: var(--green-btn);
+}
+
+#addGuardianBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ===== MODAL SCROLLABLE FIX ===== */
+#singleStudentModal .modal-dialog {
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#singleStudentModal .modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+#singleStudentModal .modal-body {
+    overflow-y: auto;
+    flex: 1;
+    max-height: calc(90vh - 180px);
+}
+
+#viewGuardiansModal .modal-body,
+#editStudentModal .modal-body,
+#addGuardianModal .modal-body {
+    overflow-y: auto;
+    max-height: 70vh;
 }

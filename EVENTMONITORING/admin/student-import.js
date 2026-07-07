@@ -5,12 +5,13 @@ let departmentsCache = [];
 let singleStudentModal = null;
 let duplicateRowsModal = null;
 let editStudentModal = null;
+let viewGuardiansModal = null;
 let duplicateRowsInFileCount = 0;
 let duplicateRowsInDatabaseCount = 0;
 let duplicateRowsInFile = [];
 let duplicateRowsInDatabase = [];
 let allStudents = [];
-let activeSchoolYear = null; // <-- ADD THIS LINE
+let activeSchoolYear = null;
 const QR_EMAIL_ENDPOINT = 'send-student-qr-email.php';
 const EMAIL_LIKE_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -90,7 +91,18 @@ async function loadDepartments() {
 
 function setupEventListeners() {
 
-    
+
+    // Inside setupEventListeners(), alongside the other modal inits:
+const addGuardianModalElement = document.getElementById('addGuardianModal');
+if (addGuardianModalElement && window.bootstrap) {
+    addGuardianModal = new bootstrap.Modal(addGuardianModalElement);
+}
+
+document.getElementById('addGuardianForm')?.addEventListener('submit', submitAddGuardianForm);
+document.getElementById('modalGuardianPhone')?.addEventListener('blur', handleModalGuardianPhoneLookup);
+    // Add inside setupEventListeners(), alongside the other single-student listeners:
+const guardianPhoneInput = document.getElementById('singleGuardianPhone');
+guardianPhoneInput?.addEventListener('blur', handleGuardianPhoneLookup);
     const dropZone    = document.getElementById('fileDropZone');
     const fileInput   = document.getElementById('fileInput');
     const removeBtn   = document.getElementById('fileRemoveBtn');
@@ -126,6 +138,11 @@ function setupEventListeners() {
         const editModalElement = document.getElementById('editStudentModal');
         if (editModalElement) {
             editStudentModal = new bootstrap.Modal(editModalElement);
+        }
+
+        const viewGuardiansModalElement = document.getElementById('viewGuardiansModal');
+        if (viewGuardiansModalElement) {
+            viewGuardiansModal = new bootstrap.Modal(viewGuardiansModalElement);
         }
     }
 
@@ -228,11 +245,23 @@ function setupEventListeners() {
         }
     });
 
+    // Add guardian button in single student modal
+    const addGuardian2Btn = document.getElementById('addGuardian2Btn');
+    addGuardian2Btn?.addEventListener('click', showGuardian2Form);
+
+    // Form step navigation
+    const nextToGuardianBtn = document.getElementById('nextToGuardianBtn');
+    const backToStudentBtn = document.getElementById('backToStudentBtn');
+    nextToGuardianBtn?.addEventListener('click', proceedToGuardianStep);
+    backToStudentBtn?.addEventListener('click', goBackToStudentStep);
+
     // LRN: allow digits only (up to 12).
 const singleIdInput = document.getElementById('singleStudentId');
 singleIdInput?.addEventListener('input', (e) => {
     e.target.value = e.target.value.replace(/\D/g, '').slice(0, 12);
 });
+
+
 
 // Normalize gender values.
 const singleGenderInput = document.getElementById('singleSection');
@@ -265,8 +294,98 @@ editGenderInput?.addEventListener('change', (e) => {
 });
 }
 
+// Add near the other module-level lets:
+let addGuardianModal = null;
+
+async function handleGuardianPhoneLookup(e) {
+    const phone = String(e.target.value || '').trim();
+    const statusEl = document.getElementById('guardianLookupStatus');
+    if (!phone || !supabaseClient) {
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+        return;
+    }
+
+    if (statusEl) {
+        statusEl.textContent = 'Checking existing guardians...';
+        statusEl.className = 'searching';
+    }
+
+    try {
+        const { data: existing, error } = await supabaseClient
+            .from('guardians')
+            .select('guardian_id, first_name, middle_name, last_name, relationship')
+            .eq('phone_number', phone)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (existing) {
+            document.getElementById('singleGuardianFirstName').value = existing.first_name || '';
+            document.getElementById('singleGuardianMiddleName').value = existing.middle_name || '';
+            document.getElementById('singleGuardianLastName').value = existing.last_name || '';
+            document.getElementById('singleGuardianRelationship').value = existing.relationship || '';
+
+            if (statusEl) {
+                statusEl.textContent = `Existing guardian found: ${existing.first_name} ${existing.last_name}. They'll be linked to this student.`;
+                statusEl.className = 'found';
+            }
+        } else if (statusEl) {
+            statusEl.textContent = 'No existing guardian found with this number — a new guardian record will be created.';
+            statusEl.className = '';
+        }
+    } catch (err) {
+        console.error('Guardian lookup failed:', err);
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+    }
+}
+
+async function upsertAndLinkGuardian(studentId, guardianData, isPrimary = true) {
+    const { data: existing, error: findError } = await supabaseClient
+        .from('guardians')
+        .select('guardian_id')
+        .eq('phone_number', guardianData.phone_number)
+        .maybeSingle();
+
+    if (findError) throw findError;
+
+    let guardianId = existing?.guardian_id;
+
+    if (!guardianId) {
+        const { data: inserted, error: insertError } = await supabaseClient
+            .from('guardians')
+            .insert({
+                first_name: guardianData.first_name,
+                middle_name: guardianData.middle_name || null,
+                last_name: guardianData.last_name,
+                relationship: guardianData.relationship,
+                phone_number: guardianData.phone_number,
+                alternate_phone_number: guardianData.alternate_phone_number || null,
+                email: guardianData.email || null,
+                address: guardianData.address || null,
+            })
+            .select('guardian_id')
+            .single();
+
+        if (insertError) throw insertError;
+        guardianId = inserted.guardian_id;
+    }
+
+    const { error: linkError } = await supabaseClient
+        .from('student_guardians')
+        .insert({
+            student_id: studentId,
+            guardian_id: guardianId,
+            is_primary_contact: isPrimary,
+        });
+
+    if (linkError) throw linkError;
+
+    return guardianId;
+}
+
 
 let selectedFile = null;
+
 
 function handleFileSelected(file) {
     if (!file) {
@@ -658,14 +777,18 @@ async function loadAllStudentsTable() {
 
     tbody.innerHTML = `
         <tr>
-            <td colspan="8" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
+            <td colspan="9" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
         </tr>
     `;
 
     try {
         const { data, error } = await supabaseClient
             .from('students')
-            .select('student_id, lrn, first_name, middle_name, last_name, suffix, birth_date, gender, section_id, status, sections:section_id(grade_level, section_name)')
+            .select(`
+                student_id, lrn, first_name, middle_name, last_name, suffix, birth_date, gender, section_id, status,
+                sections:section_id(grade_level, section_name),
+                student_guardians(is_primary_contact, guardians:guardian_id(first_name, last_name, relationship, phone_number, email, address))
+            `)
             .order('last_name', { ascending: true })
             .order('first_name', { ascending: true });
 
@@ -678,13 +801,12 @@ async function loadAllStudentsTable() {
         console.error('Error loading students table:', error);
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align:center;padding:1rem;color:#dc3545;">Failed to load students list.</td>
+                <td colspan="9" style="text-align:center;padding:1rem;color:#dc3545;">Failed to load students list.</td>
             </tr>
         `;
         countEl.textContent = '0';
     }
 }
-
 function renderAllStudentsTable() {
     const tbody = document.getElementById('allStudentsTableBody');
     const countEl = document.getElementById('allStudentsCount');
@@ -696,7 +818,6 @@ function renderAllStudentsTable() {
     const year = String(document.getElementById('studentYearFilter')?.value || '').trim();
 
     const filteredStudents = allStudents.filter(student => {
-        // Format: lastName, firstName middleName suffix
         const nameParts = [student.first_name, student.middle_name, student.suffix].filter(Boolean);
         const fullName = student.last_name ? (student.last_name + ', ' + nameParts.join(' ')).toLowerCase() : nameParts.join(' ').toLowerCase();
         const matchesSearch = !search
@@ -716,19 +837,42 @@ function renderAllStudentsTable() {
     if (filteredStudents.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align:center;padding:1rem;color:var(--text-muted);">No students found with current filters.</td>
+                <td colspan="9" style="text-align:center;padding:1rem;color:var(--text-muted);">No students found with current filters.</td>
             </tr>
         `;
         return;
     }
 
     tbody.innerHTML = filteredStudents.map((student) => {
-        // Format: lastName, firstName middleName suffix
         const nameParts = [student.first_name, student.middle_name, student.suffix].filter(Boolean);
         const fullName = student.last_name ? (student.last_name + ', ' + nameParts.join(' ')) : nameParts.join(' ');
         const gradeLevel = student.sections?.grade_level || 'N/A';
         const sectionName = student.sections?.section_name || 'N/A';
         const status = student.status || 'inactive';
+
+        const guardianLinks = student.student_guardians || [];
+        let guardianCell = '';
+        if (guardianLinks.length === 0) {
+            guardianCell = `<button type="button" class="status-badge warning" style="border:none;cursor:pointer;" data-action="addGuardian" data-id="${escapeHtml(student.lrn || '')}">
+                 Not Added — Add
+               </button>`;
+        } else if (guardianLinks.length === 1) {
+            const guardian = guardianLinks[0].guardians;
+            guardianCell = `<button type="button" class="status-badge valid" style="border:none;cursor:pointer;" data-action="viewGuardians" data-student-id="${escapeHtml(student.student_id || '')}" data-student-name="${escapeHtml((student.first_name || '') + ' ' + (student.last_name || ''))}" data-student-lrn="${escapeHtml(student.lrn || '')}" title="${escapeHtml(guardian.relationship || '')}">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:0.3rem;vertical-align:middle;">
+                    <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+                </svg>
+                ${escapeHtml(guardian.first_name + ' ' + guardian.last_name)}
+               </button>`;
+        } else {
+            guardianCell = `<button type="button" class="status-badge valid" style="border:none;cursor:pointer;" data-action="viewGuardians" data-student-id="${escapeHtml(student.student_id || '')}" data-student-name="${escapeHtml((student.first_name || '') + ' ' + (student.last_name || ''))}" data-student-lrn="${escapeHtml(student.lrn || '')}">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:0.3rem;vertical-align:middle;">
+                    <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+                </svg>
+                ${guardianLinks.length} Guardian${guardianLinks.length > 1 ? 's' : ''}
+               </button>`;
+        }
+
         return `
             <tr>
                 <td><strong>${escapeHtml(student.lrn || 'N/A')}</strong></td>
@@ -737,6 +881,7 @@ function renderAllStudentsTable() {
                 <td>${escapeHtml(sectionName)}</td>
                 <td>${escapeHtml(student.birth_date || '—')}</td>
                 <td>${escapeHtml(student.gender || '—')}</td>
+                <td>${guardianCell}</td>
                 <td>${escapeHtml(status)}</td>
                 <td>
                     <div class="action-buttons">
@@ -809,12 +954,21 @@ function clearStudentsFilters() {
     if (yearFilter) yearFilter.value = '';
     renderAllStudentsTable();
 }
-
 function handleStudentsTableActions(event) {
     const actionBtn = event.target.closest('[data-action]');
     if (!actionBtn) return;
 
     const action = actionBtn.dataset.action;
+    
+    // Handle viewGuardians action (doesn't need studentId from data-id)
+    if (action === 'viewGuardians') {
+        const studentUuid = actionBtn.dataset.studentId;
+        const studentName = actionBtn.dataset.studentName;
+        const studentLrn = actionBtn.dataset.studentLrn;
+        openViewGuardiansModal(studentUuid, studentName, studentLrn);
+        return;
+    }
+    
     const studentId = actionBtn.dataset.id;
     if (!studentId) return;
 
@@ -824,6 +978,198 @@ function handleStudentsTableActions(event) {
     }
     if (action === 'delete') {
         deleteStudentRow(studentId);
+        return;
+    }
+    if (action === 'addGuardian') {
+        const student = allStudents.find(s => String(s.lrn) === String(studentId));
+        const displayName = student
+            ? [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ')
+            : studentId;
+        openAddGuardianModal(student?.student_id, displayName, studentId);
+    }
+}
+
+function openViewGuardiansModal(studentUuid, studentName, studentLrn) {
+    if (!viewGuardiansModal) {
+        showImportAlert('View Guardians modal is not available right now.', 'danger');
+        return;
+    }
+
+    document.getElementById('viewGuardiansStudentName').textContent = studentName || '—';
+    document.getElementById('viewGuardiansStudentLRN').textContent = studentLrn || '—';
+
+    // Find student and populate guardians
+    const student = allStudents.find(s => String(s.student_id) === String(studentUuid));
+    if (!student || !student.student_guardians || student.student_guardians.length === 0) {
+        document.getElementById('guardiansListContent').innerHTML = `
+            <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                <p>No guardians added yet.</p>
+            </div>
+        `;
+    } else {
+        const guardiansHtml = student.student_guardians.map((link, index) => {
+            const g = link.guardians;
+            const isPrimary = link.is_primary_contact;
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 1.25rem; background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.1); border-radius: 0.625rem; transition: all 0.2s ease;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <h6 style="margin: 0; color: var(--text-main); font-weight: 600;">Guardian ${index + 1}</h6>
+                            ${isPrimary ? '<span style="display: inline-block; background: #10b981; color: white; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 600;">Primary</span>' : ''}
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 0.75rem;">
+                            <div>
+                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Name</p>
+                                <p style="margin: 0; font-weight: 600; color: var(--text-main);">${escapeHtml(g.first_name)} ${escapeHtml(g.last_name)}</p>
+                            </div>
+                            <div>
+                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Relationship</p>
+                                <p style="margin: 0; font-weight: 600; color: var(--text-main);">${escapeHtml(g.relationship || '—')}</p>
+                            </div>
+                            <div>
+                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Phone</p>
+                                <p style="margin: 0; font-weight: 600; color: var(--text-main);">${escapeHtml(g.phone_number || '—')}</p>
+                            </div>
+                            ${g.email ? `<div>
+                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Email</p>
+                                <p style="margin: 0; font-weight: 600; color: var(--text-main);">${escapeHtml(g.email)}</p>
+                            </div>` : '<div></div>'}
+                            ${g.address ? `<div style="grid-column: 1 / -1;">
+                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Address</p>
+                                <p style="margin: 0; font-weight: 600; color: var(--text-main);">${escapeHtml(g.address)}</p>
+                            </div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        document.getElementById('guardiansListContent').innerHTML = guardiansHtml;
+    }
+
+    // Update the "Add Guardian" button to trigger the add modal
+    const addGuardianBtn = document.getElementById('addGuardianFromViewBtn');
+    if (addGuardianBtn) {
+        addGuardianBtn.onclick = () => {
+            viewGuardiansModal.hide();
+            openAddGuardianModal(studentUuid, studentName, studentLrn);
+        };
+    }
+
+    viewGuardiansModal.show();
+}
+
+function openAddGuardianModal(studentUuid, displayName, lrn) {
+    if (!addGuardianModal) {
+        showImportAlert('Add Guardian form is not available right now.', 'danger');
+        return;
+    }
+    document.getElementById('addGuardianForm')?.reset();
+    const statusEl = document.getElementById('modalGuardianLookupStatus');
+    if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+
+    document.getElementById('guardianModalStudentId').value = studentUuid || '';
+    document.getElementById('guardianModalStudentId').dataset.lrn = lrn || '';
+    document.getElementById('guardianModalStudentName').textContent = displayName || lrn;
+
+    addGuardianModal.show();
+}
+
+async function handleModalGuardianPhoneLookup(e) {
+    const phone = String(e.target.value || '').trim();
+    const statusEl = document.getElementById('modalGuardianLookupStatus');
+    if (!phone || !supabaseClient) {
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+        return;
+    }
+
+    if (statusEl) {
+        statusEl.textContent = 'Checking existing guardians...';
+        statusEl.className = 'searching';
+    }
+
+    try {
+        const { data: existing, error } = await supabaseClient
+            .from('guardians')
+            .select('guardian_id, first_name, middle_name, last_name, relationship')
+            .eq('phone_number', phone)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (existing) {
+            document.getElementById('modalGuardianFirstName').value = existing.first_name || '';
+            document.getElementById('modalGuardianMiddleName').value = existing.middle_name || '';
+            document.getElementById('modalGuardianLastName').value = existing.last_name || '';
+            document.getElementById('modalGuardianRelationship').value = existing.relationship || '';
+
+            if (statusEl) {
+                statusEl.textContent = `Existing guardian found: ${existing.first_name} ${existing.last_name}. They'll be linked to this student.`;
+                statusEl.className = 'found';
+            }
+        } else if (statusEl) {
+            statusEl.textContent = 'No existing guardian found with this number — a new guardian record will be created.';
+            statusEl.className = '';
+        }
+    } catch (err) {
+        console.error('Guardian lookup failed:', err);
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+    }
+}
+
+async function submitAddGuardianForm(event) {
+    event.preventDefault();
+
+    const submitBtn = document.getElementById('addGuardianSubmitBtn');
+    const overlay = document.getElementById('addGuardianLoadingOverlay');
+    const studentUuid = document.getElementById('guardianModalStudentId')?.value || '';
+    const lrn = document.getElementById('guardianModalStudentId')?.dataset.lrn || '';
+
+    const firstName = String(document.getElementById('modalGuardianFirstName')?.value || '').trim();
+    const middleName = String(document.getElementById('modalGuardianMiddleName')?.value || '').trim();
+    const lastName = String(document.getElementById('modalGuardianLastName')?.value || '').trim();
+    const relationship = String(document.getElementById('modalGuardianRelationship')?.value || '').trim();
+    const phone = String(document.getElementById('modalGuardianPhone')?.value || '').trim();
+    const altPhone = String(document.getElementById('modalGuardianAltPhone')?.value || '').trim();
+    const email = String(document.getElementById('modalGuardianEmail')?.value || '').trim();
+    const address = String(document.getElementById('modalGuardianAddress')?.value || '').trim();
+
+    if (!firstName || !lastName || !relationship || !phone || !address) {
+        showImportAlert('Please fill in First Name, Last Name, Relationship, Phone, and Address.', 'warning');
+        return;
+    }
+    if (!['mother', 'father', 'legal_guardian', 'other'].includes(relationship)) {
+        showImportAlert('Relationship must be Mother, Father, Legal Guardian, or Other.', 'warning');
+        return;
+    }
+    if (!studentUuid) {
+        showImportAlert('Could not identify the student record. Please refresh and try again.', 'danger');
+        return;
+    }
+
+    try {
+        if (overlay) overlay.classList.add('active');
+        if (submitBtn) submitBtn.disabled = true;
+
+        await upsertAndLinkGuardian(studentUuid, {
+            first_name: firstName,
+            middle_name: middleName,
+            last_name: lastName,
+            relationship,
+            phone_number: phone,
+            alternate_phone_number: altPhone,
+            email,
+            address,
+        }, true);
+
+        showImportAlert(`Guardian linked successfully for ${lrn}.`, 'success');
+        addGuardianModal?.hide();
+        await loadAllStudentsTable();
+    } catch (error) {
+        console.error('Failed to add guardian:', error);
+        showImportAlert(`Failed to add guardian: ${error.message}`, 'danger');
+    } finally {
+        if (overlay) overlay.classList.remove('active');
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
@@ -1013,6 +1359,36 @@ function openSingleStudentModal() {
     if (deptSelect && selectedDepartmentId) {
         deptSelect.value = selectedDepartmentId;
     }
+    
+    // Reset student form fields
+    document.getElementById('singleStudentId').value = '';
+    document.getElementById('singleFirstName').value = '';
+    document.getElementById('singleMiddleName').value = '';
+    document.getElementById('singleLastName').value = '';
+    document.getElementById('singleSuffix').value = '';
+    document.getElementById('singleYearLevel').value = '';
+    document.getElementById('singleSection').value = '';
+    document.getElementById('singleEmail').value = '';
+    document.getElementById('singleAddress').value = '';
+    
+    // Reset form steps to student step
+    const studentStep = document.getElementById('studentFormStep');
+    const guardianStep = document.getElementById('guardianFormStep');
+    const studentFooter = document.getElementById('studentFormFooter');
+    const guardianFooter = document.getElementById('guardianFormFooter');
+    if (studentStep) studentStep.style.display = 'block';
+    if (guardianStep) guardianStep.style.display = 'none';
+    if (studentFooter) studentFooter.style.display = 'flex';
+    if (guardianFooter) guardianFooter.style.display = 'none';
+    
+    // Reset guardian forms
+    clearGuardian1Form();
+    clearGuardian2Form();
+    const guardian2Section = document.getElementById('guardian2Section');
+    const addGuardian2Container = document.getElementById('addGuardian2ButtonContainer');
+    if (guardian2Section) guardian2Section.style.display = 'none';
+    if (addGuardian2Container) addGuardian2Container.style.display = 'block';
+    
     singleStudentModal.show();
 }
 
@@ -1042,6 +1418,190 @@ function showEmailStatusToast(message, type = 'success') {
     document.body.appendChild(toast);
     toast.querySelector('.email-status-toast-close')?.addEventListener('click', () => toast.remove());
     setTimeout(() => toast.remove(), 8000);
+}
+
+// ====== FORM STEP NAVIGATION ======
+function proceedToGuardianStep(e) {
+    e?.preventDefault?.();
+
+    // Validate student form
+    const sectionId = document.getElementById('singleDepartment')?.value || '';
+    const studentId = String(document.getElementById('singleStudentId')?.value || '').replace(/\D/g, '').trim();
+    const firstName = String(document.getElementById('singleFirstName')?.value || '').trim();
+    const lastName = String(document.getElementById('singleLastName')?.value || '').trim();
+    const birthDate = String(document.getElementById('singleYearLevel')?.value || '').trim();
+    const gender = String(document.getElementById('singleSection')?.value || '').trim().toLowerCase();
+    const email = String(document.getElementById('singleEmail')?.value || '').trim();
+
+    if (!sectionId || !studentId || !firstName || !lastName) {
+        showImportAlert('Please fill in Section, LRN, First Name, and Last Name.', 'warning');
+        return;
+    }
+    if (!/^\d{12}$/.test(studentId)) {
+        showImportAlert('LRN must be exactly 12 digits.', 'warning');
+        return;
+    }
+    if (!email) {
+        showImportAlert('Email is required for QR code notification.', 'warning');
+        return;
+    }
+    if (birthDate && Number.isNaN(Date.parse(birthDate))) {
+        showImportAlert('Birth Date must be valid.', 'warning');
+        return;
+    }
+    if (gender && !['male', 'female', 'other'].includes(gender)) {
+        showImportAlert('Gender must be male, female, or other.', 'warning');
+        return;
+    }
+
+    // All validations passed, move to guardian step
+    const studentStep = document.getElementById('studentFormStep');
+    const guardianStep = document.getElementById('guardianFormStep');
+    const studentFooter = document.getElementById('studentFormFooter');
+    const guardianFooter = document.getElementById('guardianFormFooter');
+
+    studentStep.style.display = 'none';
+    guardianStep.style.display = 'block';
+    studentFooter.style.display = 'none';
+    guardianFooter.style.display = 'flex';
+
+    // Set up "same as student" checkbox listeners
+    setupSameAsStudentCheckboxes();
+}
+
+function goBackToStudentStep(e) {
+    e?.preventDefault?.();
+
+    const studentStep = document.getElementById('studentFormStep');
+    const guardianStep = document.getElementById('guardianFormStep');
+    const studentFooter = document.getElementById('studentFormFooter');
+    const guardianFooter = document.getElementById('guardianFormFooter');
+
+    studentStep.style.display = 'block';
+    guardianStep.style.display = 'none';
+    studentFooter.style.display = 'flex';
+    guardianFooter.style.display = 'none';
+}
+
+// ====== SAME AS STUDENT CHECKBOX ======
+function setupSameAsStudentCheckboxes() {
+    const studentAddress = document.getElementById('singleAddress');
+    const guardian1Checkbox = document.getElementById('guardian1SameAsStudent');
+    const guardian1Address = document.getElementById('guardian1Address');
+    const guardian2Checkbox = document.getElementById('guardian2SameAsStudent');
+    const guardian2Address = document.getElementById('guardian2Address');
+
+    if (!guardian1Checkbox || !guardian1Address) return;
+
+    // Handle Guardian 1 checkbox
+    guardian1Checkbox.addEventListener('change', () => {
+        if (guardian1Checkbox.checked) {
+            const address = studentAddress?.value || '';
+            if (address) {
+                guardian1Address.value = address;
+            } else {
+                guardian1Checkbox.checked = false;
+                showImportAlert('Student address is empty. Please go back and fill in the student address.', 'warning');
+            }
+        } else {
+            guardian1Address.value = '';
+        }
+    });
+
+    // Handle Guardian 2 checkbox if visible
+    if (guardian2Checkbox && guardian2Address) {
+        guardian2Checkbox.addEventListener('change', () => {
+            if (guardian2Checkbox.checked) {
+                const address = studentAddress?.value || '';
+                if (address) {
+                    guardian2Address.value = address;
+                } else {
+                    guardian2Checkbox.checked = false;
+                    showImportAlert('Student address is empty. Please go back and fill in the student address.', 'warning');
+                }
+            } else {
+                guardian2Address.value = '';
+            }
+        });
+    }
+
+    // Update guardian addresses when student address changes (if checkbox is checked)
+    if (studentAddress) {
+        studentAddress.addEventListener('change', () => {
+            if (guardian1Checkbox.checked) {
+                guardian1Address.value = studentAddress.value;
+            }
+            if (guardian2Checkbox && guardian2Checkbox.checked) {
+                guardian2Address.value = studentAddress.value;
+            }
+        });
+    }
+}
+
+// ====== GUARDIAN MANAGEMENT FUNCTIONS ======
+function showGuardian2Form(e) {
+    e?.preventDefault?.();
+    
+    const guardian2Section = document.getElementById('guardian2Section');
+    const addGuardian2Container = document.getElementById('addGuardian2ButtonContainer');
+    
+    if (guardian2Section) {
+        guardian2Section.style.display = 'block';
+        guardian2Section.style.animation = 'slideInUp 0.3s ease-out';
+    }
+    if (addGuardian2Container) {
+        addGuardian2Container.style.display = 'none';
+    }
+}
+
+function clearGuardian1Form() {
+    document.getElementById('guardian1Phone').value = '';
+    document.getElementById('guardian1Relationship').value = '';
+    document.getElementById('guardian1FirstName').value = '';
+    document.getElementById('guardian1LastName').value = '';
+    document.getElementById('guardian1MiddleName').value = '';
+    document.getElementById('guardian1AltPhone').value = '';
+    document.getElementById('guardian1Email').value = '';
+    document.getElementById('guardian1Address').value = '';
+    const checkbox1 = document.getElementById('guardian1SameAsStudent');
+    if (checkbox1) checkbox1.checked = false;
+    const statusEl = document.getElementById('guardian1LookupStatus');
+    if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+}
+
+function clearGuardian2Form() {
+    document.getElementById('guardian2Phone').value = '';
+    document.getElementById('guardian2Relationship').value = '';
+    document.getElementById('guardian2FirstName').value = '';
+    document.getElementById('guardian2LastName').value = '';
+    document.getElementById('guardian2MiddleName').value = '';
+    document.getElementById('guardian2AltPhone').value = '';
+    document.getElementById('guardian2Email').value = '';
+    document.getElementById('guardian2Address').value = '';
+    const checkbox2 = document.getElementById('guardian2SameAsStudent');
+    if (checkbox2) checkbox2.checked = false;
+    const statusEl = document.getElementById('guardian2LookupStatus');
+    if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+    
+    // Hide guardian 2 section
+    const guardian2Section = document.getElementById('guardian2Section');
+    const addGuardian2Container = document.getElementById('addGuardian2ButtonContainer');
+    if (guardian2Section) guardian2Section.style.display = 'none';
+    if (addGuardian2Container) addGuardian2Container.style.display = 'block';
+}
+
+function getGuardianDataFromForm(guardianNum) {
+    const prefix = `guardian${guardianNum}`;
+    return {
+        phone_number: String(document.getElementById(`${prefix}Phone`)?.value || '').trim(),
+        relationship: String(document.getElementById(`${prefix}Relationship`)?.value || '').trim(),
+        first_name: String(document.getElementById(`${prefix}FirstName`)?.value || '').trim(),
+        last_name: String(document.getElementById(`${prefix}LastName`)?.value || '').trim(),
+        middle_name: String(document.getElementById(`${prefix}MiddleName`)?.value || '').trim() || null,
+        alternate_phone_number: String(document.getElementById(`${prefix}AltPhone`)?.value || '').trim() || null,
+        email: String(document.getElementById(`${prefix}Email`)?.value || '').trim() || null,
+        address: String(document.getElementById(`${prefix}Address`)?.value || '').trim() || null,
+    };
 }
 
 async function submitSingleStudentForm(event) {
@@ -1079,6 +1639,33 @@ async function submitSingleStudentForm(event) {
         return;
     }
 
+    // Get guardian data from forms
+    const guardian1Data = getGuardianDataFromForm(1);
+    const guardian2Data = getGuardianDataFromForm(2);
+    const guardian2Visible = document.getElementById('guardian2Section')?.style.display !== 'none';
+
+    // Validate guardian 1
+    if (!guardian1Data.phone_number || !guardian1Data.relationship || !guardian1Data.first_name || !guardian1Data.last_name || !guardian1Data.address) {
+        showImportAlert('Please fill in all required Guardian 1 fields (Phone, Relationship, First Name, Last Name, Address).', 'warning');
+        return;
+    }
+
+    // Guardian 2 is optional but if some fields are filled, validate all required fields
+    if (guardian2Visible) {
+        const guardian2HasData = guardian2Data.phone_number || guardian2Data.relationship || guardian2Data.first_name || guardian2Data.last_name || guardian2Data.address;
+        if (guardian2HasData) {
+            if (!guardian2Data.phone_number || !guardian2Data.relationship || !guardian2Data.first_name || !guardian2Data.last_name || !guardian2Data.address) {
+                showImportAlert('Please fill in all required Guardian 2 fields or leave them all empty.', 'warning');
+                return;
+            }
+            // Check duplicate phones
+            if (guardian1Data.phone_number === guardian2Data.phone_number) {
+                showImportAlert('Guardian 1 and Guardian 2 cannot have the same phone number.', 'warning');
+                return;
+            }
+        }
+    }
+
     try {
         setSingleStudentLoading(true, 'Saving student...');
 
@@ -1096,8 +1683,9 @@ async function submitSingleStudentForm(event) {
             return;
         }
 
+        const studentUuid = crypto.randomUUID();
         const payload = {
-            student_id: crypto.randomUUID(),
+            student_id: studentUuid,
             lrn: studentId,
             first_name: firstName,
             middle_name: middleName || null,
@@ -1115,9 +1703,32 @@ async function submitSingleStudentForm(event) {
         const { error: insertError } = await supabaseClient.from('students').insert(payload);
         if (insertError) throw insertError;
 
-        // Student is saved — unblock the user immediately, don't wait on email.
-        showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully.`, 'success');
+        // Link guardian 1 (primary)
+        setSingleStudentLoading(true, 'Linking guardians...');
+        let guardiansAdded = 0;
+        try {
+            await upsertAndLinkGuardian(studentUuid, guardian1Data, true);
+            guardiansAdded = 1;
+        } catch (guardianErr) {
+            console.error('Guardian 1 link failed:', guardianErr);
+            showImportAlert(`Student saved, but Guardian 1 could not be linked: ${guardianErr.message}.`, 'warning');
+        }
+
+        // Link guardian 2 (if filled)
+        if (guardian2Visible && guardian2Data.phone_number && guardian2Data.relationship && guardian2Data.first_name && guardian2Data.last_name) {
+            try {
+                await upsertAndLinkGuardian(studentUuid, guardian2Data, false);
+                guardiansAdded = 2;
+            } catch (guardianErr) {
+                console.error('Guardian 2 link failed:', guardianErr);
+                showImportAlert(`Student and Guardian 1 saved, but Guardian 2 could not be linked: ${guardianErr.message}.`, 'warning');
+            }
+        }
+
+        showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully with ${guardiansAdded} guardian(s).`, 'success');
         document.getElementById('singleStudentForm')?.reset();
+        clearGuardian1Form();
+        clearGuardian2Form();
         setSingleStudentLoading(false);
         singleStudentModal?.hide();
         await loadAllStudentsTable();
@@ -1127,7 +1738,6 @@ async function submitSingleStudentForm(event) {
                 ? `${departmentsCache.find(s => String(s.section_id) === String(sectionId)).grade_level} - ${departmentsCache.find(s => String(s.section_id) === String(sectionId)).section_name}`
                 : '';
 
-            // Fire-and-forget: report the result whenever it lands, without blocking the UI.
             sendStudentQrEmail({
                 studentId, firstName, middleName, lastName, suffix, birthDate, gender, sectionLabel, email,
             }).then((emailResult) => {

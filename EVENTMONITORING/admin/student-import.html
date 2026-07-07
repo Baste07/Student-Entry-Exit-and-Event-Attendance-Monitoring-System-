@@ -16,27 +16,6 @@
 <div id="header-container"></div>
 <div id="sidebar-container"></div>
 
-<!--Gemma Chat-->
-<div id="chat-widget">
-    <div id="chat-header" onclick="toggleChat()">
-        <span>Gemma Chat</span>
-        <button id="toggle-btn" type="button">–</button>
-    </div>
-    <iframe id="chat-frame" src="../Gemma/index.html"></iframe>
-</div>
-<script>
-    const widget = document.getElementById("chat-widget");
-    const btn = document.getElementById("toggle-btn");
-    function toggleChat() {
-        widget.classList.toggle("collapsed");
-        btn.textContent = widget.classList.contains("collapsed") ? "+" : "–";
-    }
-    btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        toggleChat();
-    });
-</script>
-
 <main class="main-content">
 
     <!-- Page Header -->
@@ -296,24 +275,25 @@
 
         <div class="students-table-wrap">
             <table class="students-table">
-                <thead>
-                    <tr>
-                        <th>LRN</th>
-                        <th>Name</th>
-                        <th>Grade Level</th>
-                        <th>Section</th>
-                        <th>Birth Date</th>
-                        <th>Gender</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="allStudentsTableBody">
-                    <tr>
-                        <td colspan="8" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
-                    </tr>
-                </tbody>
-            </table>
+    <thead>
+        <tr>
+            <th>LRN</th>
+            <th>Name</th>
+            <th>Grade Level</th>
+            <th>Section</th>
+            <th>Birth Date</th>
+            <th>Gender</th>
+            <th>Guardian</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody id="allStudentsTableBody">
+        <tr>
+            <td colspan="9" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
+        </tr>
+    </tbody>
+</table>
         </div>
     </div>
 
@@ -349,7 +329,7 @@
 
 
 <div class="modal fade" id="singleStudentModal" tabindex="-1" aria-labelledby="singleStudentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content" style="position:relative;">
 
             <div class="modal-loading-overlay" id="singleStudentLoadingOverlay">
@@ -364,67 +344,231 @@
                 </div>
                 
                 <div class="modal-body">
-                    <div class="mb-4">
-                        <label for="singleActiveSchoolYear" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <polyline points="12 6 12 12 16 14"></polyline>
-                            </svg> 
-                            Active School Year
-                        </label>
-                        <input type="text" class="form-control" id="singleActiveSchoolYear" readonly placeholder="Loading..." style="background-color: #f8fafc; color: #64748b; font-weight: 500; border: 1px solid #e2e8f0; cursor: not-allowed;">
+                    <!-- STEP 1: Student Information -->
+                    <div id="studentFormStep" class="form-step active">
+                        <!-- School Year -->
+                        <div class="mb-4">
+                            <label for="singleActiveSchoolYear" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg> 
+                                Active School Year
+                            </label>
+                            <input type="text" class="form-control" id="singleActiveSchoolYear" readonly placeholder="Loading..." style="background-color: #f8fafc; color: #64748b; font-weight: 500; border: 1px solid #e2e8f0; cursor: not-allowed;">
+                        </div>
+
+                        <!-- Student Information -->
+                        <h6 class="fw-semibold mb-3" style="color:var(--text-main);">Student Information</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="singleDepartment" class="form-label">Section <span class="text-danger">*</span></label>
+                                <select id="singleDepartment" class="form-select" required>
+                                    <option value="">Select section...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="singleStudentId" class="form-label">LRN <span class="text-danger">*</span></label>
+                                <input type="text" id="singleStudentId" class="form-control" placeholder="12-digit LRN" maxlength="12" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="singleFirstName" class="form-label">First Name <span class="text-danger">*</span></label>
+                                <input type="text" id="singleFirstName" class="form-control" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="singleMiddleName" class="form-label">Middle Name</label>
+                                <input type="text" id="singleMiddleName" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="singleLastName" class="form-label">Last Name <span class="text-danger">*</span></label>
+                                <input type="text" id="singleLastName" class="form-control" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="singleSuffix" class="form-label">Suffix</label>
+                                <input type="text" id="singleSuffix" class="form-control" placeholder="e.g. Sr, Jr">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="singleYearLevel" class="form-label">Birth Date</label>
+                                <input type="date" id="singleYearLevel" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="singleSection" class="form-label">Gender</label>
+                                <select id="singleSection" class="form-select">
+                                    <option value="">Select gender...</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label for="singleEmail" class="form-label">Email <span class="text-danger">*</span></label>
+                                <input type="text" id="singleEmail" class="form-control" placeholder="Email for QR notification" required>
+                                <div class="form-text">Email is required for QR code notification delivery.</div>
+                            </div>
+                            <div class="col-12">
+                                <label for="singleAddress" class="form-label">Address</label>
+                                <input type="text" id="singleAddress" class="form-control" placeholder="Student residential address">
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label for="singleDepartment" class="form-label">Section <span class="text-danger">*</span></label>
-                            <select id="singleDepartment" class="form-select" required>
-                                <option value="">Select section...</option>
-                            </select>
+                    <!-- STEP 2: Guardian Information -->
+                    <div id="guardianFormStep" class="form-step" style="display: none;">
+                        <h6 class="fw-semibold mb-3" style="color:var(--text-main);">Guardian Information <span class="text-danger">*</span> (1-2 Required)</h6>
+                        <p class="text-muted" style="font-size:0.85rem;margin-bottom:1.5rem;">
+                            Fill in at least Guardian 1. Guardian 2 is optional. If a guardian with that phone number already exists, they'll be linked instead of duplicated.
+                        </p>
+
+                        <!-- GUARDIAN 1 -->
+                        <div class="guardian-form-section">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h6 style="color: var(--text-main); margin: 0;">Guardian 1 <span class="text-danger">*</span> (Required)</h6>
+                                <button type="button" class="btn btn-sm btn-outline-danger" id="removeGuardian1Btn" onclick="clearGuardian1Form()" style="display: none;">Remove</button>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <label for="guardian1Phone" class="form-label form-label-sm">Phone <span class="text-danger">*</span></label>
+                                    <input type="text" id="guardian1Phone" class="form-control form-control-sm" placeholder="09XXXXXXXXX" data-guardian="1">
+                                    <small class="form-text text-muted" id="guardian1LookupStatus"></small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="guardian1Relationship" class="form-label form-label-sm">Relationship <span class="text-danger">*</span></label>
+                                    <select id="guardian1Relationship" class="form-select form-select-sm" data-guardian="1">
+                                        <option value="">Select...</option>
+                                        <option value="mother">Mother</option>
+                                        <option value="father">Father</option>
+                                        <option value="legal_guardian">Legal Guardian</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="guardian1FirstName" class="form-label form-label-sm">First Name <span class="text-danger">*</span></label>
+                                    <input type="text" id="guardian1FirstName" class="form-control form-control-sm" data-guardian="1">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="guardian1LastName" class="form-label form-label-sm">Last Name <span class="text-danger">*</span></label>
+                                    <input type="text" id="guardian1LastName" class="form-control form-control-sm" data-guardian="1">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="guardian1MiddleName" class="form-label form-label-sm">Middle Name</label>
+                                    <input type="text" id="guardian1MiddleName" class="form-control form-control-sm" data-guardian="1">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="guardian1AltPhone" class="form-label form-label-sm">Alt Phone</label>
+                                    <input type="text" id="guardian1AltPhone" class="form-control form-control-sm" data-guardian="1">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="guardian1Email" class="form-label form-label-sm">Email</label>
+                                    <input type="text" id="guardian1Email" class="form-control form-control-sm" data-guardian="1">
+                                </div>
+                                <div class="col-12">
+                                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.75rem; align-items: flex-end;">
+                                        <div>
+                                            <label for="guardian1Address" class="form-label form-label-sm">Address <span class="text-danger">*</span></label>
+                                            <input type="text" id="guardian1Address" class="form-control form-control-sm" data-guardian="1" required>
+                                        </div>
+                                        <div class="form-check" style="padding-bottom: 0.3rem;">
+                                            <input type="checkbox" id="guardian1SameAsStudent" class="form-check-input" style="cursor: pointer;">
+                                            <label class="form-check-label" for="guardian1SameAsStudent" style="cursor: pointer; font-size: 0.85rem; white-space: nowrap;">
+                                                Same as Student?
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label for="singleStudentId" class="form-label">LRN <span class="text-danger">*</span></label>
-                            <input type="text" id="singleStudentId" class="form-control" placeholder="12-digit LRN" maxlength="12" required>
+
+                        <!-- GUARDIAN 2 (Hidden by default) -->
+                        <div class="guardian-form-section" id="guardian2Section" style="display: none; margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h6 style="color: var(--text-main); margin: 0;">Guardian 2 <span style="color: #999; font-weight: normal;">(Optional)</span></h6>
+                                <button type="button" class="btn btn-sm btn-outline-danger" id="removeGuardian2Btn" onclick="clearGuardian2Form()">Remove</button>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <label for="guardian2Phone" class="form-label form-label-sm">Phone</label>
+                                    <input type="text" id="guardian2Phone" class="form-control form-control-sm" placeholder="09XXXXXXXXX" data-guardian="2">
+                                    <small class="form-text text-muted" id="guardian2LookupStatus"></small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="guardian2Relationship" class="form-label form-label-sm">Relationship</label>
+                                    <select id="guardian2Relationship" class="form-select form-select-sm" data-guardian="2">
+                                        <option value="">Select...</option>
+                                        <option value="mother">Mother</option>
+                                        <option value="father">Father</option>
+                                        <option value="legal_guardian">Legal Guardian</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="guardian2FirstName" class="form-label form-label-sm">First Name</label>
+                                    <input type="text" id="guardian2FirstName" class="form-control form-control-sm" data-guardian="2">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="guardian2LastName" class="form-label form-label-sm">Last Name</label>
+                                    <input type="text" id="guardian2LastName" class="form-control form-control-sm" data-guardian="2">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="guardian2MiddleName" class="form-label form-label-sm">Middle Name</label>
+                                    <input type="text" id="guardian2MiddleName" class="form-control form-control-sm" data-guardian="2">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="guardian2AltPhone" class="form-label form-label-sm">Alt Phone</label>
+                                    <input type="text" id="guardian2AltPhone" class="form-control form-control-sm" data-guardian="2">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="guardian2Email" class="form-label form-label-sm">Email</label>
+                                    <input type="text" id="guardian2Email" class="form-control form-control-sm" data-guardian="2">
+                                </div>
+                                <div class="col-12">
+                                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.75rem; align-items: flex-end;">
+                                        <div>
+                                            <label for="guardian2Address" class="form-label form-label-sm">Address</label>
+                                            <input type="text" id="guardian2Address" class="form-control form-control-sm" data-guardian="2" required>
+                                        </div>
+                                        <div class="form-check" style="padding-bottom: 0.3rem;">
+                                            <input type="checkbox" id="guardian2SameAsStudent" class="form-check-input" style="cursor: pointer;">
+                                            <label class="form-check-label" for="guardian2SameAsStudent" style="cursor: pointer; font-size: 0.85rem; white-space: nowrap;">
+                                                Same as Student?
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-4">
-                            <label for="singleFirstName" class="form-label">First Name <span class="text-danger">*</span></label>
-                            <input type="text" id="singleFirstName" class="form-control" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="singleMiddleName" class="form-label">Middle Name</label>
-                            <input type="text" id="singleMiddleName" class="form-control">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="singleLastName" class="form-label">Last Name <span class="text-danger">*</span></label>
-                            <input type="text" id="singleLastName" class="form-control" required>
-                        </div>
-                        <div class="col-md-3">
-                            <label for="singleSuffix" class="form-label">Suffix</label>
-                            <input type="text" id="singleSuffix" class="form-control" placeholder="e.g. Sr, Jr">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="singleYearLevel" class="form-label">Birth Date</label>
-                            <input type="date" id="singleYearLevel" class="form-control">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="singleSection" class="form-label">Gender</label>
-                            <select id="singleSection" class="form-select">
-                                <option value="">Select gender...</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                        <div class="col-12">
-                            <label for="singleEmail" class="form-label">Email (Optional for QR Notification)</label>
-                            <input type="text" id="singleEmail" class="form-control" placeholder="Any email text">
-                            <div class="form-text">No strict format required. QR email is sent only when the value looks deliverable.</div>
+
+                        <!-- Add Guardian 2 Button -->
+                        <div id="addGuardian2ButtonContainer" style="margin-top: 1.5rem;">
+                            <button type="button" class="btn btn-success" id="addGuardian2Btn" style="width: 100%;">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:0.5rem;">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Add Guardian 2 (Optional)
+                            </button>
                         </div>
                     </div>
                 </div>
                 
-                <div class="modal-footer">
+                <div class="modal-footer" id="studentFormFooter">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="nextToGuardianBtn">
+                        Next
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-left:0.3rem;">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="modal-footer" id="guardianFormFooter" style="display: none;">
+                    <button type="button" class="btn btn-outline-secondary" id="backToStudentBtn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:0.3rem;">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                        Back
+                    </button>
                     <button type="submit" class="btn btn-success" id="singleStudentSubmitBtn">Save Student</button>
                 </div>
                 
@@ -493,6 +637,105 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-success" id="saveStudentEditBtn">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="viewGuardiansModal" tabindex="-1" aria-labelledby="viewGuardiansModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom: 2px solid var(--border);">
+                <h5 class="modal-title" id="viewGuardiansModalLabel">Student Guardians</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 1.5rem;">
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Student: <strong id="viewGuardiansStudentName">—</strong> (LRN: <span id="viewGuardiansStudentLRN">—</span>)</p>
+                </div>
+                <div id="guardiansListContent" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- Guardians will be populated here -->
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--border);">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="addGuardianFromViewBtn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:0.5rem;">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add Guardian
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addGuardianModal" tabindex="-1" aria-labelledby="addGuardianModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="position:relative;">
+            <div class="modal-loading-overlay" id="addGuardianLoadingOverlay">
+                <div class="modal-loading-spinner"></div>
+                <div class="modal-loading-text">Saving guardian...</div>
+            </div>
+            <form id="addGuardianForm" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addGuardianModalLabel">Add Guardian</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="guardianModalStudentId">
+                    <p class="mb-3" style="font-size:0.9rem;">
+                        Adding guardian for <strong id="guardianModalStudentName">—</strong>
+                    </p>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="modalGuardianPhone" class="form-label">Guardian Phone <span class="text-danger">*</span></label>
+                            <input type="text" id="modalGuardianPhone" class="form-control" placeholder="09XXXXXXXXX" required>
+                            <small class="form-text text-muted" id="modalGuardianLookupStatus"></small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="modalGuardianRelationship" class="form-label">Relationship <span class="text-danger">*</span></label>
+                            <select id="modalGuardianRelationship" class="form-select" required>
+                                <option value="">Select relationship...</option>
+                                <option value="mother">Mother</option>
+                                <option value="father">Father</option>
+                                <option value="legal_guardian">Legal Guardian</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="modalGuardianFirstName" class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input type="text" id="modalGuardianFirstName" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="modalGuardianMiddleName" class="form-label">Middle Name</label>
+                            <input type="text" id="modalGuardianMiddleName" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="modalGuardianLastName" class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" id="modalGuardianLastName" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="modalGuardianAltPhone" class="form-label">Alternate Phone</label>
+                            <input type="text" id="modalGuardianAltPhone" class="form-control" placeholder="Optional">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="modalGuardianEmail" class="form-label">Email</label>
+                            <input type="text" id="modalGuardianEmail" class="form-control" placeholder="Optional">
+                        </div>
+                        <div class="col-12">
+                            <label for="modalGuardianAddress" class="form-label">Address <span class="text-danger">*</span></label>
+                            <input type="text" id="modalGuardianAddress" class="form-control" placeholder="Enter address" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="addGuardianSubmitBtn">Save Guardian</button>
                 </div>
             </form>
         </div>

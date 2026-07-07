@@ -46,8 +46,7 @@ function loadHeader() {
     const userStr = sessionStorage.getItem('user');
     let subtitle = 'Administration';
     let userDisplay = 'Administrator';
-    let departmentLogo = '../auth/assets/ccslogo.png';
-    let siteName = 'SAMS Admin Panel';
+    let siteName = 'Admin Panel';
 
     if (userStr) {
         try {
@@ -65,13 +64,9 @@ function loadHeader() {
                 }
             }
             
-            // Update site name and logo based on department
+            // Update site name based on department
             if (user.department) {
                 siteName = `${user.department} — Admin Panel`;
-            }
-            
-            if (user.departmentLogo) {
-                departmentLogo = user.departmentLogo;
             }
         } catch (e) {
             console.error('Error parsing user:', e);
@@ -81,8 +76,7 @@ function loadHeader() {
     headerContainer.innerHTML = `
         <header class="topbar">
             <div class="topbar-left">
-                <img src="../auth/assets/plplogo.png" alt="PLP Logo" class="topbar-logo"/>
-                <img src="${departmentLogo}" alt="Department Logo" class="topbar-logo-ccs"/>
+                <img src="../auth/assets/Schoollogo.jpg" alt="School Logo" class="topbar-logo"/>
                 <div class="topbar-info">
                     <div class="topbar-title">${siteName}</div>
                     <div class="topbar-subtitle" id="topbarSubtitle">${subtitle}</div>
@@ -124,7 +118,6 @@ function loadSidebar(activePage = '') {
     const departmentManagementClass = activePage === 'admin-section-management' ? 'active' : '';
     const systemSettingsClass = activePage === 'system-settings' ? 'active' : '';
     const studentImportClass = activePage === 'student-import' ? 'active' : '';
-    const subjectsClass = activePage === 'admin-subjects' ? 'active' : ''; // <--- NEW
 
     const backToPortalLink = isSuperAdmin ? '' : `
             <a href="../portal/portal.html" class="nav-item">
@@ -138,12 +131,8 @@ function loadSidebar(activePage = '') {
                 Section Import
             </a>` : '';
 
-    // <--- NEW: SUBJECTS LINK FOR SUPER ADMINS --->
-    const subjectsLink = isSuperAdmin ? `
-            <a href="admin-subjects.html" class="nav-item ${subjectsClass}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-                Subjects Management
-            </a>` : '';
+    // <--- SUBJECTS LINK REMOVED --->
+    const subjectsLink = ''; // Subjects Management removed from sidebar
 
     const systemSettingsLink = isSuperAdmin ? `
             <a href="system-settings.html" class="nav-item ${systemSettingsClass}">
