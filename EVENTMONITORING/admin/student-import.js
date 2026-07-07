@@ -10,6 +10,7 @@ let duplicateRowsInDatabaseCount = 0;
 let duplicateRowsInFile = [];
 let duplicateRowsInDatabase = [];
 let allStudents = [];
+let activeSchoolYear = null; // <-- ADD THIS LINE
 const QR_EMAIL_ENDPOINT = 'send-student-qr-email.php';
 const EMAIL_LIKE_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -30,38 +31,62 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.preventDefault();
     });
 });
-
 async function loadDepartments() {
     try {
         if (!supabaseClient) return;
 
-        const { data: sections, error } = await supabaseClient
+        // Fetch and assign directly to the global variable
+        const { data: fetchedSY, error: schoolYearError } = await supabaseClient
+            .from('school_years')
+            .select('id, name')
+            .eq('is_active', true)
+            .maybeSingle();
+
+        activeSchoolYear = fetchedSY; // Save it globally
+        const syDisplay = document.getElementById('activeSchoolYearDisplay');
+
+        if (schoolYearError || !activeSchoolYear) {
+            console.warn('No active school year found:', schoolYearError);
+            showAlert('No active school year set. Please set one in System Settings before importing.', 'warning');
+            
+            if (syDisplay) syDisplay.value = 'No Active School Year';
+            document.getElementById('departmentSelect').innerHTML = '<option value="" disabled selected>No Active School Year</option>';
+            return;
+        }
+
+        if (syDisplay) {
+            syDisplay.value = activeSchoolYear.name;
+        }
+
+        const { data: depts, error } = await supabaseClient
             .from('sections')
             .select('section_id, grade_level, section_name')
+            .eq('school_year_id', activeSchoolYear.id)
             .order('grade_level', { ascending: true })
             .order('section_name', { ascending: true });
 
         if (error) throw error;
-
-        departmentsCache = sections || [];
+        departmentsCache = depts || [];
 
         const select = document.getElementById('departmentSelect');
-        select.innerHTML = '<option value="">Select a section...</option>';
-
+        select.innerHTML = '<option value="" disabled selected>Select grade level and section...</option>';
+        
         departmentsCache.forEach(dept => {
             const opt = document.createElement('option');
             opt.value = dept.section_id;
             opt.textContent = `${dept.grade_level} - ${dept.section_name}`;
-            opt.dataset.name = `${dept.grade_level} - ${dept.section_name}`;
             select.appendChild(opt);
         });
 
+        // RESTORED: This populates the dropdown inside the Single Student Modal!
         populateSingleStudentDepartments();
-    } catch (err) {
-        console.error('Error loading departments:', err);
+        checkReadyToParse();
+
+    } catch (error) {
+        console.error('Error loading sections:', error);
+        showAlert('Error loading sections: ' + error.message, 'danger');
     }
 }
-
 
 function setupEventListeners() {
 
@@ -320,17 +345,16 @@ async function parseFile() {
                 showImportAlert('The file appears to be empty or has no data rows.', 'warning');
                 return;
             }
-            rows = raw.slice(1).map(r => ({
-                studentId:   String(r[0] || '').trim(),
-                lastName:    String(r[1] || '').trim(),
-                firstName:   String(r[2] || '').trim(),
-                middleName:  String(r[3] || '').trim(),
-                suffix:      String(r[4] || '').trim(),
-                birthDate:   String(r[5] || '').trim(),
-                gender:      String(r[6] || '').trim(),
-                section:     String(r[7] || '').trim(),
-                email:       String(r[8] || '').trim(),
-            }));
+           rows = raw.slice(1).map(r => ({
+    studentId:   String(r[0] || '').trim(),
+    lastName:    String(r[1] || '').trim(),
+    firstName:   String(r[2] || '').trim(),
+    middleName:  String(r[3] || '').trim(),
+    suffix:      String(r[4] || '').trim(),
+    birthDate:   String(r[5] || '').trim(),
+    gender:      String(r[6] || '').trim(),
+    email:       String(r[7] || '').trim(),
+}));
         }
 
         rows = rows.filter(r => r.studentId || r.firstName || r.lastName);
@@ -355,7 +379,6 @@ async function parseFile() {
         showImportAlert('Failed to parse file: ' + err.message, 'danger');
     }
 }
-
 function parseCSV(text) {
     const lines = text.split(/\r?\n/).filter(l => l.trim());
     if (lines.length < 2) return [];
@@ -370,8 +393,7 @@ function parseCSV(text) {
             suffix:     cols[4] || '',
             birthDate:  cols[5] || '',
             gender:     cols[6] || '',
-            section:    cols[7] || '',
-            email:      cols[8] || '',
+            email:      cols[7] || '',
         };
     });
 }
@@ -513,12 +535,17 @@ function renderPreview() {
     }).join('');
 }
 
-
 async function startImport() {
     const validRows = parsedRows.filter(r => r.status !== 'error');
 
     if (validRows.length === 0) {
         showImportAlert('No valid rows to import.', 'warning');
+        return;
+    }
+
+    // Safety check: Ensure active school year exists before bulk importing
+    if (!activeSchoolYear || !activeSchoolYear.id) {
+        showImportAlert('No active school year found. Please set one in System Settings first.', 'danger');
         return;
     }
 
@@ -556,6 +583,7 @@ async function startImport() {
                 birth_date:   row.birthDate || null,
                 gender:       row.gender || null,
                 section_id:   selectedDepartmentId,
+                school_year_id: activeSchoolYear.id, // <-- ADDED THIS LINE
                 status:       'active',
                 updated_at:   new Date().toISOString(),
             };
@@ -971,19 +999,49 @@ function populateSingleStudentDepartments() {
         select.appendChild(option);
     });
 }
-
 function openSingleStudentModal() {
     if (!singleStudentModal) {
         showImportAlert('Single student form is not available right now.', 'danger');
         return;
     }
-
+    setSingleStudentLoading(false); // ensure a clean state
+    const syDisplay = document.getElementById('singleActiveSchoolYear');
+    if (syDisplay) {
+        syDisplay.value = activeSchoolYear && activeSchoolYear.name ? activeSchoolYear.name : 'No Active School Year';
+    }
     const deptSelect = document.getElementById('singleDepartment');
     if (deptSelect && selectedDepartmentId) {
         deptSelect.value = selectedDepartmentId;
     }
-
     singleStudentModal.show();
+}
+
+function setSingleStudentLoading(isLoading, text) {
+    const overlay = document.getElementById('singleStudentLoadingOverlay');
+    const loadingText = document.getElementById('singleStudentLoadingText');
+    const form = document.getElementById('singleStudentForm');
+
+    if (overlay) overlay.classList.toggle('active', isLoading);
+    if (loadingText && text) loadingText.textContent = text;
+    if (form) {
+        form.querySelectorAll('input, select, button').forEach(el => { el.disabled = isLoading; });
+    }
+}
+
+function showEmailStatusToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `email-status-toast ${type}`;
+    const icon = type === 'success'
+        ? '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+    toast.innerHTML = `
+        ${icon}
+        <span class="email-status-toast-text">${escapeHtml(message)}</span>
+        <button type="button" class="email-status-toast-close" aria-label="Dismiss">&times;</button>
+    `;
+    document.body.appendChild(toast);
+    toast.querySelector('.email-status-toast-close')?.addEventListener('click', () => toast.remove());
+    setTimeout(() => toast.remove(), 8000);
 }
 
 async function submitSingleStudentForm(event) {
@@ -998,33 +1056,31 @@ async function submitSingleStudentForm(event) {
     const suffix = String(document.getElementById('singleSuffix')?.value || '').trim();
     const birthDate = String(document.getElementById('singleYearLevel')?.value || '').trim();
     const gender = String(document.getElementById('singleSection')?.value || '').trim().toLowerCase();
-    const emailRaw = String(document.getElementById('singleEmail')?.value || '').trim();
+    const email = String(document.getElementById('singleEmail')?.value || '').trim();
 
+    if (!activeSchoolYear || !activeSchoolYear.id) {
+        showImportAlert('No active school year found. Please set one in System Settings first.', 'danger');
+        return;
+    }
     if (!sectionId || !studentId || !firstName || !lastName) {
         showImportAlert('Please fill in Section, LRN, First Name, and Last Name.', 'warning');
         return;
     }
-
     if (!/^\d{12}$/.test(studentId)) {
         showImportAlert('LRN must be exactly 12 digits.', 'warning');
         return;
     }
-
     if (birthDate && Number.isNaN(Date.parse(birthDate))) {
         showImportAlert('Birth Date must be valid.', 'warning');
         return;
     }
-
     if (gender && !['male', 'female', 'other'].includes(gender)) {
         showImportAlert('Gender must be male, female, or other.', 'warning');
         return;
     }
 
-    const email = emailRaw;
-
     try {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving...';
+        setSingleStudentLoading(true, 'Saving student...');
 
         if (!supabaseClient) throw new Error('Database connection not available. Please refresh the page and try again.');
 
@@ -1050,53 +1106,47 @@ async function submitSingleStudentForm(event) {
             birth_date: birthDate || null,
             gender: gender || null,
             section_id: sectionId,
+            school_year_id: activeSchoolYear.id,
             status: 'active',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         };
 
-        const { error: insertError } = await supabaseClient
-            .from('students')
-            .insert(payload);
-
+        const { error: insertError } = await supabaseClient.from('students').insert(payload);
         if (insertError) throw insertError;
 
-        const emailResult = await sendStudentQrEmail({
-            studentId,
-            firstName,
-            middleName,
-            lastName,
-            suffix,
-            birthDate,
-            gender,
-            sectionLabel: departmentsCache.find(s => String(s.section_id) === String(sectionId))
-                ? `${departmentsCache.find(s => String(s.section_id) === String(sectionId)).grade_level} - ${departmentsCache.find(s => String(s.section_id) === String(sectionId)).section_name}`
-                : '',
-            email,
-        });
-
-        if (emailResult.sent) {
-            showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully. QR code was emailed to ${email}.`, 'success');
-        } else {
-            const level = email ? 'warning' : 'info';
-            showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully. QR email status: ${emailResult.message}.`, level);
-        }
-
+        // Student is saved — unblock the user immediately, don't wait on email.
+        showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully.`, 'success');
         document.getElementById('singleStudentForm')?.reset();
+        setSingleStudentLoading(false);
         singleStudentModal?.hide();
         await loadAllStudentsTable();
 
+        if (email) {
+            const sectionLabel = departmentsCache.find(s => String(s.section_id) === String(sectionId))
+                ? `${departmentsCache.find(s => String(s.section_id) === String(sectionId)).grade_level} - ${departmentsCache.find(s => String(s.section_id) === String(sectionId)).section_name}`
+                : '';
+
+            // Fire-and-forget: report the result whenever it lands, without blocking the UI.
+            sendStudentQrEmail({
+                studentId, firstName, middleName, lastName, suffix, birthDate, gender, sectionLabel, email,
+            }).then((emailResult) => {
+                if (emailResult.sent) {
+                    showEmailStatusToast(`QR code emailed to ${email} for ${firstName} ${lastName}.`, 'success');
+                } else {
+                    showEmailStatusToast(`Student saved, but QR email wasn't sent (${emailResult.message}).`, 'warning');
+                }
+            });
+        }
+
     } catch (err) {
         console.error('Single student registration failed:', err?.message || err, {
-            code: err?.code,
-            details: err?.details,
-            hint: err?.hint,
-            full: err
+            code: err?.code, details: err?.details, hint: err?.hint, full: err
         });
         showImportAlert(`Failed to save student: ${err?.message || 'Unknown error. Check console for details.'}`, 'danger');
     } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Save Student';
+        setSingleStudentLoading(false);
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
@@ -1198,20 +1248,24 @@ async function sendStudentQrEmail(student) {
         return { sent: false, message: 'email format not deliverable' };
     }
 
-    const payload = {
+   const payload = {
         email,
-        studentId: String(student.studentId || '').trim(),
+        lrn: String(student.studentId || '').trim(),
         firstName: String(student.firstName || '').trim(),
         middleName: String(student.middleName || '').trim(),
         lastName: String(student.lastName || '').trim(),
-        course: String(student.sectionLabel || '').trim(),
-        yearLevel: String(student.birthDate ?? '').trim(),
-        section: String(student.gender || '').trim(),
+        sectionInfo: String(student.sectionLabel || '').trim(),
+        birthDate: String(student.birthDate ?? '').trim(),
+        gender: String(student.gender || '').trim(),
         qrPayload: getStudentQrPayload(student),
     };
 
-    if (!payload.studentId) {
-        return { sent: false, message: 'missing student ID' };
+    if (!payload.lrn) {
+        return { sent: false, message: 'missing LRN' };
+    }
+
+  if (!payload.lrn) {
+        return { sent: false, message: 'missing LRN' };
     }
 
     try {
@@ -1259,7 +1313,6 @@ function escapeHtml(text) {
     const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
     return String(text).replace(/[&<>"']/g, m => map[m]);
 }
-
 function downloadStudentTemplate() {
     const headers = [
         'LRN',
@@ -1269,9 +1322,13 @@ function downloadStudentTemplate() {
         'Suffix',
         'Birth Date',
         'Gender',
-        'Section',
-        'Email'
+        'Email',
+        'School Year'
     ];
+
+    const schoolYearSample = (activeSchoolYear && activeSchoolYear.name)
+        ? activeSchoolYear.name
+        : '2024-2025';
 
     const sampleRow = [
         '123456789012',
@@ -1281,8 +1338,8 @@ function downloadStudentTemplate() {
         '',
         '2012-06-14',
         'male',
-        'Grade 3 - A',
-        'delacruz_juan@plpasig.edu.ph'
+        'delacruz_juan@plpasig.edu.ph',
+        schoolYearSample
     ];
 
     if (window.XLSX) {
@@ -1293,7 +1350,6 @@ function downloadStudentTemplate() {
         return;
     }
 
-    // Fallback if SheetJS fails to load.
     const csv = [headers, sampleRow]
         .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
         .join('\r\n');

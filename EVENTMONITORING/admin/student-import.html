@@ -64,15 +64,31 @@
         <p class="step-desc">Choose the section these students belong to, then upload your filled Excel or CSV template.</p>
 
         <div class="row g-4 mt-1">
-            <div class="col-md-5">
-                <label class="form-label-custom" for="departmentSelect">
-                    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                    Grade Level / Section <span class="required">*</span>
-                </label>
-                <select class="form-select-custom" id="departmentSelect">
-                    <option value="">Loading sections...</option>
-                </select>
-            </div>
+          <div class="col-md-5">
+    <div class="mb-3">
+        <label for="departmentSelect" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg> 
+            Grade Level / Section <span class="text-danger ms-1">*</span>
+        </label>
+        <select class="form-select" id="departmentSelect">
+            <option value="" disabled selected>Loading...</option>
+        </select>
+    </div>
+
+    <div>
+        <label for="activeSchoolYearDisplay" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg> 
+            Active School Year
+        </label>
+        <input type="text" class="form-control" id="activeSchoolYearDisplay" readonly placeholder="Loading..." style="background-color: #f8fafc; color: #64748b; font-weight: 500; border: 1px solid #e2e8f0; cursor: not-allowed;">
+    </div>
+</div>
 
             <div class="col-md-7">
                 <label class="form-label-custom">
@@ -331,15 +347,34 @@
     </div>
 </div>
 
+
 <div class="modal fade" id="singleStudentModal" tabindex="-1" aria-labelledby="singleStudentModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content" style="position:relative;">
+
+            <div class="modal-loading-overlay" id="singleStudentLoadingOverlay">
+                <div class="modal-loading-spinner"></div>
+                <div class="modal-loading-text" id="singleStudentLoadingText">Saving student...</div>
+            </div>
             <form id="singleStudentForm" novalidate>
+                
                 <div class="modal-header">
                     <h5 class="modal-title" id="singleStudentModalLabel">Single Student Registration</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
+                
                 <div class="modal-body">
+                    <div class="mb-4">
+                        <label for="singleActiveSchoolYear" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg> 
+                            Active School Year
+                        </label>
+                        <input type="text" class="form-control" id="singleActiveSchoolYear" readonly placeholder="Loading..." style="background-color: #f8fafc; color: #64748b; font-weight: 500; border: 1px solid #e2e8f0; cursor: not-allowed;">
+                    </div>
+
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label for="singleDepartment" class="form-label">Section <span class="text-danger">*</span></label>
@@ -387,10 +422,12 @@
                         </div>
                     </div>
                 </div>
+                
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-success" id="singleStudentSubmitBtn">Save Student</button>
                 </div>
+                
             </form>
         </div>
     </div>
