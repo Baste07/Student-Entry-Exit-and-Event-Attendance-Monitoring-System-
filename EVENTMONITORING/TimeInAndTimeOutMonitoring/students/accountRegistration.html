@@ -86,7 +86,7 @@
             </button>
             <button class="role-btn" id="btnProfessor" onclick="switchRole('professor')">
                 <i class="fa-solid fa-chalkboard-teacher"></i>
-                Professor <span class="role-accent">Registration</span>
+                Teacher <span class="role-accent">Registration</span>
             </button>
         </div>
 
@@ -118,8 +118,8 @@
                 <p class="form-section-label">Student Lookup</p>
                 <div class="form-row cols-1">
                     <div class="form-group">
-                        <label><i class="fa-solid fa-id-card"></i> Student ID Number</label>
-                        <input type="text" id="studentIdInput" placeholder="XX-XXXXX" maxlength="8">
+                        <label><i class="fa-solid fa-id-card"></i> Student LRN</label>
+                        <input type="text" id="studentIdInput" placeholder="Enter your LRN" maxlength="15">
                         <span class="field-msg success" id="idSuccess"></span>
                         <span class="field-msg error" id="idError"></span>
                     </div>
@@ -140,18 +140,14 @@
                         <input type="text" id="s_lastName" readonly placeholder="Auto-filled">
                     </div>
                 </div>
-                <div class="form-row cols-3">
+                <div class="form-row cols-2">
                     <div class="form-group">
-                        <label>Course</label>
-                        <input type="text" id="s_course" readonly placeholder="Auto-filled">
-                    </div>
-                    <div class="form-group">
-                        <label>Year Level</label>
-                        <input type="text" id="s_yearLevel" readonly placeholder="Auto-filled">
+                        <label>Grade Level</label>
+                        <input type="text" id="s_gradeLevel" readonly placeholder="Auto-filled">
                     </div>
                     <div class="form-group">
                         <label>Section</label>
-                        <input type="text" id="s_section" readonly placeholder="Auto-filled">
+                        <input type="text" id="s_sectionName" readonly placeholder="Auto-filled">
                     </div>
                 </div>
                 <div class="form-row cols-1">
@@ -179,7 +175,7 @@
                 <div class="form-card-header">
                     <div class="hicon"><i class="fa-solid fa-chalkboard-teacher"></i></div>
                     <div>
-                        <h3>Professor Face Registration</h3>
+                        <h3>Teacher Face Registration</h3>
                         <p>Enter your Employee ID to retrieve your information, then scan your face.</p>
                     </div>
                 </div>
@@ -187,7 +183,7 @@
 
                     <div id="professorInfoCard" class="info-card professor">
                         <div class="info-card-head">
-                            <h4><i class="fa-solid fa-circle-check"></i> Professor Found</h4>
+                            <h4><i class="fa-solid fa-circle-check"></i> Teacher Found</h4>
                             <span id="professorFaceBadge" class="status-badge"></span>
                         </div>
                         <div class="info-grid">

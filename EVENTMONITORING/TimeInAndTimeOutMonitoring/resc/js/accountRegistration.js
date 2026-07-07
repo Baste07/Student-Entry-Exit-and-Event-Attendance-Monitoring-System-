@@ -14,13 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auto-switch to professor tab if role=professor
     if (params.get('role') === 'professor') switchRole('professor');
 
-    // Pre-fill student ID from URL
+    // Pre-fill student LRN from URL
     const sid = params.get('student_id');
     if (sid && currentRole === 'student') {
-        const raw = sid.replace(/\D/g, '').slice(0, 7);
-        const formatted = raw.length > 2 ? raw.slice(0, 2) + '-' + raw.slice(2) : raw;
         const idInput = document.getElementById('studentIdInput');
-        idInput.value = formatted;
+        idInput.value = sid;
         idInput.dispatchEvent(new Event('input'));
     }
 
@@ -163,7 +161,7 @@ function clearStudentForm() {
     studentInfoCard.classList.remove('show');
     studentIdInput.value = '';
     studentData = null;
-    ['s_firstName','s_middleName','s_lastName','s_course','s_yearLevel','s_section','s_email']
+    ['s_firstName','s_middleName','s_lastName','s_gradeLevel','s_sectionName','s_email']
         .forEach(id => document.getElementById(id).value = '');
     ['displayName','displayCourse','displayYearSection','displayEmail']
         .forEach(id => document.getElementById(id).textContent = '');
@@ -211,7 +209,7 @@ studentScanBtn.addEventListener('click', async () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                id_number: studentData.id_number,
+                id_number: studentData.lrn,
                 firstName: studentData.first_name,
                 lastName:  studentData.last_name,
                 role:      'student'
@@ -295,10 +293,8 @@ async function waitForFlask(retries = 30, delayMs = 1500) {
 // STUDENT ID INPUT LOGIC
 // ═══════════════════════════════════════════
 studentIdInput.addEventListener('input', function () {
-    let raw = this.value.replace(/\D/g, '').slice(0, 7);
-    let formatted = raw.length > 2 ? raw.slice(0, 2) + '-' + raw.slice(2) : raw;
-    this.value = formatted;
-
+    const val = this.value.trim();
+    
     clearTimeout(studentTimer);
     document.getElementById('idError').textContent = '';
     document.getElementById('idSuccess').innerHTML = '';
@@ -307,18 +303,18 @@ studentIdInput.addEventListener('input', function () {
     studentData = null; // Reset data
     updateScanButtonsState(); // Lock button
 
- if (raw.length === 7) {
+    if (val.length >= 3) {
         document.getElementById('idSuccess').innerHTML = 'Searching... <span class="loading"></span>';
-        studentTimer = setTimeout(() => searchStudent(formatted), 600); // <--- FIXED: Sends "23-22222"
+        studentTimer = setTimeout(() => searchStudent(val), 600);
     }
 });
 
-async function searchStudent(rawId) {
+async function searchStudent(lrn) {
     try {
         const { data } = await supabaseClient
             .from('students')
             .select('*')
-            .eq('id_number', rawId)
+            .eq('lrn', lrn)
             .maybeSingle();
 
         document.getElementById('idSuccess').innerHTML = '';
@@ -339,15 +335,35 @@ async function fillStudentFields(data) {
     document.getElementById('s_firstName').value  = data.first_name  || '';
     document.getElementById('s_middleName').value = data.middle_name || '';
     document.getElementById('s_lastName').value   = data.last_name   || '';
-    document.getElementById('s_course').value     = data.course      || '';
-    document.getElementById('s_yearLevel').value  = data.year_level  || '';
-    document.getElementById('s_section').value    = data.section     || '';
     document.getElementById('s_email').value      = data.email       || '';
 
+    // Fetch section info from sections table
+    let gradeLevel = 'N/A';
+    let sectionName = 'N/A';
+    
+    if (data.section_id) {
+        try {
+            const { data: sectionData } = await supabaseClient
+                .from('sections')
+                .select('grade_level, section_name')
+                .eq('section_id', data.section_id)
+                .maybeSingle();
+            
+            if (sectionData) {
+                gradeLevel = sectionData.grade_level || 'N/A';
+                sectionName = sectionData.section_name || 'N/A';
+            }
+        } catch (err) {
+            console.error('Error fetching section:', err);
+        }
+    }
+    
+    document.getElementById('s_gradeLevel').value = gradeLevel;
+    document.getElementById('s_sectionName').value = sectionName;
+
     document.getElementById('displayName').textContent        = `${data.first_name} ${data.last_name}`;
-    document.getElementById('displayCourse').textContent      = data.course || 'N/A';
-    const year = data.year_level || '', section = data.section || '';
-    document.getElementById('displayYearSection').textContent = (year || section) ? `${year} - ${section}` : 'N/A';
+    document.getElementById('displayCourse').textContent      = gradeLevel;
+    document.getElementById('displayYearSection').textContent = `${gradeLevel} - ${sectionName}`;
     document.getElementById('displayEmail').textContent       = data.email || 'N/A';
 
     const badge = document.getElementById('studentFaceBadge');
@@ -386,8 +402,8 @@ empIdInput.addEventListener('input', function () {
 
 async function searchProfessor(id) {
     const { data } = await supabaseClient
-        .from('professors')
-        .select('*, departments(department_name)')
+        .from('teachers')
+        .select('*')
         .eq('employee_id', id)
         .maybeSingle();
 
@@ -402,16 +418,14 @@ async function searchProfessor(id) {
 }
 
 async function fillProfessorFields(data) {
-    const departmentName = data.departments?.department_name || 'N/A';
-
     document.getElementById('p_firstName').value  = data.first_name  || '';
     document.getElementById('p_middleName').value = data.middle_name || '';
     document.getElementById('p_lastName').value   = data.last_name   || '';
-    document.getElementById('p_department').value = departmentName;
+    document.getElementById('p_department').value = 'N/A';
     document.getElementById('p_email').value      = data.email       || '';
 
     document.getElementById('p_displayName').textContent  = `${data.first_name} ${data.last_name}`;
-    document.getElementById('p_displayDept').textContent  = departmentName;
+    document.getElementById('p_displayDept').textContent  = 'N/A';
     document.getElementById('p_displayEmpId').textContent = data.employee_id || 'N/A';
     document.getElementById('p_displayEmail').textContent = data.email       || 'N/A';
 
@@ -420,7 +434,7 @@ async function fillProfessorFields(data) {
     badge.textContent = 'Checking...';
 
     const hasFace = await hasFaceFiles(data.facial_dataset_path);
-    if (!professorData || professorData.professor_id !== data.professor_id) return;
+    if (!professorData || professorData.teacher_id !== data.teacher_id) return;
 
     if (hasFace) {
         badge.className = 'status-badge registered';

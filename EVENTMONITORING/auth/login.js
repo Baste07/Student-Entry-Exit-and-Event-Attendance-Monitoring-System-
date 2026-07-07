@@ -426,7 +426,7 @@ async function loginUser(username, password) {
     if (adminData.admin_level === 'super_admin') {
         window.location.href = '../admin/usermanagement.html';
     } else {
-        window.location.href = '../admin/dashboard.html';
+        window.location.href = '../TimeinAndTimeOutMonitoring/admin/dashboard.html';
     }
 }
 
