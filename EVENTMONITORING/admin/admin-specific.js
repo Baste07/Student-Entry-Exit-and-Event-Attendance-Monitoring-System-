@@ -121,7 +121,7 @@ function loadSidebar(activePage = '') {
     }
 
     const userManagementClass = activePage === 'usermanagement' ? 'active' : '';
-    const departmentManagementClass = activePage === 'admin-department-management' ? 'active' : '';
+    const departmentManagementClass = activePage === 'admin-section-management' ? 'active' : '';
     const systemSettingsClass = activePage === 'system-settings' ? 'active' : '';
     const studentImportClass = activePage === 'student-import' ? 'active' : '';
     const subjectsClass = activePage === 'admin-subjects' ? 'active' : ''; // <--- NEW
@@ -133,9 +133,9 @@ function loadSidebar(activePage = '') {
             </a>`;
 
     const departmentManagementLink = isSuperAdmin ? `
-            <a href="admin-department-management.html" class="nav-item ${departmentManagementClass}">
+            <a href="admin-section-management.html" class="nav-item ${departmentManagementClass}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                Department Management
+                Section Import
             </a>` : '';
 
     // <--- NEW: SUBJECTS LINK FOR SUPER ADMINS --->
