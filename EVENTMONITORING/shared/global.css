@@ -1,20 +1,20 @@
 :root {
     font-size: 125%;
-    --green-dark:    #0d3b1e;
-    --green-mid:     #145a2e;
-    --green-sidebar: #0f4423;
-    --green-btn:     #1a6b36;
-    --green-hover:   #12522a;
-    --green-active:  #1e7a3e;
+    --blue-dark:    #0b4f6c;
+    --blue-mid:     #1976b8;
+    --blue-sidebar: #083b53;
+    --blue-btn:     #2382c8;
+    --blue-hover:   #17679a;
+    --blue-active:  #2b93db;
     --sidebar-w:     235px;
     --topbar-h:      70px;
-    --body-bg:       #f0f4f1;
+    --body-bg:       #f3f8fc;
     --card-bg:       #ffffff;
-    --border:        #e2ebe4;
-    --text-main:     #1a2e1c;
-    --text-muted:    #6b7f6e;
-    --shadow-sm:     0 2px 8px rgba(0,0,0,0.07);
-    --shadow-md:     0 4px 20px rgba(0,0,0,0.10);
+    --border:        #dbeaf4;
+    --text-main:     #15364d;
+    --text-muted:    #5f7889;
+    --shadow-sm:     0 2px 10px rgba(8, 44, 69, 0.08);
+    --shadow-md:     0 12px 30px rgba(8, 44, 69, 0.12);
     --radius:        0.85rem;
 }
 
@@ -33,7 +33,7 @@ body {
     position: fixed;
     top: 0; left: 0; right: 0;
     height: var(--topbar-h);
-    background: var(--green-dark);
+    background: var(--blue-dark);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -162,7 +162,7 @@ body {
     left: 0;
     width: var(--sidebar-w);
     bottom: 0;
-    background: var(--green-sidebar);
+    background: var(--blue-sidebar);
     display: flex;
     flex-direction: column;
     padding: 1.5rem 0;
@@ -276,7 +276,7 @@ body {
 .semester-name {
     font-size: 1rem;
     font-weight: 700;
-    color: var(--green-mid);
+    color: var(--blue-mid);
     font-family: 'Source Sans 3', sans-serif;
 }
 
@@ -307,7 +307,7 @@ body {
 
 .panel-title svg {
     width: 17px; height: 17px;
-    stroke: var(--green-btn); fill: none;
+    stroke: var(--blue-btn); fill: none;
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
 
@@ -372,7 +372,7 @@ body {
 
 .toolbar-title svg {
     width: 16px; height: 16px;
-    stroke: var(--green-btn); fill: none;
+    stroke: var(--blue-btn); fill: none;
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
 
@@ -411,7 +411,7 @@ body {
 
 .search-box input:focus {
     outline: none;
-    border-color: var(--green-mid);
+    border-color: var(--blue-mid);
     background: #fff;
 }
 
@@ -442,7 +442,7 @@ body {
 
 .filter-select:focus {
     outline: none;
-    border-color: var(--green-mid);
+    border-color: var(--blue-mid);
 }
 
 .btn-action {
@@ -464,7 +464,7 @@ body {
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
 
-.btn-action:hover { background: #e8f0ea; border-color: var(--green-mid); color: var(--green-mid); }
+.btn-action:hover { background: #e8f0ea; border-color: var(--blue-mid); color: var(--blue-mid); }
 .btn-action.danger:hover { background: #fee2e2; border-color: #ef4444; color: #ef4444; }
 
 .btn-primary-green {
@@ -495,7 +495,7 @@ body {
 }
 
 .btn-primary-green:hover {
-    background: var(--green-hover);
+    background: var(--blue-hover);
     transform: translateY(-1px);
     box-shadow: 0 5px 16px rgba(20,90,46,.4);
     color: #fff;
