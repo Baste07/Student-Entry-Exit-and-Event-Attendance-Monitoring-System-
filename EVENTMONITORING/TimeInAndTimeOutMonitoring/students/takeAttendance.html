@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../resc/css/takeAttendance.css">
-<title>Take Attendance | Time In & Time Out Monitoring System</title>
+<title>Take Attendance | School Attendance System</title>
 
 <style>
 /* ── Manual Attendance Button ── */
@@ -196,402 +196,98 @@
 
 .cred-note i { color: #40916c; margin-right: 4px; }
 
-/* ── Machine Laboratory Lock ── */
-.lab-lock {
-    margin: 18px 0 6px;
-    padding: 18px 18px 16px;
-    border-radius: 16px;
-    border: 1.5px solid #d9eadf;
-    background: linear-gradient(180deg, #f8fcf8 0%, #ffffff 100%);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
-}
-.lab-lock-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 14px;
-}
-.lab-lock-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: #eaf5ee;
-    color: #1a4731;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: .4px;
-    text-transform: uppercase;
-    font-family: 'DM Sans', sans-serif;
-}
-.lab-lock h3 {
-    margin: 10px 0 6px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 16px;
-    color: #10261b;
-}
-.lab-lock p {
-    margin: 0;
-    color: #5f7668;
-    font-size: 13px;
-    line-height: 1.45;
-    font-family: 'DM Sans', sans-serif;
-}
-.lab-lock-state {
-    flex: 0 0 auto;
-    align-self: center;
-    padding: 7px 11px;
-    border-radius: 999px;
-    background: #eef2ff;
-    color: #3730a3;
-    font-size: 12px;
-    font-weight: 800;
-    font-family: 'DM Sans', sans-serif;
-    white-space: nowrap;
-}
-.lab-lock-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 10px;
-}
-.lab-lock-select {
-    width: 100%;
-    min-height: 44px;
-    padding: 11px 14px;
-    border: 1.5px solid #cfe1d5;
-    border-radius: 10px;
-    background: #fff;
-    color: #10261b;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    outline: none;
-}
-.lab-lock-select:focus {
-    border-color: #40916c;
-    box-shadow: 0 0 0 3px rgba(64,145,108,.12);
-}
-.lab-lock-save {
-    min-height: 44px;
-    padding: 0 16px;
-    border: none;
-    border-radius: 10px;
-    background: #1a4731;
-    color: #fff;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all .18s;
-    box-shadow: 0 4px 12px rgba(26,71,49,.16);
-}
-.lab-lock-save:hover:not(:disabled) {
-    background: #2d6a4f;
-    transform: translateY(-1px);
-}
-.lab-lock-save:disabled {
-    opacity: .55;
-    cursor: not-allowed;
-}
-.lab-lock-note {
-    margin-top: 10px;
-    font-size: 12.5px;
-    color: #4b6356;
-    font-family: 'DM Sans', sans-serif;
-    line-height: 1.45;
-}
-.lab-lock-note strong { color: #10261b; }
-.lab-lock-warning {
-    color: #b45309;
-    font-weight: 700;
-}
-
-.lab-lock-summary {
-    margin-top: 12px;
-    padding: 14px 15px;
-    border-radius: 12px;
-    background: #f8fcf8;
-    border: 1px solid #d9eadf;
-}
-.lab-lock-summary h4 {
-    margin: 0 0 6px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    color: #10261b;
-}
-.lab-lock-summary p {
-    margin: 0;
-    color: #52695d;
-    font-size: 12.8px;
-    line-height: 1.5;
-    font-family: 'DM Sans', sans-serif;
-}
-.lab-lock-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 12px;
-}
-.lab-lock-trigger {
-    min-height: 44px;
-    padding: 0 16px;
-    border: none;
-    border-radius: 10px;
-    background: #1a4731;
-    color: #fff;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all .18s;
-    box-shadow: 0 4px 12px rgba(26,71,49,.16);
-}
-.lab-lock-trigger:hover {
-    background: #2d6a4f;
-    transform: translateY(-1px);
-}
-
-.lab-auth-overlay,
-.lab-modal-overlay {
+/* ── Greeting Overlay ── */
+.greet-overlay {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(10, 20, 15, 0.72);
+    background: rgba(10, 20, 15, 0.75);
     z-index: 9999;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(6px);
-    padding: 20px;
+    backdrop-filter: blur(8px);
 }
-.lab-auth-overlay.show,
-.lab-modal-overlay.show { display: flex; }
+.greet-overlay.on { display: flex; }
 
-.lab-auth-box,
-.lab-modal-box {
+.greet-card {
     background: #ffffff;
-    border-radius: 18px;
-    padding: 36px 32px 30px;
+    border-radius: 24px;
+    padding: 48px 40px 36px;
+    max-width: 420px;
     width: 92%;
-    max-width: 440px;
-    box-shadow: 0 24px 60px rgba(0,0,0,.25);
-    animation: labPop .28s cubic-bezier(.34,1.56,.64,1);
-    border: 1.5px solid #d4e6d9;
+    text-align: center;
+    box-shadow: 0 24px 80px rgba(0,0,0,.35);
+    animation: greetPop .4s cubic-bezier(.34,1.56,.64,1);
+    border: 2px solid #166534;
 }
 
-@keyframes labPop {
-    from { opacity: 0; transform: scale(.88) translateY(16px); }
+@keyframes greetPop {
+    from { opacity: 0; transform: scale(.7) translateY(30px); }
     to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-.lab-bar {
-    height: 4px;
-    background: linear-gradient(90deg, #1a4731, #40916c, #f4c430);
-    margin: -36px -32px 28px;
-    border-radius: 18px 18px 0 0;
+.greet-avatar {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px;
+    background: #dcfce7;
+    border: 3px solid #166534;
 }
 
-.lab-auth-top,
-.lab-modal-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-.lab-auth-tag,
-.lab-modal-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: #eaf5ee;
-    color: #1a4731;
-    font-size: 12px;
+.greet-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.6rem;
     font-weight: 800;
-    letter-spacing: .4px;
-    text-transform: uppercase;
-    font-family: 'DM Sans', sans-serif;
-}
-.lab-auth-box h3,
-.lab-modal-box h3 {
-    margin: 10px 0 6px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 16px;
-    color: #10261b;
-}
-.lab-auth-box p,
-.lab-modal-box p {
-    margin: 0;
-    color: #5f7668;
-    font-size: 13px;
-    line-height: 1.45;
-    font-family: 'DM Sans', sans-serif;
-}
-.lab-auth-state,
-.lab-modal-state {
-    flex: 0 0 auto;
-    align-self: center;
-    padding: 7px 11px;
-    border-radius: 999px;
-    background: #eef2ff;
-    color: #3730a3;
-    font-size: 12px;
-    font-weight: 800;
-    font-family: 'DM Sans', sans-serif;
-    white-space: nowrap;
-}
-
-.lab-auth-error {
-    display: none;
-    align-items: center;
-    gap: 8px;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #991b1b;
-    padding: 10px 13px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    margin: 0 0 14px;
-    font-family: 'DM Sans', sans-serif;
-}
-.lab-auth-error.show { display: flex; }
-
-.lab-auth-fg { margin-bottom: 14px; }
-.lab-auth-fg label {
-    display: block;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: #1a4731;
-    margin-bottom: 6px;
-    text-transform: uppercase;
-    letter-spacing: .7px;
-    font-family: 'DM Sans', sans-serif;
-}
-.lab-auth-fg input {
-    width: 100%;
-    padding: 11px 14px;
-    border: 1.5px solid #d4e6d9;
-    border-radius: 10px;
-    font-size: 14px;
-    font-family: 'DM Sans', sans-serif;
     color: #0f2419;
-    background: #f5f8f5;
-    outline: none;
-    transition: border-color .18s, box-shadow .18s;
-    box-sizing: border-box;
-}
-.lab-auth-fg input:focus {
-    border-color: #40916c;
-    background: #fff;
-    box-shadow: 0 0 0 3px rgba(64,145,108,.12);
+    margin-bottom: 8px;
 }
 
-.lab-modal-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 10px;
-}
-.lab-modal-select {
-    width: 100%;
-    min-height: 44px;
-    padding: 11px 14px;
-    border: 1.5px solid #cfe1d5;
-    border-radius: 10px;
-    background: #fff;
-    color: #10261b;
+.greet-msg {
     font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    outline: none;
-}
-.lab-modal-select:focus {
-    border-color: #40916c;
-    box-shadow: 0 0 0 3px rgba(64,145,108,.12);
-}
-.lab-modal-save,
-.lab-modal-cancel {
-    min-height: 44px;
-    padding: 0 16px;
-    border-radius: 10px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all .18s;
-}
-.lab-modal-save {
-    border: none;
-    background: #1a4731;
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(26,71,49,.16);
-}
-.lab-modal-save:hover:not(:disabled) {
-    background: #2d6a4f;
-    transform: translateY(-1px);
-}
-.lab-modal-save:disabled {
-    opacity: .55;
-    cursor: not-allowed;
-}
-.lab-modal-cancel {
-    margin-top: 12px;
-    width: 100%;
-    border: 1.5px solid #d4e6d9;
-    background: transparent;
-    color: #5a7265;
-}
-.lab-modal-cancel:hover {
-    border-color: #40916c;
+    font-size: 1.1rem;
     color: #1a4731;
-    background: #f5f8f5;
+    font-weight: 600;
+    margin-bottom: 20px;
 }
-.lab-modal-note {
-    margin-top: 10px;
-    font-size: 12.5px;
-    color: #4b6356;
+
+.greet-countdown {
+    font-size: .8rem;
+    color: #64748b;
     font-family: 'DM Sans', sans-serif;
-    line-height: 1.45;
 }
 
-@media (max-width: 640px) {
-    .lab-auth-top,
-    .lab-modal-top,
-    .lab-modal-row {
-        display: grid;
-        grid-template-columns: 1fr;
-    }
-    .lab-auth-state,
-    .lab-modal-state {
-        justify-self: start;
-    }
+/* Spoof variant */
+.greet-card.spoof {
+    border-color: #7f1d1d;
 }
-
-@media (max-width: 640px) {
-    .lab-lock-head,
-    .lab-lock-row {
-        display: grid;
-        grid-template-columns: 1fr;
-    }
-    .lab-lock-state {
-        justify-self: start;
-    }
+.greet-card.spoof .greet-avatar {
+    background: #fef2f2;
+    border-color: #7f1d1d;
+}
+.greet-card.spoof .greet-name {
+    color: #7f1d1d;
+}
+.greet-card.spoof .greet-msg {
+    color: #991b1b;
 }
 </style>
+<base target="_blank">
 </head>
 <body>
 
 <!-- TOP BAR -->
 <header>
     <a href="homepage.html" class="brand">
-        <div class="brand-logos">
-            <img src="../resc/assets/plp_logo.png" alt="PLP Logo">
-            <div class="logo-divider"></div>
-            <img src="../resc/assets/ccs_logo.png" alt="CCS Logo" onerror="this.style.display='none';this.previousElementSibling.style.display='none'">
-        </div>
+     <div class="brand-logos">
+    <img src="../resc/assets/El Tres Eres Cencia Escuela.jpg"
+         alt="School Logo"
+         class="plp-logo">
+</div>
         <div class="brand-text">
             <span class="sys-label">Monitoring System</span>
-            <h1>Time In &amp; Time Out</h1>
+            <h1>Entry Exit Attendance</h1>
         </div>
     </a>
 
@@ -613,7 +309,7 @@
 <div class="page-header">
   <div class="header-icon"><i class="fa-solid fa-user-check"></i></div>
   <h1>Take Attendance</h1>
-  <p>Facial recognition-powered attendance session</p>
+  <p>Facial recognition-powered attendance scanner</p>
 </div>
 
 <!-- CARD -->
@@ -635,7 +331,7 @@
         <div class="tile-value"><i class="fa-solid fa-camera"></i> Facial AI</div>
       </div>
       <div class="tile">
-        <div class="tile-label">Session</div>
+        <div class="tile-label">Status</div>
                 <div class="tile-value"><i class="fa-solid fa-circle-dot"></i> <span id="sessionState">Engine Off</span></div>
       </div>
       <div class="tile">
@@ -648,39 +344,13 @@
 
     <div class="instruction">
       <p>
-        Click <strong>Start Session</strong> to connect to the live camera feed and begin
-        capturing attendance via facial recognition.<br>
+        Click <strong>Start Engine</strong> to boot the facial recognition engine, then click <strong>Start Session</strong> to begin scanning.<br>
         <span style="font-size:13px;color:#888;">
           <i class="fa-solid fa-circle-info"></i>
-          Make sure <strong> the ENGINE</strong> is running 
+          Make sure the <strong>ENGINE</strong> is running before starting a session.
         </span>
       </p>
     </div>
-
-        <div class="lab-lock">
-            <div class="lab-lock-head">
-                <div>
-                    <div class="lab-lock-tag"><i class="fa-solid fa-flask"></i> Machine Laboratory Lock</div>
-                    <h3>Bind this terminal to one laboratory</h3>
-                    <p>
-                        Configure the room assigned to this physical PC. The setting is saved on this machine and
-                        enforced for facial and manual attendance.
-                    </p>
-                </div>
-            </div>
-
-            <div class="lab-lock-summary">
-                <h4 id="machineLabSummaryState">Loading...</h4>
-                <p id="machineLabSummaryLabel">Loading laboratory assignment...</p>
-                <p id="machineLabSummaryNote">The terminal is not yet linked to a laboratory.</p>
-            </div>
-
-            <div class="lab-lock-actions">
-                <button class="lab-lock-trigger" id="machineLabOpenBtn" type="button">
-                    <i class="fa-solid fa-user-shield"></i> Authorize & Configure
-                </button>
-            </div>
-        </div>
 
    <div class="btn-wrap">
       <button class="btn btn-boot" id="bootEngineBtn">
@@ -690,7 +360,7 @@
             <button class="btn btn-start" id="startBtn" disabled style="display:none">
         <i class="fa-solid fa-play"></i> Start Session
       </button>
-      
+
       <button class="btn btn-stop" id="stopBtn" style="display:none">
         <i class="fa-solid fa-stop"></i> Stop Session
       </button>
@@ -722,91 +392,16 @@
   </div>
 </div>
 
-<!-- NOTIFICATION OVERLAY -->
-<div id="notifOverlay">
-  <div id="notifBox">
-    <div id="notifIcon"></div>
-    <div id="notifTitle"></div>
-    <div id="notifMsg"></div>
-    <div id="lateBadge"></div>
-    <div id="dismissInfo"></div>
-    <div id="cannotTimeOutInfo"></div>
-    <div id="notifBtns"></div>
-    <div id="notifCountdown"></div>
-  </div>
-</div>
-
 <!-- TOAST -->
 <div id="toast"></div>
 
-<!-- ══ SUPERADMIN AUTH MODAL ══ -->
-<div class="lab-auth-overlay" id="labAuthOverlay" onclick="if(event.target===this)closeLabAuthModal()">
-    <div class="lab-auth-box">
-        <div class="lab-bar"></div>
-        <div class="lab-auth-top">
-            <div>
-                <div class="lab-auth-tag"><i class="fa-solid fa-user-shield"></i> Super Admin Verification</div>
-                <h3>Authorize lab assignment changes</h3>
-                <p>Enter the superadmin credentials once per session to open the laboratory picker.</p>
-            </div>
-            <div class="lab-auth-state">Protected</div>
-        </div>
-
-        <div class="lab-auth-error" id="labAuthError">
-            <i class="fa-solid fa-circle-xmark"></i>
-            <span id="labAuthErrorMsg">Invalid superadmin credentials.</span>
-        </div>
-
-        <div class="lab-auth-fg">
-            <label><i class="fa-solid fa-user" style="color:#40916c;margin-right:5px"></i> Username or Email</label>
-            <input type="text" id="labAuthUsername" placeholder="Enter superadmin username or email" autocomplete="off">
-        </div>
-
-        <div class="lab-auth-fg">
-            <label><i class="fa-solid fa-lock" style="color:#40916c;margin-right:5px"></i> Password</label>
-            <input type="password" id="labAuthPassword" placeholder="Enter superadmin password" onkeydown="if(event.key==='Enter')submitLabAuthCredentials()">
-        </div>
-
-        <div class="cred-btns">
-            <button class="cred-btn-cancel" type="button" onclick="closeLabAuthModal()">
-                <i class="fa-solid fa-xmark"></i> Cancel
-            </button>
-            <button class="cred-btn-submit" id="labAuthSubmitBtn" type="button">
-                <i class="fa-solid fa-shield-halved"></i> Verify & Continue
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- ══ LAB ASSIGNMENT MODAL ══ -->
-<div class="lab-modal-overlay" id="labModalOverlay" onclick="if(event.target===this)closeLabModal()">
-    <div class="lab-modal-box">
-        <div class="lab-bar"></div>
-        <div class="lab-modal-top">
-            <div>
-                <div class="lab-modal-tag"><i class="fa-solid fa-flask"></i> Lab Assignment</div>
-                <h3>Assign this terminal to a laboratory</h3>
-                <p>Select the room that this PC should use for attendance. The assignment is saved locally on this machine.</p>
-            </div>
-            <div class="lab-modal-state" id="machineLabState">Loading...</div>
-        </div>
-
-        <div class="lab-modal-row">
-            <select id="machineLabSelect" class="lab-modal-select" disabled>
-                <option value="">Loading laboratories...</option>
-            </select>
-            <button class="lab-modal-save" id="machineLabSaveBtn" type="button">
-                <i class="fa-solid fa-floppy-disk"></i> Save Assignment
-            </button>
-        </div>
-
-        <div class="lab-modal-note" id="machineLabNote">
-            Fetching available laboratories...
-        </div>
-
-        <button class="lab-modal-cancel" type="button" onclick="closeLabModal()">
-            <i class="fa-solid fa-xmark"></i> Cancel
-        </button>
+<!-- ══ GREETING OVERLAY ══ -->
+<div class="greet-overlay" id="greetOverlay" onclick="if(event.target===this)dismissGreeting()">
+    <div class="greet-card" id="greetCard">
+        <div class="greet-avatar" id="greetAvatar">👋</div>
+        <div class="greet-name" id="greetName"></div>
+        <div class="greet-msg" id="greetMsg"></div>
+        <div class="greet-countdown" id="greetCountdown"></div>
     </div>
 </div>
 
@@ -819,7 +414,7 @@
             <i class="fa-solid fa-lock"></i>
         </div>
 
-        <h3>Admin / Professor Access</h3>
+        <h3>Admin / Teacher Access</h3>
         <p>Enter your credentials to unlock Manual Attendance mode. This action is logged for security.</p>
 
         <div class="cred-error" id="credError">
@@ -851,7 +446,7 @@
 
         <p class="cred-note" style="margin-top:14px">
             <i class="fa-solid fa-shield-halved"></i>
-            Only admins and professors can access manual mode
+            Only admins and teachers can access manual mode
         </p>
     </div>
 </div>
@@ -911,7 +506,6 @@ async function submitCredentials() {
             .maybeSingle();
 
         if (adminData) {
-            // ✅ Admin verified
             sessionStorage.setItem('manual_access_granted', 'true');
             sessionStorage.setItem('manual_access_role', adminData.admin_level || 'admin');
             closeCredModal();
@@ -919,19 +513,18 @@ async function submitCredentials() {
             return;
         }
 
-        // Check professors table
-        const { data: profData } = await supabaseClient
-            .from('professors')
-            .select('professor_id, email, first_name, last_name')
+        // Check teachers table
+        const { data: teacherData } = await supabaseClient
+            .from('teachers')
+            .select('teacher_id, email, first_name, last_name')
             .eq('email', email)
             .eq('password', password)
             .eq('status', 'active')
             .maybeSingle();
 
-        if (profData) {
-            // ✅ Professor verified
+        if (teacherData) {
             sessionStorage.setItem('manual_access_granted', 'true');
-            sessionStorage.setItem('manual_access_role', 'professor');
+            sessionStorage.setItem('manual_access_role', 'teacher');
             closeCredModal();
             window.location.href = 'manualAttendance.html';
             return;

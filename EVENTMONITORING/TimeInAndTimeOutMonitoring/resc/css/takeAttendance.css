@@ -74,11 +74,13 @@ header {
     flex-shrink: 0; 
 }
 
-.logo-divider {
-    width: 1px; height: 28px;
-    background: rgba(255,255,255,0.18);
-    flex-shrink: 0;
+.plp-logo {
+    width: 50px;
+    height: 50px;
+    object-fit: contain;
 }
+
+
 
 .brand-text { display: flex; flex-direction: column; line-height: 1.2; }
 

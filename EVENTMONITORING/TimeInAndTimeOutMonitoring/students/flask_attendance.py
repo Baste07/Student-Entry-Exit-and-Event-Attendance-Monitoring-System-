@@ -15,7 +15,6 @@ load_dotenv(env_path, override=True)
 
 # 4. Standard Imports (Cleaned up, no duplicates)
 import io, signal, warnings, datetime, queue, threading, json, time, hashlib
-import xml.etree.ElementTree as ET
 import numpy as np
 import cv2
 import face_recognition
@@ -102,73 +101,8 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     print(f"CRITICAL ERROR: Could not load credentials from {env_path}")
     sys.exit(1)
 
-# Ensure XML audit helper available early so startup logging can't fail
-XML_LOG_FILE = os.path.join(script_dir, "engine_log.xml")
-ENGINE_NAME = "attendance"
-ENGINE_LABEL = "Attendance Engine"
-ENGINE_INSTANCE_ID = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
-def _log_hint(event_type, details=None):
-    event_type = str(event_type)
-    details = details if isinstance(details, dict) else {}
-    phase = str(details.get("phase") or "").strip().lower()
-    status_code = str(details.get("status_code") or "").strip()
-
-    if event_type == "startup":
-        return "The attendance engine started successfully and is ready to use."
-    if event_type == "rebuild_summary":
-        return "The face database was refreshed using the latest records."
-    if event_type == "error" and phase == "save_face_cache":
-        return "The cache could not be saved. The engine may rebuild it again later."
-    if event_type == "error" and phase == "load_all_faces":
-        return "The face database could not be rebuilt at startup. Check the connection and try again."
-    if event_type == "error":
-        return "Something went wrong. Check the message below for the reason and next step."
-    if event_type == "trigger_rebuild_response":
-        if status_code == "200":
-            return "The attendance engine accepted the rebuild request."
-        if status_code == "409":
-            return "A rebuild is already running, so this request was skipped."
-        if status_code == "401":
-            return "The rebuild request was rejected because the secret token was not accepted."
-        return "The attendance engine returned a response. Check the details below."
-    return "Check the details below for more information."
-
-def _ensure_xml_log():
-    try:
-        if not os.path.exists(XML_LOG_FILE):
-            root = ET.Element("EngineLog", version="1")
-            tree = ET.ElementTree(root)
-            tmp = XML_LOG_FILE + ".tmp"
-            tree.write(tmp, encoding="utf-8", xml_declaration=True)
-            os.replace(tmp, XML_LOG_FILE)
-    except Exception as e:
-        print(f"⚠ Failed to create XML log file: {e}")
-
-def _audit_event(event_type, details=None):
-    try:
-        _ensure_xml_log()
-        tree = ET.parse(XML_LOG_FILE)
-        root = tree.getroot()
-        ev = ET.Element("Event", type=str(event_type), ts=datetime.datetime.now().isoformat())
-        hint = ET.SubElement(ev, "Field", name="hint")
-        hint.text = _log_hint(event_type, details)
-        if isinstance(details, dict):
-            for k, v in details.items():
-                f = ET.SubElement(ev, "Field", name=str(k))
-                f.text = str(v)
-        else:
-            f = ET.SubElement(ev, "Field", name="message")
-            f.text = str(details)
-        root.append(ev)
-        tmp = XML_LOG_FILE + ".tmp"
-        tree.write(tmp, encoding="utf-8", xml_declaration=True)
-        os.replace(tmp, XML_LOG_FILE)
-    except Exception as e:
-        print(f"⚠ Failed to write XML audit event: {e}")
-
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 print("✓ Supabase client ready (Loaded from .env)")
-_audit_event("startup", {"message": "Supabase client ready (Loaded from .env)"})
 
 app = Flask(__name__)
 CORS(app)
@@ -216,6 +150,11 @@ anti_spoof_state = {
     "last_error": None,
 }
 anti_spoof_cache = {}
+
+# Module-level face DB globals (must exist before any function uses them)
+known_encodings    = []
+known_meta         = []
+known_encodings_np = None
 
 
 def _init_anti_spoof():
@@ -275,12 +214,6 @@ def _init_anti_spoof():
             "last_error": None,
         })
         print(f"✓ Anti-spoofing ready (official Silent-Face .pth, device={anti_spoof_runtime['device']})")
-        _audit_event("startup", {
-            "phase": "anti_spoof",
-            "status": "ready",
-            "device": anti_spoof_runtime["device"],
-            "models": ",".join(os.path.basename(v) for v in model_paths),
-        })
     except Exception as exc:
         anti_spoof_state.update({
             "available": False,
@@ -288,7 +221,6 @@ def _init_anti_spoof():
             "last_error": str(exc),
         })
         print(f"⚠ Anti-spoofing model load failed: {exc}")
-        _audit_event("error", {"phase": "anti_spoof_init", "error": str(exc)})
 
 
 def _run_anti_spoof(frame_bgr, bbox):
@@ -356,7 +288,6 @@ def _run_anti_spoof(frame_bgr, bbox):
         }
     except Exception as exc:
         anti_spoof_state["last_error"] = str(exc)
-        _audit_event("error", {"phase": "anti_spoof_infer", "error": str(exc)})
         if ANTI_SPOOF_FAIL_CLOSED:
             return {"allowed": False, "is_live": False, "score": None, "reason": "infer_error"}
         return {"allowed": True, "is_live": True, "score": None, "reason": "infer_error_allowed"}
@@ -383,272 +314,11 @@ def _set_engine_boot_state(**updates):
 
 _init_anti_spoof()
 
-
-# ----------------------
-# XML Audit Logger
-# ----------------------
-XML_LOG_FILE = os.path.join(script_dir, "engine_log.xml")
-XML_ARCHIVE_FILE = os.path.join(script_dir, "engine_log_archive.xml")
-XML_MAX_EVENTS = int(os.getenv("ENGINE_LOG_MAX_EVENTS", "60"))
-
-def _ensure_xml_log():
-    try:
-        if not os.path.exists(XML_LOG_FILE):
-            root = ET.Element("EngineLog", version="1")
-            tree = ET.ElementTree(root)
-            tmp = XML_LOG_FILE + ".tmp"
-            tree.write(tmp, encoding="utf-8", xml_declaration=True)
-            os.replace(tmp, XML_LOG_FILE)
-        if not os.path.exists(XML_ARCHIVE_FILE):
-            root = ET.Element("EngineLog", version="1")
-            tree = ET.ElementTree(root)
-            tmp = XML_ARCHIVE_FILE + ".tmp"
-            tree.write(tmp, encoding="utf-8", xml_declaration=True)
-            os.replace(tmp, XML_ARCHIVE_FILE)
-    except Exception as e:
-        print(f"⚠ Failed to create XML log file: {e}")
-
-
-def _archive_old_xml_events(max_events=XML_MAX_EVENTS):
-    try:
-        if max_events <= 0 or not os.path.exists(XML_LOG_FILE):
-            return
-        tree = ET.parse(XML_LOG_FILE)
-        root = tree.getroot()
-        events = list(root.findall("Event"))
-        if len(events) <= max_events:
-            return
-
-        archive_count = len(events) - max_events
-        old_events = events[:archive_count]
-        keep_events = events[archive_count:]
-
-        archive_tree = ET.parse(XML_ARCHIVE_FILE)
-        archive_root = archive_tree.getroot()
-        for event in old_events:
-            archive_root.append(event)
-        archive_tmp = XML_ARCHIVE_FILE + ".tmp"
-        archive_tree.write(archive_tmp, encoding="utf-8", xml_declaration=True)
-        os.replace(archive_tmp, XML_ARCHIVE_FILE)
-
-        new_root = ET.Element("EngineLog", version=root.get("version", "1"))
-        for event in keep_events:
-            new_root.append(event)
-        new_tree = ET.ElementTree(new_root)
-        tmp = XML_LOG_FILE + ".tmp"
-        new_tree.write(tmp, encoding="utf-8", xml_declaration=True)
-        os.replace(tmp, XML_LOG_FILE)
-    except Exception as e:
-        print(f"⚠ Failed to archive old XML log events: {e}")
-
-
-def _audit_event(event_type, details=None):
-    try:
-        _ensure_xml_log()
-        tree = ET.parse(XML_LOG_FILE)
-        root = tree.getroot()
-        ev = ET.Element("Event", type=str(event_type), ts=datetime.datetime.now().isoformat())
-        base_details = {
-            "engine": ENGINE_NAME,
-            "engine_label": ENGINE_LABEL,
-            "engine_instance": ENGINE_INSTANCE_ID,
-            "group_key": ENGINE_INSTANCE_ID,
-            "group_label": ENGINE_LABEL if event_type != "startup" else f"{ENGINE_LABEL} Started",
-        }
-        if isinstance(details, dict):
-            base_details.update(details)
-        hint = ET.SubElement(ev, "Field", name="hint")
-        hint.text = _log_hint(event_type, details)
-        for k, v in base_details.items():
-            if v is None or v == "":
-                continue
-            f = ET.SubElement(ev, "Field", name=str(k))
-            f.text = str(v)
-        if isinstance(details, dict):
-            for k, v in details.items():
-                if k in base_details:
-                    continue
-                f = ET.SubElement(ev, "Field", name=str(k))
-                f.text = str(v)
-        else:
-            f = ET.SubElement(ev, "Field", name="message")
-            f.text = str(details)
-        root.append(ev)
-        tmp = XML_LOG_FILE + ".tmp"
-        tree.write(tmp, encoding="utf-8", xml_declaration=True)
-        os.replace(tmp, XML_LOG_FILE)
-        _archive_old_xml_events()
-    except Exception as e:
-        # Avoid raising from logging failures; print to plain text log instead
-        print(f"⚠ Failed to write XML audit event: {e}")
-
 # Last rebuild summary visible via /engine_status
 last_rebuild_summary = None
 current_face_fingerprint = None
 
-student_action_inflight = {}
-student_action_lock = threading.Lock()
-STUDENT_ACTION_TTL_SECS = 10
-
-PROFESSOR_START_WINDOW = 45
-STUDENT_GRACE_MINUTES  = 15
-
 thread_pool = ThreadPoolExecutor(max_workers=3)
-
-MACHINE_LAB_CONFIG_FILE = os.path.join(script_dir, "machine_lab_config.json")
-_machine_lab_config_cache = {"mtime": None, "data": None}
-
-
-def _format_lab_label(info):
-    if not info:
-        return "Unassigned"
-    code = str(info.get("lab_code") or "").strip()
-    name = str(info.get("lab_name") or "").strip()
-    if code and name:
-        return f"{code} - {name}"
-    if code:
-        return code
-    if name:
-        return name
-    lab_id = str(info.get("lab_id") or "").strip()
-    return f"Lab {lab_id}" if lab_id else "Unassigned"
-
-
-def _load_machine_lab_config(force=False):
-    default_config = {
-        "configured": False,
-        "lab_id": None,
-        "lab_code": None,
-        "lab_name": None,
-        "building": None,
-        "saved_at": None,
-        "machine_name": os.getenv("COMPUTERNAME") or os.getenv("HOSTNAME") or os.uname().nodename if hasattr(os, "uname") else None,
-    }
-
-    if not os.path.exists(MACHINE_LAB_CONFIG_FILE):
-        return default_config
-
-    try:
-        mtime = os.path.getmtime(MACHINE_LAB_CONFIG_FILE)
-        cached = _machine_lab_config_cache.get("data")
-        if not force and _machine_lab_config_cache.get("mtime") == mtime and cached is not None:
-            return dict(cached)
-
-        with open(MACHINE_LAB_CONFIG_FILE, "r", encoding="utf-8") as handle:
-            data = json.load(handle)
-
-        if not isinstance(data, dict):
-            return default_config
-
-        data["configured"] = bool(str(data.get("lab_id") or "").strip() or str(data.get("lab_code") or "").strip())
-        _machine_lab_config_cache["mtime"] = mtime
-        _machine_lab_config_cache["data"] = dict(data)
-        return dict(data)
-    except Exception as exc:
-        print(f"⚠ Failed to read machine lab config: {exc}")
-        return default_config
-
-
-def _load_lab_assignment_for_schedule(schedule_id):
-    if not schedule_id:
-        return None
-
-    result = supabase.table("lab_schedules")\
-        .select("schedule_id, lab_id, subjects(subject_code, subject_name), laboratory_rooms(lab_id, lab_code, lab_name)")\
-        .eq("schedule_id", schedule_id)\
-        .execute()
-    row = result.data[0] if result.data else None
-    if not row:
-        return None
-
-    room = row.get("laboratory_rooms") or {}
-    return {
-        "schedule_id": row.get("schedule_id"),
-        "lab_id": row.get("lab_id"),
-        "lab_code": room.get("lab_code"),
-        "lab_name": room.get("lab_name"),
-        "subject_code": (row.get("subjects") or {}).get("subject_code"),
-    }
-
-
-def _terminal_allows_schedule(schedule_id):
-    machine_lab = _load_machine_lab_config()
-    if not machine_lab.get("configured"):
-        return False, "This terminal is not assigned to a laboratory yet. Please configure the machine on the Take Attendance page.", machine_lab, None
-
-    schedule_lab = _load_lab_assignment_for_schedule(schedule_id)
-    if not schedule_lab:
-        return False, "Unable to determine the scheduled laboratory for this session.", machine_lab, None
-
-    machine_lab_id = str(machine_lab.get("lab_id") or "").strip()
-    machine_lab_code = str(machine_lab.get("lab_code") or "").strip().lower()
-    schedule_lab_id = str(schedule_lab.get("lab_id") or "").strip()
-    schedule_lab_code = str(schedule_lab.get("lab_code") or "").strip().lower()
-
-    if machine_lab_id and schedule_lab_id and machine_lab_id == schedule_lab_id:
-        return True, None, machine_lab, schedule_lab
-
-    if machine_lab_code and schedule_lab_code and machine_lab_code == schedule_lab_code:
-        return True, None, machine_lab, schedule_lab
-
-    schedule_label = _format_lab_label(schedule_lab)
-    machine_label = _format_lab_label(machine_lab)
-    return False, f"You are scheduled in Laboratory {schedule_label}, please use the correct terminal. This terminal is locked to Laboratory {machine_label}.", machine_lab, schedule_lab
-
-# ─────────────────────────────────────────────
-# Timezone-safe datetime parser
-# ─────────────────────────────────────────────
-def parse_dt(value) -> datetime.datetime:
-    if value is None:
-        return None
-    s = str(value).replace('Z', '+00:00')
-    try:
-        dt = datetime.datetime.fromisoformat(s)
-    except ValueError:
-        dt = datetime.datetime.fromisoformat(s[:19])
-        return dt
-    if dt.tzinfo is not None:
-        dt = dt.astimezone().replace(tzinfo=None)
-    return dt
-
-def get_now():
-    now_store = datetime.datetime.now(datetime.timezone.utc)
-    now_local = datetime.datetime.now()
-    return now_store, now_local
-
-def _mark_student_action_inflight(student_id, session_id, action, ttl=STUDENT_ACTION_TTL_SECS):
-    if not student_id or not session_id or action not in ("IN", "OUT"):
-        return True
-    now_ts = time.time()
-    key = (str(student_id), str(session_id), action)
-    with student_action_lock:
-        expired = [k for k, expires_at in student_action_inflight.items() if expires_at <= now_ts]
-        for k in expired:
-            student_action_inflight.pop(k, None)
-        expires_at = student_action_inflight.get(key, 0)
-        if expires_at > now_ts:
-            return False
-        student_action_inflight[key] = now_ts + ttl
-        return True
-
-def _clear_student_action_inflight(student_id, session_id, action=None):
-    if not student_id or not session_id:
-        return
-    sid = str(student_id)
-    sess = str(session_id)
-    with student_action_lock:
-        if action in ("IN", "OUT"):
-            student_action_inflight.pop((sid, sess, action), None)
-            return
-        student_action_inflight.pop((sid, sess, "IN"), None)
-        student_action_inflight.pop((sid, sess, "OUT"), None)
-
-# ─────────────────────────────────────────────
-# Face database globals
-# ─────────────────────────────────────────────
-known_encodings    = []
-known_meta         = []
-known_encodings_np = None
 
 def _hash_payload(obj) -> str:
     payload = json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str)
@@ -703,7 +373,7 @@ def _person_fingerprint(role, person_id, folder, images):
     }
     return _hash_payload(obj)
 
-def _build_remote_face_manifest(students_rows, professors_rows):
+def _build_remote_face_manifest(students_rows, teachers_rows):
     manifest = []
     for row in students_rows:
         folder = row.get("facial_dataset_path")
@@ -723,14 +393,14 @@ def _build_remote_face_manifest(students_rows, professors_rows):
                 for img in folder_images
             ]),
         })
-    for row in professors_rows:
+    for row in teachers_rows:
         folder = row.get("facial_dataset_path")
         if not folder:
             continue
         folder_images = _list_face_images_for_folder(folder)
         manifest.append({
-            "role": "professor",
-            "id": _to_json_safe(row.get("professor_id")),
+            "role": "teacher",
+            "id": _to_json_safe(row.get("teacher_id")),
             "path": folder,
             "folder_signature": _hash_payload([
                 {
@@ -744,9 +414,9 @@ def _build_remote_face_manifest(students_rows, professors_rows):
     manifest.sort(key=lambda x: (x.get("role", ""), str(x.get("id", "")), x.get("path", "")))
     return manifest
 
-def _build_remote_face_fingerprint(students_rows, professors_rows):
+def _build_remote_face_fingerprint(students_rows, teachers_rows):
     """Fingerprint only the facial dataset scope so unrelated DB edits do not trigger sync."""
-    manifest = _build_remote_face_manifest(students_rows, professors_rows)
+    manifest = _build_remote_face_manifest(students_rows, teachers_rows)
     return _hash_payload(manifest), manifest
 
 # ─────────────────────────────────────────────
@@ -808,7 +478,6 @@ def _save_face_cache_to_disk(encodings, meta, fingerprint, per_person_fp):
         print(f"✓ Cache saved → {FACE_CACHE_FILE}")
     except Exception as e:
         print(f"⚠ Failed to save face cache: {e}")
-        _audit_event("error", {"phase": "save_face_cache", "error": str(e)})
 
 def _activate_face_db(encodings, meta):
     global known_encodings, known_meta, known_encodings_np
@@ -819,17 +488,29 @@ def _activate_face_db(encodings, meta):
 
 def _fetch_face_rows():
     students_result = supabase.table("students")\
-        .select("student_id, id_number, first_name, middle_name, last_name, facial_dataset_path")\
+        .select("student_id, lrn, first_name, middle_name, last_name, facial_dataset_path")\
         .not_.is_("facial_dataset_path", "null")\
         .neq("facial_dataset_path", "")\
         .execute()
-    professors_result = supabase.table("professors")\
-        .select("professor_id, employee_id, first_name, middle_name, last_name, facial_dataset_path")\
-        .not_.is_("facial_dataset_path", "null")\
-        .neq("facial_dataset_path", "")\
-        .eq("status", "active")\
-        .execute()
-    return students_result.data or [], professors_result.data or []
+    students_data = students_result.data or []
+
+    teachers_data = []
+    try:
+        teachers_result = supabase.table("teachers")\
+            .select("teacher_id, employee_id, first_name, middle_name, last_name, facial_dataset_path")\
+            .not_.is_("facial_dataset_path", "null")\
+            .neq("facial_dataset_path", "")\
+            .execute()
+        teachers_data = teachers_result.data or []
+    except Exception as e:
+        err_msg = str(e).lower()
+        if "column" in err_msg and "facial_dataset_path" in err_msg:
+            print("⚠ teachers.facial_dataset_path column not found — skipping teacher face recognition")
+        else:
+            print(f"⚠ Failed to fetch teachers: {e}")
+        teachers_data = []
+
+    return students_data, teachers_data
 
 def load_encodings_from_storage(cloud_folder, meta, enc_store, meta_store):
     try:
@@ -931,11 +612,11 @@ def load_all_faces(force_rebuild=False):
         # ── STEP 2: Fetch DB metadata rows (no image downloads yet) ──────────
         _set_engine_boot_state(face_db_phase="validating")
         fp_t0 = time.perf_counter()
-        students_rows, professors_rows = _fetch_face_rows()
+        students_rows, teachers_rows = _fetch_face_rows()
 
         # Build the facial-path fingerprint (used to detect only face dataset path changes)
         try:
-            remote_fingerprint, _ = _build_remote_face_fingerprint(students_rows, professors_rows)
+            remote_fingerprint, _ = _build_remote_face_fingerprint(students_rows, teachers_rows)
         except Exception as e:
             # If Supabase storage is temporarily slow, keep the current cache alive.
             print(f"⚠ Remote fingerprint build failed; keeping cached encodings active: {e}")
@@ -965,9 +646,10 @@ def load_all_faces(force_rebuild=False):
                         "note": "fallback_to_cache",
                     }
                     print(f"REBUILD SUMMARY (fallback): {last_rebuild_summary}")
-                    _audit_event("rebuild_summary", last_rebuild_summary)
                 except Exception:
                     pass
+                # Ensure globals are set from cache before returning
+                _activate_face_db(cached["encodings"], cached["meta"])
                 return
             raise
         with engine_boot_lock:
@@ -1000,7 +682,6 @@ def load_all_faces(force_rebuild=False):
                     "note": "no_changes",
                 }
                 print(f"REBUILD SUMMARY: {last_rebuild_summary}")
-                _audit_event("rebuild_summary", last_rebuild_summary)
             except Exception:
                 pass
             print("=" * 60)
@@ -1014,7 +695,7 @@ def load_all_faces(force_rebuild=False):
         added = updated = removed = kept = 0
 
         # Build the set of person keys that exist remotely right now
-        # Key format:  "student_<student_id>"  or  "professor_<professor_id>"
+        # Key format:  "student_<student_id>"  or  "teacher_<teacher_id>"
         remote_keys = set()
 
         all_remote_rows = []
@@ -1035,17 +716,17 @@ def load_all_faces(force_rebuild=False):
                 "fp":     new_fp,
             })
 
-        for row in professors_rows:
+        for row in teachers_rows:
             folder = row.get("facial_dataset_path")
             if not folder:
                 continue
             images     = _list_face_images_for_folder(folder)
-            person_key = f"professor_{row['professor_id']}"
+            person_key = f"teacher_{row['teacher_id']}"
             remote_keys.add(person_key)
-            new_fp     = _person_fingerprint("professor", row["professor_id"], folder, images)
+            new_fp     = _person_fingerprint("teacher", row["teacher_id"], folder, images)
             all_remote_rows.append({
                 "key":    person_key,
-                "role":   "professor",
+                "role":   "teacher",
                 "row":    row,
                 "folder": folder,
                 "images": images,
@@ -1101,16 +782,16 @@ def load_all_faces(force_rebuild=False):
                 meta = {
                     "role":      "student",
                     "id":        row["student_id"],
-                    "id_number": row["id_number"],
+                    "lrn":       row["lrn"],
                     "name":      f"{row['first_name']} {mid} {row['last_name']}".strip(),
                 }
             else:
                 mid  = row.get("middle_name") or ""
                 meta = {
-                    "role":        "professor",
-                    "id":          row["professor_id"],
+                    "role":        "teacher",
+                    "id":          row["teacher_id"],
                     "employee_id": row["employee_id"],
-                    "name":        f"Prof. {row['first_name']} {mid} {row['last_name']}".strip(),
+                    "name":        f"{row['first_name']} {mid} {row['last_name']}".strip(),
                 }
 
             # If updating an existing person, remove their old encodings first
@@ -1187,7 +868,6 @@ def load_all_faces(force_rebuild=False):
                 "kept": int(kept),
             }
             print(f"REBUILD SUMMARY: {last_rebuild_summary}")
-            _audit_event("rebuild_summary", last_rebuild_summary)
         except Exception:
             pass
 
@@ -1197,169 +877,14 @@ def load_all_faces(force_rebuild=False):
             d["total_startup"] = round((time.perf_counter() - overall_t0) * 1000, 2)
         _set_engine_boot_state(status="ready", face_db_phase="error", error=str(e), durations_ms=d)
         print(f"⚠ Failed to build face database at startup: {e}")
-        _audit_event("error", {"phase": "load_all_faces", "error": str(e)})
         import traceback; traceback.print_exc()
     finally:
         with face_db_lock:
-            loaded = len(known_meta)
+            loaded = len(known_meta) if 'known_meta' in globals() else 0
             face_db_loading_started = False
         _set_engine_boot_state(encodings_loaded=loaded, cache_exists=os.path.exists(FACE_CACHE_FILE))
         face_db_ready.set()
         print("=" * 60)
-
-# ─────────────────────────────────────────────
-# Session Cache
-# ─────────────────────────────────────────────
-schedule_cache    = {}
-session_cache     = {}
-attendance_cache  = {}
-acknowledged_done = set()
-cache_lock        = threading.Lock()
-last_cache_refresh = 0
-CACHE_TTL         = 60
-
-def refresh_session_cache():
-    global last_cache_refresh
-    today = datetime.date.today()
-    try:
-        result = supabase.table("lab_sessions")\
-            .select("session_id, schedule_id, status")\
-            .eq("session_date", str(today))\
-            .execute()
-        with cache_lock:
-            session_cache.clear()
-            for row in (result.data or []):
-                session_cache[row["schedule_id"]] = (row["session_id"], row["status"])
-        last_cache_refresh = time.time()
-        print(f"✓ Session cache refreshed: {len(session_cache)} sessions")
-    except Exception as e:
-        print(f"⚠ Session cache refresh failed: {e}")
-
-def get_session_cached(schedule_id):
-    if time.time() - last_cache_refresh > CACHE_TTL:
-        threading.Thread(target=refresh_session_cache, daemon=True).start()
-    with cache_lock:
-        return session_cache.get(schedule_id, (None, "not_created"))
-
-def update_session_cache(schedule_id, session_id, status):
-    with cache_lock:
-        session_cache[schedule_id] = (session_id, status)
-
-def get_attendance_cached(session_id, student_id):
-    key = (session_id, student_id)
-    with cache_lock:
-        if key in attendance_cache:
-            return attendance_cache[key]
-    result = supabase.table("lab_attendance")\
-        .select("attendance_id, time_in, time_out")\
-        .eq("session_id", session_id)\
-        .eq("student_id", student_id)\
-        .execute()
-    rec = result.data[0] if result.data else None
-    with cache_lock:
-        attendance_cache[key] = rec
-    return rec
-
-def invalidate_attendance_cache(session_id, student_id):
-    with cache_lock:
-        attendance_cache.pop((session_id, student_id), None)
-
-def td_to_secs(td):
-    if isinstance(td, datetime.timedelta):
-        return int(td.total_seconds())
-    if isinstance(td, str):
-        td = td.split('.')[0]
-        parts = td.split(':')
-        return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2]) if len(parts) == 3 else 0
-    return 0
-
-# ─────────────────────────────────────────────
-# Supabase DB helpers
-# ─────────────────────────────────────────────
-def find_professor_schedule(professor_id, today):
-    day_name = today.strftime("%A")
-    result = supabase.table("lab_schedules")\
-        .select("schedule_id, section, start_time, end_time, subjects(subject_code, subject_name), laboratory_rooms(lab_code, lab_name)")\
-        .eq("professor_id", professor_id)\
-        .eq("day_of_week", day_name)\
-        .eq("status", "active")\
-        .order("start_time")\
-        .execute()
-    schedules = result.data or []
-    output    = []
-    for sch in schedules:
-        session_id, session_status = get_session_cached(sch["schedule_id"])
-        output.append({
-            "schedule_id":    sch["schedule_id"],
-            "section":        sch["section"],
-            "subject_code":   sch["subjects"]["subject_code"] if sch.get("subjects") else "N/A",
-            "lab_code":       sch["laboratory_rooms"]["lab_code"] if sch.get("laboratory_rooms") else "N/A",
-            "start_time":     sch["start_time"] or "00:00:00",
-            "end_time":       sch["end_time"]   or "00:00:00",
-            "session_id":     session_id,
-            "session_status": session_status,
-        })
-    return output
-
-def find_student_schedule(student_id, today):
-    day_name = today.strftime("%A")
-    result = supabase.table("schedule_enrollments")\
-        .select("schedule_id, lab_schedules!inner(schedule_id, start_time, end_time, day_of_week, status)")\
-        .eq("student_id", student_id)\
-        .eq("status", "enrolled")\
-        .execute()
-    rows = result.data or []
-    matching = [
-        r for r in rows
-        if r.get("lab_schedules") and
-           r["lab_schedules"].get("day_of_week") == day_name and
-           r["lab_schedules"].get("status") == "active"
-    ]
-    if not matching:
-        return ("NOT_ENROLLED",)
-    matching.sort(key=lambda x: td_to_secs(x["lab_schedules"]["start_time"] or "00:00:00"))
-    best, priority = None, 99
-    for row in matching:
-        sch = row["lab_schedules"]
-        schedule_id = sch["schedule_id"]
-        session_id, session_status = get_session_cached(schedule_id)
-        is_student_done = False
-        if session_id:
-            rec = get_attendance_cached(session_id, student_id)
-            if rec and rec.get("time_in") and rec.get("time_out"):
-                is_student_done = True
-        if session_status == "cancelled":
-            continue
-        if is_student_done or session_status == "completed":
-            if session_id and (student_id, session_id) not in acknowledged_done:
-                acknowledged_done.add((student_id, session_id))
-                return (schedule_id, sch["start_time"], sch["end_time"], session_id, session_status)
-            else:
-                continue
-        rank = {'ongoing': 1, 'dismissing': 1, 'scheduled': 2, 'not_created': 3}.get(session_status, 5)
-        if rank < priority:
-            priority = rank
-            best = (schedule_id, sch["start_time"], sch["end_time"], session_id, session_status)
-        if priority == 1:
-            break
-    if best is None:
-        return ("ALL_DONE",)
-    return best
-
-def get_or_create_session(schedule_id, today):
-    session_id, status = get_session_cached(schedule_id)
-    if session_id:
-        return session_id, status
-    now_store, _ = get_now()
-    insert_result = supabase.table("lab_sessions").insert({
-        "schedule_id":  schedule_id,
-        "session_date": str(today),
-        "status":       "scheduled",
-        "created_at":   now_store.isoformat()
-    }).execute()
-    new_id = insert_result.data[0]["session_id"]
-    update_session_cache(schedule_id, new_id, "scheduled")
-    return new_id, "scheduled"
 
 # ─────────────────────────────────────────────
 # Shared state for threading
@@ -1378,6 +903,12 @@ def get_guide_bounds(frame_shape):
     x2 = x1 + guide_w
     y2 = y1 + guide_h
     return x1, y1, x2, y2
+
+def _greet_person(meta):
+    _push({
+        "message": f"HELLO {meta['name']}",
+        "name": meta["name"]
+    })
 
 def recognition_worker():
     global latest_frame
@@ -1437,26 +968,16 @@ def recognition_worker():
                         color = (0, 0, 255)
                         recently_seen[key] = datetime.datetime.now()
                         _push({
-                            "role":      meta["role"],
-                            "name":      meta["name"],
-                            "action":    "SPOOF_DETECTED",
-                            "error":     f"Liveness check failed (score={score_txt}, threshold={ANTI_SPOOF_THRESHOLD:.2f}). Please face the camera directly and try again.",
-                            "liveness_score": score,
-                            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "message": "SPOOF DETECTED",
+                            "name": meta["name"],
+                            "reason": f"Liveness check failed (score={score_txt}, threshold={ANTI_SPOOF_THRESHOLD:.2f}). Please face the camera directly and try again.",
                         })
                         new_locs.append((top, right, bottom, left))
                         new_labels.append(label)
                         new_colors.append(color)
                         continue
                     recently_seen[key] = datetime.datetime.now()
-                    _push({
-                        "role":      meta["role"],
-                        "name":      meta["name"],
-                        "action":    "LOADING",
-                        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    })
-                    thread_pool.submit(handle_recognized, meta,
-                                       datetime.date.today(), datetime.datetime.now())
+                    thread_pool.submit(_greet_person, meta)
             else:
                 label = "Unknown"
                 color = (0, 0, 255)
@@ -1470,16 +991,6 @@ def recognition_worker():
 
 threading.Thread(target=recognition_worker, daemon=True).start()
 
-def handle_recognized(meta, today, now):
-    try:
-        if meta["role"] == "professor":
-            _handle_professor(meta, today, now)
-        else:
-            _handle_student(meta, today, now)
-    except Exception as e:
-        print(f"[ERROR] handle_recognized: {e}")
-        import traceback; traceback.print_exc()
-
 def _push(payload):
     message = json.dumps(payload)
     with attendee_clients_lock:
@@ -1489,236 +1000,7 @@ def _push(payload):
             client_queue.put_nowait(message)
         except Exception:
             pass
-    print(f"  → PUSH [{payload['action']}] {payload['name']}")
-
-# ─────────────────────────────────────────────
-# Professor flow
-# ─────────────────────────────────────────────
-def _handle_professor(meta, today, now):
-    pid, emp_id, name = meta["id"], meta["employee_id"], meta["name"]
-    print(f"\n[PROF] {name} @ {now:%H:%M:%S} | today={today.strftime('%A')}")
-    all_schedules = find_professor_schedule(pid, today)
-    if not all_schedules:
-        print(f"  → No active schedule on {today.strftime('%A')}")
-        return _push({"role":"professor","professor_id":pid,"employee_id":emp_id,
-                       "name":name,"action":"ALL_DONE","session_id":None,
-                       "error":"You have no class scheduled today.",
-                       "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-    closest_future_schedule = None
-    closest_future_time     = None
-    for sched in all_schedules:
-        schedule_id    = sched["schedule_id"]
-        session_id     = sched["session_id"]
-        session_status = sched["session_status"]
-        s = datetime.datetime.combine(today, datetime.time()) + datetime.timedelta(seconds=td_to_secs(sched["start_time"]))
-        e = datetime.datetime.combine(today, datetime.time()) + datetime.timedelta(seconds=td_to_secs(sched["end_time"]))
-        w = s - datetime.timedelta(minutes=30)
-        void_cutoff = s + datetime.timedelta(minutes=PROFESSOR_START_WINDOW)
-        print(f"  → Checking {sched['subject_code']} {s:%I:%M %p}–{e:%I:%M %p} | status={session_status}")
-        prof_track_key = (pid, schedule_id)
-        if session_status in ("completed", "cancelled"):
-            if prof_track_key not in acknowledged_done:
-                acknowledged_done.add(prof_track_key)
-                action_type = "SESSION_ENDED" if session_status == "completed" else "SESSION_CANCELLED"
-                msg = "Session successfully completed!" if session_status == "completed" else "This session was voided/cancelled."
-                print(f"     → Acknowledging {session_status} once")
-                return _push({"role":"professor","professor_id":pid,"employee_id":emp_id,
-                               "name":name,"action":action_type,"session_id":session_id,"schedule":sched,
-                               "error":msg,"timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-            else:
-                print(f"     → Already acknowledged {session_status}, jumping to next...")
-                continue
-        if now < w:
-            mins = int((w - now).total_seconds() / 60)
-            print(f"     → Too early ({mins} min until window opens)")
-            closest_future_schedule = sched
-            closest_future_time     = s
-            break
-        if session_status in ("scheduled", "not_created", None) and now > void_cutoff:
-            print(f"     → AUTO-VOID (past {PROFESSOR_START_WINDOW}-min window)")
-            if not session_id:
-                now_store, _ = get_now()
-                insert_result = supabase.table("lab_sessions").insert({
-                    "schedule_id":  schedule_id,
-                    "session_date": str(today),
-                    "status":       "cancelled",
-                    "notes":        "System Auto-Void: 45-minute grace period elapsed",
-                    "created_at":   now_store.isoformat()
-                }).execute()
-                session_id = insert_result.data[0]["session_id"]
-            else:
-                now_store, _ = get_now()
-                supabase.table("lab_sessions").update({
-                    "status":     "cancelled",
-                    "notes":      "System Auto-Void: 45-minute grace period elapsed",
-                    "updated_at": now_store.isoformat()
-                }).eq("session_id", session_id).execute()
-            update_session_cache(schedule_id, session_id, "cancelled")
-            acknowledged_done.add(prof_track_key)
-            return _push({"role":"professor","professor_id":pid,"employee_id":emp_id,
-                           "name":name,"action":"SESSION_CANCELLED","session_id":session_id,"schedule":sched,
-                           "error":"Class auto-voided: 45-minute start window elapsed.",
-                           "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-        if now > e and session_status in ("scheduled", "not_created", None):
-            print(f"     → Class completely missed. Skipping...")
-            continue
-        if not session_id:
-            now_store, _ = get_now()
-            insert_result = supabase.table("lab_sessions").insert({
-                "schedule_id":  schedule_id,
-                "session_date": str(today),
-                "status":       "scheduled",
-                "created_at":   now_store.isoformat()
-            }).execute()
-            session_id     = insert_result.data[0]["session_id"]
-            session_status = "scheduled"
-            update_session_cache(schedule_id, session_id, session_status)
-        if session_status in ("scheduled", "not_created"):
-            action = "START"
-        elif session_status == "ongoing":
-            dismiss_result = supabase.table("lab_sessions")\
-                .select("actual_dismiss_time")\
-                .eq("session_id", session_id)\
-                .execute()
-            dismiss_row = dismiss_result.data[0] if dismiss_result.data else None
-            if dismiss_row and dismiss_row.get("actual_dismiss_time") is not None:
-                action = "END"
-                print(f"     → STAY IN detected (dismissed at {dismiss_row['actual_dismiss_time']})")
-            else:
-                action = "DISMISS"
-        elif session_status == "dismissing":
-            action = "END"
-        else:
-            action = "START"
-        print(f"     ✓ Action={action} session_id={session_id}")
-        
-        # ──── CHECK LAB VALIDATION ────
-        allowed, error_msg, machine_lab, schedule_lab = _terminal_allows_schedule(schedule_id)
-        payload = {"role":"professor","professor_id":pid,"employee_id":emp_id,
-                   "name":name,"action":action,"session_id":session_id,"schedule":sched,
-                   "machine_lab":machine_lab,"schedule_lab":schedule_lab,
-                   "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")}
-        if not allowed:
-            # Don't block — inform the UI with a warning so professor can still start the session.
-            print(f"     ⚠ Lab mismatch (non-blocking): {error_msg}")
-            payload["warning"] = error_msg
-
-        return _push(payload)
-    print(f"  → No valid schedule in current window")
-    if closest_future_schedule:
-        window_open = closest_future_time - datetime.timedelta(minutes=30)
-        mins_until  = int((window_open - now).total_seconds() / 60)
-        return _push({"role":"professor","professor_id":pid,"employee_id":emp_id,
-                       "name":name,"action":"TOO_EARLY","session_id":None,
-                       "schedule":closest_future_schedule,
-                       "error":f"Next class {closest_future_schedule['subject_code']} starts at {closest_future_time:%I:%M %p}. Window opens at {window_open:%I:%M %p} ({mins_until} min from now).",
-                       "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-    return _push({"role":"professor","professor_id":pid,"employee_id":emp_id,
-                   "name":name,"action":"ALL_DONE","session_id":None,
-                   "error":"You have no more classes for today.",
-                   "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-
-# ─────────────────────────────────────────────
-# Student flow
-# ─────────────────────────────────────────────
-def _handle_student(meta, today, now):
-    sid, id_num, name = meta["id"], meta["id_number"], meta["name"]
-    print(f"\n[STUDENT] {name} @ {now:%H:%M:%S} | today={today.strftime('%A')}")
-    row = find_student_schedule(sid, today)
-    if row and row[0] == "NOT_ENROLLED":
-        return _push({"role":"student","student_id":sid,"id_number":id_num,
-                       "name":name,"action":"NOT_ENROLLED","session_id":None,
-                       "error":"You are not enrolled in any subject with a schedule today.",
-                       "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-    if row and row[0] == "ALL_DONE":
-        return _push({"role":"student","student_id":sid,"id_number":id_num,
-                       "name":name,"action":"ALL_DONE","session_id":None,
-                       "error":"You have no more classes for today.",
-                       "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-    if not row:
-        return _push({"role":"student", "action":"NOT_ENROLLED", "error":"No schedule found."})
-    schedule_id, start_td, end_td, session_id, status = row
-    s = datetime.datetime.combine(today, datetime.time()) + datetime.timedelta(seconds=td_to_secs(start_td))
-    e = datetime.datetime.combine(today, datetime.time()) + datetime.timedelta(seconds=td_to_secs(end_td))
-    schedule_info = None
-    try:
-        schedule_result = supabase.table("lab_schedules")\
-            .select("schedule_id, section, day_of_week, subjects(subject_code, subject_name), laboratory_rooms(lab_code, lab_name)")\
-            .eq("schedule_id", schedule_id)\
-            .single()\
-            .execute()
-        schedule_row = schedule_result.data or {}
-        room_row = schedule_row.get("laboratory_rooms") or {}
-        subject_row = schedule_row.get("subjects") or {}
-        schedule_info = {
-            "schedule_id": schedule_id,
-            "subject_code": subject_row.get("subject_code"),
-            "section": schedule_row.get("section"),
-            "lab_code": room_row.get("lab_code"),
-            "lab_name": room_row.get("lab_name"),
-            "day_of_week": today.strftime("%A"),
-            "start_time": s.strftime("%I:%M %p"),
-            "end_time": e.strftime("%I:%M %p"),
-        }
-    except Exception:
-        schedule_info = {
-            "schedule_id": schedule_id,
-            "day_of_week": today.strftime("%A"),
-            "start_time": s.strftime("%I:%M %p"),
-            "end_time": e.strftime("%I:%M %p"),
-        }
-    schedule_payload = {
-        **schedule_info,
-        "start_time": s.strftime("%I:%M %p"),
-        "end_time": e.strftime("%I:%M %p"),
-    }
-    if status in ("not_created", "scheduled", None) or session_id is None:
-        return _push({"role":"student","student_id":sid,"id_number":id_num,
-                   "name":name,"action":"SESSION_NOT_STARTED","session_id":None,
-                   "schedule": schedule_payload,
-                   "error":f"Professor has not started the session yet. Class starts at {s:%I:%M %p}.",
-                   "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-    sess_result = supabase.table("lab_sessions")\
-        .select("actual_start_time")\
-        .eq("session_id", session_id)\
-        .execute()
-    sess_row = sess_result.data[0] if sess_result.data else None
-    is_late      = False
-    late_minutes = 0
-    if sess_row and sess_row.get("actual_start_time") is not None:
-        actual_start_secs = td_to_secs(sess_row["actual_start_time"])
-        session_start_dt  = datetime.datetime.combine(today, datetime.time()) + datetime.timedelta(seconds=actual_start_secs)
-        grace_cutoff      = session_start_dt + datetime.timedelta(minutes=STUDENT_GRACE_MINUTES)
-        if now > grace_cutoff:
-            is_late      = True
-            late_minutes = int((now - session_start_dt).total_seconds() / 60)
-    rec = get_attendance_cached(session_id, sid)
-    if rec and rec.get("time_in") and rec.get("time_out"):
-        action = "COMPLETED"
-    elif status == "completed":
-        return _push({"role":"student","student_id":sid,"id_number":id_num,
-                       "name":name,"action":"SESSION_ENDED","session_id":session_id,
-                       "schedule": schedule_payload,
-                       "error":"This session has already ended.",
-                       "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-    elif rec is None:
-        action = "IN"
-    elif rec["time_in"] and not rec["time_out"]:
-        if status == "ongoing":
-            return _push({"role":"student","student_id":sid,"id_number":id_num,
-                           "name":name,"action":"CANNOT_TIME_OUT","session_id":session_id,
-                           "schedule": schedule_payload,
-                           "error":"Professor has not allowed dismissal yet.",
-                           "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
-        action = "OUT"
-    if action in ("IN", "OUT") and not _mark_student_action_inflight(sid, session_id, action):
-        print(f"  → Debounced duplicate student action {action} for student_id={sid} session_id={session_id}")
-        return
-    _push({"role":"student","student_id":sid,"id_number":id_num,
-           "name":name,"action":action,"session_id":session_id,
-            "schedule": schedule_payload,
-           "is_late":is_late,"late_minutes":late_minutes,
-           "timestamp":now.strftime("%Y-%m-%d %H:%M:%S")})
+    print(f"  → PUSH [{payload.get('message', 'GREETING')}] {payload.get('name', '')}")
 
 # ─────────────────────────────────────────────
 # Camera + frame generator
@@ -1853,235 +1135,6 @@ def generate_frames():
 # ─────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────
-@app.route('/confirm_attendance', methods=['POST'])
-def confirm_attendance():
-    data       = request.get_json()
-    student_id = data.get("student_id")
-    session_id = data.get("session_id")
-    action     = data.get("action")
-    now_store, now_local = get_now()
-    no_db = {"NO_SCHEDULE","NOT_ENROLLED","SESSION_NOT_STARTED","SESSION_ENDED",
-             "CANNOT_TIME_OUT","SESSION_CANCELLED","COMPLETED"}
-    if action in no_db:
-        return jsonify({"success": True, "message": data.get("error", action)})
-    if not session_id:
-        return jsonify({"success": False, "message": "Missing session_id"}), 400
-
-    session_result = supabase.table("lab_sessions")\
-        .select("schedule_id, status")\
-        .eq("session_id", session_id)\
-        .execute()
-    session_row = session_result.data[0] if session_result.data else None
-    if not session_row:
-        return jsonify({"success": False, "message": "Session not found."}), 404
-
-    # Only enforce terminal lock if the session has not yet been started.
-    sess_status = (session_row.get("status") or "").lower()
-    if sess_status in ("scheduled", "not_created", ""):
-        allowed, message, _, _ = _terminal_allows_schedule(session_row.get("schedule_id"))
-        if not allowed:
-            return jsonify({"success": False, "message": message}), 409
-
-    inflight_action = action if action in ("IN", "OUT") else None
-    if inflight_action:
-        _mark_student_action_inflight(student_id, session_id, inflight_action, ttl=STUDENT_ACTION_TTL_SECS + 2)
-    try:
-        if action == "OUT":
-            sess_result = supabase.table("lab_sessions")\
-                .select("status").eq("session_id", session_id).execute()
-            if sess_result.data and sess_result.data[0]["status"] == "ongoing":
-                return jsonify({"success": False,
-                                "message": "❌ Time-out blocked — professor has not enabled dismissal yet."})
-        att_result = supabase.table("lab_attendance")\
-            .select("attendance_id, time_in, time_out")\
-            .eq("session_id", session_id)\
-            .eq("student_id", student_id)\
-            .execute()
-        rec = att_result.data[0] if att_result.data else None
-        if rec is None:
-            is_late      = data.get("is_late", False)
-            late_minutes = int(data.get("late_minutes", 0))
-            time_status  = "late" if is_late else "on-time"
-            try:
-                supabase.table("lab_attendance").insert({
-                    "session_id":                     session_id,
-                    "student_id":                     student_id,
-                    "time_in":                        now_store.isoformat(),
-                    "time_in_status":                 time_status,
-                    "late_minutes":                   late_minutes,
-                    "verified_by_facial_recognition": True,
-                    "created_at":                     now_store.isoformat()
-                }).execute()
-            except Exception as insert_err:
-                err_txt = str(insert_err).lower()
-                if "duplicate" in err_txt or "unique" in err_txt:
-                    invalidate_attendance_cache(session_id, student_id)
-                    if student_id:
-                        # Extended cooldown (8s) to prevent duplicate modals
-                        recently_seen[f"student_{student_id}"] = datetime.datetime.now() + datetime.timedelta(seconds=3)
-                    return jsonify({"success": True, "message": "Time IN already recorded ✔"})
-                raise
-            invalidate_attendance_cache(session_id, student_id)
-            if student_id:
-                # Extended cooldown (8s) to prevent duplicate modals
-                recently_seen[f"student_{student_id}"] = datetime.datetime.now() + datetime.timedelta(seconds=3)
-            # attendance IN event: auditing omitted per configuration (engine-level logs only)
-            msg = f"Time IN recorded ✅ — {'⚠ LATE by '+str(late_minutes)+' min' if is_late else 'On Time'}"
-            return jsonify({"success": True, "message": msg})
-        if rec["time_in"] and not rec["time_out"]:
-            time_in_dt = parse_dt(rec["time_in"])
-            duration   = int((now_local - time_in_dt).total_seconds() / 60)
-            supabase.table("lab_attendance").update({
-                "time_out":         now_store.isoformat(),
-                "duration_minutes": duration,
-                "updated_at":       now_store.isoformat()
-            }).eq("attendance_id", rec["attendance_id"]).execute()
-            invalidate_attendance_cache(session_id, student_id)
-            if student_id:
-                # Extended cooldown (8s) to prevent duplicate modals
-                recently_seen[f"student_{student_id}"] = datetime.datetime.now() + datetime.timedelta(seconds=3)
-            # attendance OUT event: auditing omitted per configuration (engine-level logs only)
-            return jsonify({"success": True, "message": "Time OUT recorded ✅"})
-        return jsonify({"success": True, "message": "Attendance already complete ✔"})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        if inflight_action:
-            _clear_student_action_inflight(student_id, session_id, inflight_action)
-
-@app.route('/confirm_session', methods=['POST'])
-def confirm_session():
-    data         = request.get_json()
-    session_id   = data.get("session_id")
-    action       = data.get("action")
-    schedule     = data.get("schedule", {})
-    schedule_id  = schedule.get("schedule_id") if schedule else None
-    if not schedule_id:
-        schedule_id = data.get("schedule_id")
-    professor_id = data.get("professor_id")
-    now_store, now_local = get_now()
-    no_db = {"NO_SCHEDULE","TOO_EARLY","SCHEDULE_ENDED","SESSION_VOIDED",
-             "SESSION_ALREADY_ENDED","NO_VALID_SCHEDULE"}
-    if action in no_db:
-        return jsonify({"success": True, "message": data.get("error", action)})
-    if not session_id:
-        return jsonify({"success": False, "message": "Missing session_id"}), 400
-
-    if not schedule_id:
-        session_result = supabase.table("lab_sessions")\
-            .select("schedule_id")\
-            .eq("session_id", session_id)\
-            .execute()
-        session_row = session_result.data[0] if session_result.data else None
-        schedule_id = session_row.get("schedule_id") if session_row else None
-
-    if not schedule_id:
-        return jsonify({"success": False, "message": "Session not found."}), 404
-
-    machine_lab = None
-    schedule_lab = None
-    mismatch_msg = None
-    if schedule_id:
-        allowed, message, machine_lab, schedule_lab = _terminal_allows_schedule(schedule_id)
-        if not allowed:
-            # Do not block professor — allow starting from any terminal.
-            # Record the mismatch message so the caller/UI may display a warning.
-            mismatch_msg = message
-
-    try:
-        if action == "START":
-            supabase.table("lab_sessions").update({
-                "status":            "ongoing",
-                "actual_start_time": now_local.time().isoformat(),
-                "updated_at":        now_store.isoformat()
-            }).eq("session_id", session_id).execute()
-            # If this session was started on a different machine lab, try to persist that info.
-            try:
-                if machine_lab and machine_lab.get("lab_id"):
-                    supabase.table("lab_sessions").update({"lab_id": machine_lab.get("lab_id"), "updated_at": now_store.isoformat()}).eq("session_id", session_id).execute()
-            except Exception:
-                # Ignore if DB schema doesn't include lab_id or update fails
-                pass
-            # Append a short note indicating where the session was started and what was scheduled
-            try:
-                existing = supabase.table("lab_sessions").select("notes").eq("session_id", session_id).maybe_single().execute()
-                notes = None
-                if existing and existing.data:
-                    notes = (existing.data.get("notes") or "").strip()
-                schedule_label = _format_lab_label(schedule_lab) if schedule_lab else None
-                machine_label = _format_lab_label(machine_lab) if machine_lab else None
-                note_entry = None
-                if machine_label and schedule_label and machine_label != schedule_label:
-                    note_entry = f"Started in {machine_label} (scheduled {schedule_label})"
-                elif machine_label:
-                    note_entry = f"Started in {machine_label}"
-                if note_entry:
-                    new_notes = (notes + "\n" + note_entry).strip() if notes else note_entry
-                    supabase.table("lab_sessions").update({"notes": new_notes, "updated_at": now_store.isoformat()}).eq("session_id", session_id).execute()
-            except Exception:
-                pass
-            if schedule_id:
-                update_session_cache(schedule_id, session_id, "ongoing")
-            if professor_id:
-                # Extended cooldown (8s) to prevent duplicate modals
-                recently_seen[f"professor_{professor_id}"] = datetime.datetime.now() + datetime.timedelta(seconds=3)
-            # Return success and include optional mismatch warning so UI can notify the user.
-            payload = {"success": True, "message": f"✅ Session started — Students have {STUDENT_GRACE_MINUTES} min grace period"}
-            if mismatch_msg:
-                payload["warning"] = mismatch_msg
-            # Audit session start
-            try:
-                note_text = note_entry if 'note_entry' in locals() and note_entry else ""
-            except Exception:
-                note_text = ""
-            # session start auditing omitted per configuration (engine-level logs only)
-            return jsonify(payload)
-        if action == "DISMISS":
-            supabase.table("lab_sessions").update({
-                "status":              "dismissing",
-                "actual_dismiss_time": now_local.time().isoformat(),
-                "updated_at":          now_store.isoformat()
-            }).eq("session_id", session_id).execute()
-            if schedule_id:
-                update_session_cache(schedule_id, session_id, "dismissing")
-            if professor_id:
-                # Extended cooldown (8s) to prevent duplicate modals
-                recently_seen[f"professor_{professor_id}"] = datetime.datetime.now() + datetime.timedelta(seconds=3)
-            # session dismissed auditing omitted per configuration (engine-level logs only)
-            return jsonify({"success": True,
-                            "message": "✅ Dismissal mode ON — Students may now time out"})
-        if action == "END":
-            supabase.table("lab_sessions").update({
-                "status":          "completed",
-                "actual_end_time": now_local.time().isoformat(),
-                "updated_at":      now_store.isoformat()
-            }).eq("session_id", session_id).execute()
-            if schedule_id:
-                update_session_cache(schedule_id, session_id, "completed")
-            if professor_id:
-                # Extended cooldown (8s) to prevent duplicate modals
-                recently_seen[f"professor_{professor_id}"] = datetime.datetime.now() + datetime.timedelta(seconds=3)
-            att_result = supabase.table("lab_attendance")\
-                .select("attendance_id, time_in, student_id")\
-                .eq("session_id", session_id)\
-                .not_.is_("time_in", "null")\
-                .is_("time_out", "null")\
-                .execute()
-            for att in (att_result.data or []):
-                time_in_dt = parse_dt(att["time_in"])
-                duration   = int((now_local - time_in_dt).total_seconds() / 60)
-                supabase.table("lab_attendance").update({
-                    "time_out":         now_store.isoformat(),
-                    "duration_minutes": duration,
-                    "updated_at":       now_store.isoformat()
-                }).eq("attendance_id", att["attendance_id"]).execute()
-                invalidate_attendance_cache(session_id, att["student_id"])
-            return jsonify({"success": True,
-                            "message": "✅ Session ended — remaining students timed out"})
-        return jsonify({"success": True, "message": "No action"})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
-
 @app.route('/attendee_stream')
 def attendee_stream():
     client_queue = queue.Queue()
@@ -2103,12 +1156,11 @@ def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/engine_status')
-def     engine_status():
+def engine_status():
     with engine_boot_lock:
         payload = dict(engine_boot_state)
     payload["face_db_ready"] = face_db_ready.is_set()
     payload["engine_online"] = True
-    payload["machine_lab_assignment"] = _load_machine_lab_config()
     payload["anti_spoof"] = {
         "enabled": anti_spoof_state.get("enabled"),
         "available": anti_spoof_state.get("available"),
@@ -2188,8 +1240,8 @@ def face_auto_sync_worker():
         try:
             # Only check while engine is already usable and not currently rebuilding.
             if face_db_ready.is_set() and not face_db_loading_started:
-                students_rows, professors_rows = _fetch_face_rows()
-                remote_fingerprint, _ = _build_remote_face_fingerprint(students_rows, professors_rows)
+                students_rows, teachers_rows = _fetch_face_rows()
+                remote_fingerprint, _ = _build_remote_face_fingerprint(students_rows, teachers_rows)
 
                 if current_face_fingerprint is None:
                     current_face_fingerprint = remote_fingerprint
@@ -2216,114 +1268,16 @@ def shutdown():
         print(f"Error during shutdown: {e}")
         return jsonify({"success": False, "error": str(e)})
 
-def session_cleaner_worker():
-    while True:
-        try:
-            now_store, now_local = get_now()
-            today = datetime.date.today()
-            day_name = today.strftime("%A")
-            current_time_str = now_local.strftime("%H:%M:%S")
-            res = supabase.table("lab_sessions")\
-                .select("session_id, status, lab_schedules(start_time, end_time)")\
-                .eq("session_date", str(today))\
-                .in_("status", ["ongoing", "dismissing", "scheduled"])\
-                .execute()
-            for sess in (res.data or []):
-                sch        = sess.get("lab_schedules", {})
-                start_time = sch.get("start_time")
-                end_time   = sch.get("end_time")
-                status     = sess.get("status")
-                is_expired = False
-                is_voided_by_45_min_rule = False
-                if end_time and current_time_str > end_time:
-                    is_expired = True
-                elif status == "scheduled" and start_time:
-                    start_dt = datetime.datetime.combine(today, datetime.time.fromisoformat(start_time))
-                    deadline = start_dt + datetime.timedelta(minutes=45)
-                    if now_local > deadline:
-                        is_expired = True
-                        is_voided_by_45_min_rule = True
-                if is_expired:
-                    session_id = sess["session_id"]
-                    if status == "scheduled":
-                        reason = ("System Auto-Void: 45-minute grace period elapsed"
-                                  if is_voided_by_45_min_rule
-                                  else "System Auto-Void: Class ended without professor starting it")
-                        supabase.table("lab_sessions").update({
-                            "status": "cancelled", "notes": reason,
-                            "updated_at": now_store.isoformat()
-                        }).eq("session_id", session_id).execute()
-                        print(f"Cleanup: Auto-voided unstarted session {session_id}")
-                    else:
-                        supabase.table("lab_sessions").update({
-                            "status": "completed", "actual_end_time": end_time,
-                            "notes": "System Auto-End: Schedule time elapsed",
-                            "updated_at": now_store.isoformat()
-                        }).eq("session_id", session_id).execute()
-                        att_res = supabase.table("lab_attendance")\
-                            .select("attendance_id, time_in")\
-                            .eq("session_id", session_id)\
-                            .is_("time_out", "null")\
-                            .execute()
-                        for att in (att_res.data or []):
-                            time_in_dt = parse_dt(att["time_in"])
-                            end_dt     = datetime.datetime.combine(today, datetime.time.fromisoformat(end_time))
-                            duration   = int((end_dt - time_in_dt).total_seconds() / 60)
-                            supabase.table("lab_attendance").update({
-                                "time_out":         end_dt.isoformat(),
-                                "duration_minutes": max(0, duration),
-                                "updated_at":       now_store.isoformat()
-                            }).eq("attendance_id", att["attendance_id"]).execute()
-                        # session end auditing omitted per configuration (engine-level logs only)
-                        # continue cleanup without emitting session_ended audit
-                        # (worker continues its loop)
-            sched_res = supabase.table("lab_schedules")\
-                .select("schedule_id, start_time, end_time")\
-                .eq("day_of_week", day_name)\
-                .eq("status", "active")\
-                .execute()
-            for sch in (sched_res.data or []):
-                start_time = sch.get("start_time")
-                end_time   = sch.get("end_time")
-                is_expired = False
-                if end_time and current_time_str > end_time:
-                    is_expired = True
-                elif start_time:
-                    start_dt = datetime.datetime.combine(today, datetime.time.fromisoformat(start_time))
-                    deadline = start_dt + datetime.timedelta(minutes=45)
-                    if now_local > deadline:
-                        is_expired = True
-                if is_expired:
-                    sess_check = supabase.table("lab_sessions")\
-                        .select("session_id")\
-                        .eq("schedule_id", sch["schedule_id"])\
-                        .eq("session_date", str(today))\
-                        .execute()
-                    if not sess_check.data:
-                        supabase.table("lab_sessions").insert({
-                            "schedule_id":  sch["schedule_id"],
-                            "session_date": str(today),
-                            "status":       "cancelled",
-                            "notes":        "System Auto-Void: 45-minute grace period elapsed",
-                            "created_at":   now_store.isoformat(),
-                            "updated_at":   now_store.isoformat()
-                        }).execute()
-                        print(f"Cleanup: Inserted auto-void for phantom schedule {sch['schedule_id']}")
-        except Exception as e:
-            print(f"Cleaner Error: {e}")
-        time.sleep(60)
-
-threading.Thread(target=session_cleaner_worker, daemon=True).start()
 threading.Thread(target=face_auto_sync_worker, daemon=True).start()
 
 # ─────────────────────────────────────────────
-# Scanner UI (unchanged)
+# Scanner UI
 # ─────────────────────────────────────────────
 SCANNER_HTML = r"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Lab Attendance Scanner</title>
+<title>School Attendance Scanner</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',sans-serif;background:#0a0e1a;color:#fff;
@@ -2336,114 +1290,60 @@ h2{color:#22c55e;font-size:1.25rem;letter-spacing:1px;display:flex;align-items:c
 #videoWrap img{display:block;width:640px;max-width:93vw}
 #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;justify-content:center;align-items:center}
 #overlay.on{display:flex}
-#card{background:#161b2e;border-radius:18px;padding:30px 28px 26px;max-width:400px;width:92%;border:2px solid #1e3a5f;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.7);animation:pop .1s ease-out}
+#card{background:#161b2e;border-radius:18px;padding:30px 28px 26px;max-width:400px;width:92%;border:2px solid #1e3a5f;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.7);animation:pop .3s ease-out}
 @keyframes pop{from{opacity:0;transform:scale(.82) translateY(18px)}to{opacity:1;transform:scale(1) translateY(0)}}
-#card.green{border-color:#166534}#card.amber{border-color:#92400e}#card.red{border-color:#7f1d1d}#card.blue{border-color:#1e3a5f}#card.orange{border-color:#c2410c}
+#card.green{border-color:#166534}
+#card.red{border-color:#7f1d1d}
 .avatar{width:60px;height:60px;border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:26px}
-.av-student{background:#166534}.av-prof{background:#1e3a5f}.av-warn{background:#78350f}.av-err{background:#7f1d1d}.av-dismiss{background:#92400e}
+.av-ok{background:#166534}.av-err{background:#7f1d1d}
 #cardName{font-size:1.15rem;font-weight:700;margin-bottom:3px;color:#f1f5f9}
-#cardRole{font-size:.82rem;color:#94a3b8;margin-bottom:14px}
 #cardMsg{padding:11px 14px;border-radius:9px;font-size:.9rem;line-height:1.5;margin-bottom:18px}
-.ms{background:#14532d;color:#bbf7d0}.mw{background:#78350f;color:#fde68a}.me{background:#7f1d1d;color:#fca5a5}.mi{background:#1e3a5f;color:#bae6fd}.mo{background:#7c2d12;color:#fed7aa}
-.btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-.btn{padding:10px 24px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:all .18s}
-#btnOk{background:#166534;color:#fff}#btnOk:hover{background:#14532d;transform:translateY(-1px)}
-#btnOk.dismiss-btn{background:#b45309;color:#fff}#btnOk.dismiss-btn:hover{background:#92400e}
-#btnOk.end-btn{background:#991b1b;color:#fff}#btnOk.end-btn:hover{background:#7f1d1d}
-#btnX{background:#2d3748;color:#cbd5e1}#btnX:hover{background:#4a5568}
-#bar{font-size:.78rem;color:#4ade80;letter-spacing:.4px}
+.ms{background:#14532d;color:#bbf7d0}.me{background:#7f1d1d;color:#fca5a5}
 #countdown{font-size:.75rem;color:#64748b;margin-top:6px}
 </style>
 </head>
 <body>
-<h2><span id="pulse"></span>Lab Attendance — Face Scanner</h2>
+<h2><span id="pulse"></span>School Attendance — Face Scanner</h2>
 <div id="videoWrap"><img src="/video_feed" alt="Live feed"></div>
-<div id="bar">● Scanning...</div>
 <div id="overlay">
   <div id="card">
-    <div id="av" class="avatar av-student">👤</div>
+    <div id="av" class="avatar av-ok">👤</div>
     <div id="cardName"></div>
-    <div id="cardRole"></div>
     <div id="cardMsg" class="ms"></div>
-    <div class="btns">
-      <button id="btnOk" class="btn" onclick="doConfirm()">✅ Confirm</button>
-      <button id="btnX"  class="btn" onclick="dismiss()">Dismiss</button>
-    </div>
     <div id="countdown"></div>
   </div>
 </div>
 <script>
-let payload=null,timer=null,cd=null,remaining=0;
-const ERR_ACTIONS=new Set(['NO_SCHEDULE','NOT_ENROLLED','SESSION_NOT_STARTED','SESSION_ENDED','TOO_EARLY','SCHEDULE_ENDED','COMPLETED','SESSION_VOIDED','SESSION_ALREADY_ENDED','NO_VALID_SCHEDULE','CANNOT_TIME_OUT','SESSION_CANCELLED','SPOOF_DETECTED']);
+let timer=null,cd=null,remaining=0;
 function connectSSE(){const es=new EventSource('/attendee_stream');es.onmessage=e=>show(JSON.parse(e.data));es.onerror=()=>{es.close();setTimeout(connectSSE,500);};}
 connectSSE();
 function show(data){
-  clearInterval(cd);clearTimeout(timer);payload=data;
-  const action=data.action||'',role=data.role||'student',isErr=ERR_ACTIONS.has(action);
-  if(action==='LOADING'){
-    const av=document.getElementById('av');
-    av.className='avatar '+(role==='professor'?'av-prof':'av-student');
-    av.textContent=role==='professor'?'👨‍🏫':'🎓';
-    document.getElementById('cardName').textContent=data.name||'';
-    document.getElementById('cardRole').textContent=role==='professor'?'Professor':'Student';
-    document.getElementById('card').className='blue';
-    const msgEl=document.getElementById('cardMsg');msgEl.textContent='Checking schedule...';msgEl.className='mi';
-    document.getElementById('btnOk').style.display='none';
-    document.getElementById('overlay').classList.add('on');return;
-  }
+  clearInterval(cd);clearTimeout(timer);
   const card=document.getElementById('card');
-  card.dataset.isLate=data.is_late?'1':'0';card.dataset.lateMinutes=data.late_minutes||0;
   const av=document.getElementById('av');
-  if(isErr){av.className='avatar av-err';av.textContent='❌';card.className='red';}
-  else if(action==='DISMISS'){av.className='avatar av-dismiss';av.textContent='🚪';card.className='orange';}
-  else if(data.is_late){av.className='avatar av-warn';av.textContent='⚠';card.className='amber';}
-  else{av.className='avatar '+(role==='professor'?'av-prof':'av-student');av.textContent=role==='professor'?'👨‍🏫':'🎓';card.className='green';}
-  document.getElementById('cardName').textContent=data.name||'';
-  document.getElementById('cardRole').textContent=role==='professor'?'Professor':'Student';
-  const msgObj=resolveMsg(data,isErr);
-  const msgEl=document.getElementById('cardMsg');msgEl.textContent=msgObj.txt;msgEl.className=msgObj.cls;
-  const btn=document.getElementById('btnOk');
-  btn.style.display=isErr?'none':'block';btn.className='btn';
-  if(action==='DISMISS')btn.classList.add('dismiss-btn');
-  if(action==='END')btn.classList.add('end-btn');
-  btn.textContent=label(action);
-  document.getElementById('overlay').classList.add('on');
-  if(!isErr&&role==='student'&&(action==='IN'||action==='OUT')){
-    btn.style.display='none';document.getElementById('countdown').textContent='Saving to database...';doConfirm(true);
-  }else{remaining=4;updateCD();cd=setInterval(()=>{remaining--;updateCD();if(remaining<=0)dismiss();},1000);}
+  const msgEl=document.getElementById('cardMsg');
+  const nameEl=document.getElementById('cardName');
+
+  if(data.message && data.message.startsWith('HELLO')){
+    av.className='avatar av-ok';av.textContent='👋';
+    card.className='green';
+    nameEl.textContent=data.name||'';
+    msgEl.textContent=data.message||'';msgEl.className='ms';
+    document.getElementById('overlay').classList.add('on');
+    remaining=3;updateCD();
+    cd=setInterval(()=>{remaining--;updateCD();if(remaining<=0)dismiss();},1000);
+  } else if(data.message && (data.message.includes('SPOOF') || data.message.includes('ERROR'))){
+    av.className='avatar av-err';av.textContent='❌';
+    card.className='red';
+    nameEl.textContent=data.name||'';
+    msgEl.textContent=data.reason||data.message||'';msgEl.className='me';
+    document.getElementById('overlay').classList.add('on');
+    remaining=4;updateCD();
+    cd=setInterval(()=>{remaining--;updateCD();if(remaining<=0)dismiss();},1000);
+  }
 }
 function updateCD(){document.getElementById('countdown').textContent=remaining>0?`Auto-dismiss in ${remaining}s`:'';}
-function resolveMsg(d,isErr){
-  d.is_late=d.is_late||(document.getElementById('card').dataset.isLate==='1');
-  d.late_minutes=d.late_minutes||document.getElementById('card').dataset.lateMinutes||0;
-  if(d.error)return{txt:d.error,cls:(d.action==='SESSION_NOT_STARTED'||d.action==='CANNOT_TIME_OUT')?'mw':(isErr?'me':'mw')};
-    const map={IN:{txt:d.is_late?`⚠ LATE by ${d.late_minutes} min. Saving Time IN...`:'Saving Time IN...',cls:d.is_late?'mw':'ms'},OUT:{txt:'Saving Time OUT...',cls:'ms'},START:{txt:'Tap Confirm to START the session.',cls:'ms'},DISMISS:{txt:'🚪 Allow students to TIME OUT and leave the lab.',cls:'mo'},END:{txt:'⏹ End the session completely.',cls:'mw'},COMPLETED:{txt:'Attendance already complete for this session.',cls:'mi'},SPOOF_DETECTED:{txt:'Liveness check failed. Please present a real face to the camera.',cls:'me'}};
-  return map[d.action]||{txt:d.action,cls:'mi'};
-}
-function label(a){return{IN:'✅ Time IN',OUT:'✅ Time OUT',START:'▶ Start Session',DISMISS:'🚪 Allow Time Out',END:'⏹ End Session'}[a]||'✅ Confirm';}
-async function doConfirm(isAuto=false){
-  if(!payload)return;const d=payload;
-  if(!isAuto)dismiss();
-  const ep=d.role==='professor'?'/confirm_session':'/confirm_attendance';
-  try{
-    const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
-    const json=await r.json();
-    const bar=document.getElementById('bar');bar.textContent='● '+(json.message||'Done');
-        if(!json.success){
-            document.getElementById('card').className='red';
-            document.getElementById('av').className='avatar av-err';
-            document.getElementById('av').textContent='❌';
-            document.getElementById('cardMsg').textContent=json.message||'Unable to save attendance.';
-            document.getElementById('cardMsg').className='me';
-            document.getElementById('countdown').textContent='Rejected';
-            setTimeout(()=>dismiss(), isAuto ? 4000 : 5000);
-            return;
-        }
-        if(isAuto){document.getElementById('cardMsg').textContent=json.message||'Saved!';document.getElementById('cardMsg').className='ms';document.getElementById('countdown').textContent='Saved successfully ✅';setTimeout(()=>dismiss(),1500);}
-        else{setTimeout(()=>{bar.textContent='● Scanning...';},3000);}
-  }catch(e){console.error(e);}
-}
-function dismiss(){clearInterval(cd);clearTimeout(timer);document.getElementById('overlay').classList.remove('on');payload=null;}
+function dismiss(){clearInterval(cd);clearTimeout(timer);document.getElementById('overlay').classList.remove('on');}
 </script>
 </body>
 </html>"""
@@ -2454,18 +1354,15 @@ def scanner():
 
 @app.route('/')
 def index():
-    return ('<h2 style="font-family:sans-serif;padding:20px">Lab Attendance ✓ &nbsp;'
+    return ('<h2 style="font-family:sans-serif;padding:20px">School Attendance ✓ &nbsp;'
             '<a href="/scanner">Open Scanner →</a></h2>')
 
 if __name__ == '__main__':
     threading.Thread(target=load_all_faces, kwargs={"force_rebuild": FORCE_FACE_CACHE_REBUILD}, daemon=True).start()
-    threading.Thread(target=refresh_session_cache, daemon=True).start()
     print("=" * 60)
-    print("Lab Attendance — Supabase Edition ✓")
+    print("School Attendance — Supabase Edition ✓")
     print("Face DB load      : incremental background sync")
     print(f"Faces/person      : up to {max(1, MAX_IMAGES_PER_PERSON)} image(s)")
-    print(f"Grace period      : {STUDENT_GRACE_MINUTES} min after professor starts")
-    print(f"Session cache TTL : {CACHE_TTL}s")
     print("Scanner UI        : http://127.0.0.1:5000/scanner")
     print("=" * 60)
     app.run(host='127.0.0.1', port=5000, debug=False, threaded=True, use_reloader=False)

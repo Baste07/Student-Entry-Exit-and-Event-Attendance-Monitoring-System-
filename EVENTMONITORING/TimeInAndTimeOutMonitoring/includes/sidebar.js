@@ -7,8 +7,9 @@
      loadSidebar('dashboard');   ← pass the page key
 
    Page keys must match the data-page attribute in sidebar.html:
-     dashboard | laboratories | sessions | subjects | students |
-     professors | schedules | enrollment | attendance | reports
+     dashboard | students | teachers | sections | guardians |
+     daily-attendance | events | event-attendance |
+     sms-notifications | attendance-reports
 ============================================================ */
 
 /* ── Resolve the base path to /includes/ regardless of nesting ──
@@ -55,8 +56,8 @@ function applyDepartmentLogoToHeader() {
             const userType = (user.userType || '').toLowerCase();
             if (userType === 'student') {
                 panelLabel.textContent = 'Student Panel';
-            } else if (userType === 'professor') {
-                panelLabel.textContent = 'Faculty Panel';
+            } else if (userType === 'teacher') {
+                panelLabel.textContent = 'Teacher Panel';
             } else if (user.adminLevel === 'super_admin') {
                 panelLabel.textContent = 'Super Admin Panel';
             } else {
