@@ -340,7 +340,7 @@ def upload_to_supabase():
     else:
         cloud_folder = f"students/student_{session['id_number']}"
         table_name   = "students"
-        id_column    = "id_number"
+        id_column    = "lrn"
 
     valid_count = 0
     current_paths = list(session["paths"])

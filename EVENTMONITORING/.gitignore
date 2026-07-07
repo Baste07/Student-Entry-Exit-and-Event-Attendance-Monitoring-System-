@@ -59,3 +59,5 @@ TimeInAndTimeOutMonitoring/students/machine_lab_config.json
 
 # Markdown documentation files
 *.md
+
+.json
