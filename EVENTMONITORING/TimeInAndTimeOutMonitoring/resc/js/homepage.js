@@ -1,15 +1,12 @@
 /* ============================================================
-   homepage.js — Public Lab Sessions Homepage
-   Path: TimeInAndTimeOutMonitoring/resc/js/homepage.js
+   homepage.js — School Attendance Dashboard
+   Simplified for greeting-only facial recognition engine
    ============================================================ */
-
-const PROFESSOR_START_WINDOW = 45; // minutes before a session is dropped from scheduled list
-const OVERDUE_GRACE_MINUTES  = 5;  // minutes AFTER start time before showing "Overdue"
 
 // ── Date / Time Helpers ──────────────────────────────────
 
-const today      = new Date().toLocaleDateString('en-CA');
-const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+const todayISO      = new Date().toLocaleDateString('en-CA');
+const currentDay    = new Date().toLocaleDateString('en-US', { weekday: 'long' });
 
 function getCurrentTime() {
     const n = new Date();
@@ -31,16 +28,11 @@ function formatTime(t) {
     return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
-function parseSessionLabFromNotes(notes) {
-    const txt = String(notes || '');
-    const m = txt.match(/Started in\s+(.+?)(?:\s*\(scheduled|$)/i);
-    if (!m || !m[1]) return null;
-    const label = m[1].trim();
-    const parts = label.split(' - ');
-    if (parts.length >= 2) {
-        return { lab_code: parts[0].trim(), lab_name: parts.slice(1).join(' - ').trim(), building: null };
-    }
-    return { lab_code: label, lab_name: '', building: null };
+function formatDateTime(isoString) {
+    if (!isoString) return '—';
+    const d = new Date(isoString);
+    if (isNaN(d)) return '—';
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 // ── Live Clock ───────────────────────────────────────────
@@ -57,264 +49,236 @@ tickClock();
 setInterval(tickClock, 1000);
 document.getElementById('footerYear').textContent = new Date().getFullYear();
 
-// ── Fetch: Active sessions ───────────────────────────────
+// ── Fetch: Today's Attendance Summary ────────────────────
 
-async function fetchActive() {
-    const { data, error } = await supabaseClient
-        .from('lab_sessions')
-        .select(`
-            session_id, actual_start_time, actual_dismiss_time, status, notes,
-            lab_schedules (
-                schedule_id, start_time, end_time, section,
-                subjects         ( subject_code, subject_name ),
-                professors       ( first_name, last_name ),
-                laboratory_rooms ( lab_code, lab_name, building )
-            ),
-            lab_attendance ( student_id )
-        `)
-        .eq('session_date', today)
-        .in('status', ['ongoing', 'dismissing']);
+async function fetchTodayAttendance() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('daily_attendance')
+            .select('status, student_id, teacher_id, created_at')
+            .eq('date', todayISO);
 
-    if (error) { console.error('fetchActive:', error); return []; }
+        if (error) { console.error('fetchTodayAttendance:', error); return null; }
 
-    return Promise.all((data || []).map(async s => {
-        const { count } = await supabaseClient
-            .from('schedule_enrollments')
-            .select('enrollment_id', { count: 'exact', head: true })
-            .eq('schedule_id', s.lab_schedules?.schedule_id)
-            .eq('status', 'enrolled');
+        const records = data || [];
+        const present = records.filter(r => r.status === 'present').length;
+        const absent  = records.filter(r => r.status === 'absent').length;
+        const late    = records.filter(r => r.status === 'late').length;
+        const excused = records.filter(r => r.status === 'excused').length;
+
+        // Get unique people who checked in today
+        const studentIds = new Set(records.filter(r => r.student_id).map(r => r.student_id));
+        const teacherIds = new Set(records.filter(r => r.teacher_id).map(r => r.teacher_id));
 
         return {
-            ...s,
-            laboratory_rooms: parseSessionLabFromNotes(s.notes),
-            students_present: new Set((s.lab_attendance || []).map(a => a.student_id)).size,
-            total_enrolled:   count || 0
+            total: records.length,
+            present,
+            absent,
+            late,
+            excused,
+            studentCount: studentIds.size,
+            teacherCount: teacherIds.size
         };
-    }));
+    } catch (err) {
+        console.error('fetchTodayAttendance error:', err);
+        return null;
+    }
 }
 
-// ── Fetch: Scheduled sessions ────────────────────────────
+// ── Fetch: Student & Teacher Counts ────────────────────────
 
-async function fetchScheduled() {
-    const currentTime = getCurrentTime();
-
-    const { data, error } = await supabaseClient
-        .from('lab_schedules')
-        .select(`
-            schedule_id, start_time, end_time, section,
-            subjects         ( subject_code, subject_name ),
-            professors       ( first_name, last_name ),
-            laboratory_rooms ( lab_code, lab_name, building ),
-            lab_sessions     ( session_id, status, session_date )
-        `)
-        .eq('day_of_week', currentDay)
-        .eq('status', 'active');
-
-    if (error) { console.error('fetchScheduled:', error); return []; }
-
-    const filtered = (data || []).filter(sch => {
-        const todaySess = (sch.lab_sessions || []).filter(s => s.session_date === today);
-        if (todaySess.some(s => ['ongoing', 'dismissing', 'completed', 'cancelled'].includes(s.status))) return false;
-        const minsElapsed = (timeToDate(currentTime) - timeToDate(sch.start_time)) / 60_000;
-        return minsElapsed <= PROFESSOR_START_WINDOW;
-    });
-
-    return Promise.all(filtered.map(async sch => {
-        const { count } = await supabaseClient
-            .from('schedule_enrollments')
-            .select('enrollment_id', { count: 'exact', head: true })
-            .eq('schedule_id', sch.schedule_id)
-            .eq('status', 'enrolled');
-
-        const todaySess  = (sch.lab_sessions || []).find(s => s.session_date === today);
-        const minsUntil  = (timeToDate(sch.start_time) - timeToDate(currentTime)) / 60_000;
+async function fetchPeopleCounts() {
+    try {
+        const [studentsRes, teachersRes, sectionsRes] = await Promise.all([
+            supabaseClient.from('students').select('student_id', { count: 'exact', head: true }),
+            supabaseClient.from('teachers').select('teacher_id', { count: 'exact', head: true }),
+            supabaseClient.from('sections').select('section_id', { count: 'exact', head: true })
+        ]);
 
         return {
-            ...sch,
-            session_status: todaySess?.status || 'not_created',
-            total_enrolled: count || 0,
-            mins_until:     minsUntil
+            students: studentsRes.count || 0,
+            teachers: teachersRes.count || 0,
+            sections: sectionsRes.count || 0
         };
-    })).then(l => l.sort((a, b) => a.start_time.localeCompare(b.start_time)));
+    } catch (err) {
+        console.error('fetchPeopleCounts error:', err);
+        return { students: 0, teachers: 0, sections: 0 };
+    }
 }
 
-// ── Fetch: Completed sessions ────────────────────────────
+// ── Fetch: Recent Daily Attendance Records ───────────────
 
-async function fetchCompleted() {
-    const { data, error } = await supabaseClient
-        .from('lab_sessions')
-        .select(`
-            session_id, actual_start_time, actual_end_time, notes,
-            lab_schedules (
-                schedule_id, section,
-                subjects         ( subject_code, subject_name ),
-                professors       ( first_name, last_name ),
-                laboratory_rooms ( lab_code, lab_name )
-            ),
-            lab_attendance ( student_id )
-        `)
-        .eq('session_date', today)
-        .eq('status', 'completed')
-        .order('actual_end_time', { ascending: false });
+async function fetchRecentAttendance(limit = 10) {
+    try {
+        const { data, error } = await supabaseClient
+            .from('daily_attendance')
+            .select(`
+                attendance_id, status, date, time_in, time_out, remarks, created_at,
+                students ( student_id, first_name, last_name, lrn, section_id, sections ( section_name, grade_level ) ),
+                teachers ( teacher_id, first_name, last_name, employee_id )
+            `)
+            .eq('date', todayISO)
+            .order('created_at', { ascending: false })
+            .limit(limit);
 
-    if (error) { console.error('fetchCompleted:', error); return []; }
-
-    return Promise.all((data || []).map(async s => {
-        const { count } = await supabaseClient
-            .from('schedule_enrollments')
-            .select('enrollment_id', { count: 'exact', head: true })
-            .eq('schedule_id', s.lab_schedules?.schedule_id)
-            .eq('status', 'enrolled');
-
-        return {
-            ...s,
-            laboratory_rooms: parseSessionLabFromNotes(s.notes),
-            students_attended: new Set((s.lab_attendance || []).map(a => a.student_id)).size,
-            total_enrolled:    count || 0
-        };
-    }));
+        if (error) { console.error('fetchRecentAttendance:', error); return []; }
+        return data || [];
+    } catch (err) {
+        console.error('fetchRecentAttendance error:', err);
+        return [];
+    }
 }
 
-// ── Render: Active card ──────────────────────────────────
+// ── Fetch: Upcoming Events ───────────────────────────────
 
-function renderActive(s) {
-    const sch  = s.lab_schedules;
-    const subj = sch?.subjects;
-    const prof = sch?.professors;
-    const lab  = s.laboratory_rooms || sch?.laboratory_rooms;
+async function fetchUpcomingEvents() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('events')
+            .select('event_id, event_name, event_date, event_type, location, description')
+            .gte('event_date', todayISO)
+            .order('event_date', { ascending: true })
+            .limit(5);
 
-    const isDismissing = s.status === 'dismissing';
-    const isStayIn     = s.status === 'ongoing' && !!s.actual_dismiss_time;
-    const pct = s.total_enrolled > 0
-        ? Math.round((s.students_present / s.total_enrolled) * 100) : 0;
+        if (error) { console.error('fetchUpcomingEvents:', error); return []; }
+        return data || [];
+    } catch (err) {
+        console.error('fetchUpcomingEvents error:', err);
+        return [];
+    }
+}
 
-    let statusLabel, statusCls, noteHtml;
+// ── Render: Attendance Stat Card ─────────────────────────
 
-    if (isDismissing) {
-        statusLabel = '<i class="fa-solid fa-door-open"></i> Dismissing';
-        statusCls   = 'dismissing';
-        noteHtml    = `<div class="note dismissing"><i class="fa-solid fa-door-open"></i><span>Dismissal enabled — students may scan out and leave.</span></div>`;
-    } else if (isStayIn) {
-        statusLabel = '<i class="fa-solid fa-rotate-left"></i> Stay In';
-        statusCls   = 'live';
-        noteHtml    = `<div class="note ongoing"><i class="fa-solid fa-rotate-left"></i><span>All students exited — session reverted to Stay In mode.</span></div>`;
-    } else {
-        statusLabel = '<i class="fa-solid fa-broadcast-tower"></i> Live';
-        statusCls   = 'live';
-        noteHtml    = `<div class="note ongoing"><i class="fa-solid fa-circle-check"></i><span>Session is active. Students can scan in.</span></div>`;
+function renderAttendanceStats(stats) {
+    if (!stats) {
+        return `
+        <div class="card stat-card">
+            <div class="stat-header">
+                <i class="fa-solid fa-chart-pie" style="color:#6b7280"></i>
+                <span class="status grey">No Data</span>
+            </div>
+            <div class="stat-value">—</div>
+            <div class="stat-label">Attendance records unavailable</div>
+        </div>`;
     }
 
+    const totalPeople = stats.studentCount + stats.teacherCount;
+    const pctPresent = totalPeople > 0 ? Math.round((stats.present / totalPeople) * 100) : 0;
+
     return `
-        <div class="card ${isDismissing ? 'dismissing' : 'ongoing'}">
-            <span class="status ${statusCls}">${statusLabel}</span>
-            <div class="card-subject">${subj?.subject_code || '—'}</div>
-            <div class="card-name">${subj?.subject_name || ''}</div>
-            <div class="detail"><i class="fa-solid fa-door-open"></i> <strong>${lab?.lab_code || '—'}</strong> &mdash; ${lab?.lab_name || ''}</div>
-            <div class="detail"><i class="fa-solid fa-building"></i> ${lab?.building || '—'}</div>
-            <div class="detail"><i class="fa-solid fa-chalkboard-teacher"></i> ${prof?.first_name || ''} ${prof?.last_name || ''}</div>
-            <div class="detail"><i class="fa-solid fa-users"></i> Section <strong>${sch?.section || '—'}</strong></div>
-            <div class="detail"><i class="fa-solid fa-clock"></i> ${formatTime(sch?.start_time)} &mdash; ${formatTime(sch?.end_time)}</div>
-            ${s.actual_start_time ? `<div class="detail" style="color:#166534;font-weight:600;"><i class="fa-solid fa-play-circle" style="color:#22c55e"></i> Started ${formatTime(s.actual_start_time)}</div>` : ''}
-            ${noteHtml}
-            <div class="card-footer">
-                <span>${s.students_present} / ${s.total_enrolled} students present</span>
-                <span class="att-pill"><i class="fa-solid fa-user-check"></i> ${pct}%</span>
+        <div class="card stat-card">
+            <div class="stat-header">
+                <i class="fa-solid fa-chart-pie" style="color:#22c55e"></i>
+                <span class="status live">Today</span>
+            </div>
+            <div class="stat-value">${stats.present}</div>
+            <div class="stat-label">Present today (${pctPresent}%)</div>
+            <div class="stat-breakdown">
+                <span class="bd-item"><i class="fa-solid fa-check" style="color:#22c55e"></i> ${stats.present} Present</span>
+                <span class="bd-item"><i class="fa-solid fa-clock" style="color:#f59e0b"></i> ${stats.late} Late</span>
+                <span class="bd-item"><i class="fa-solid fa-xmark" style="color:#ef4444"></i> ${stats.absent} Absent</span>
+                <span class="bd-item"><i class="fa-solid fa-notes-medical" style="color:#3b82f6"></i> ${stats.excused} Excused</span>
             </div>
         </div>`;
 }
 
-// ── Render: Scheduled card ───────────────────────────────
+// ── Render: People Count Card ────────────────────────────
 
-function renderScheduled(s) {
-    const subj = s.subjects;
-    const prof = s.professors;
-    const lab  = s.laboratory_rooms;
-
-    const isWaiting = s.session_status === 'scheduled';
-    const minsUntil = s.mins_until;
-
-    let statusLabel, statusCls, noteHtml;
-
-    if (isWaiting) {
-        // Professor has created the session but hasn't started it yet
-        statusLabel = '⏳ Waiting';
-        statusCls   = 'waiting';
-        noteHtml    = `<div class="note waiting"><i class="fa-solid fa-user-clock"></i><span>Waiting for professor to start the session.</span></div>`;
-
-    } else if (minsUntil > 0) {
-        // Still in the future — show countdown
-        const h = Math.floor(minsUntil / 60);
-        const m = Math.floor(minsUntil % 60);
-        const t = h > 0 ? `${h}h ${m > 0 ? m + 'm' : ''}` : `${m}m`;
-        statusLabel = 'Scheduled';
-        statusCls   = 'scheduled';
-        noteHtml    = `<div class="note ongoing"><i class="fa-solid fa-hourglass-start"></i><span>Starts in <strong>${t.trim()}</strong> &mdash; at ${formatTime(s.start_time)}</span></div>`;
-
-    } else if (minsUntil > -OVERDUE_GRACE_MINUTES) {
-        // ── GRACE PERIOD: 0 to -5 minutes — still show as "Starting" ──
-        const minsLate = Math.abs(Math.ceil(minsUntil));
-        const graceLeft = OVERDUE_GRACE_MINUTES - minsLate;
-        statusLabel = '🕐 Starting';
-        statusCls   = 'waiting';
-        noteHtml    = `<div class="note waiting">
-                            <i class="fa-solid fa-hourglass-half"></i>
-                            <span>Just started — waiting for professor.
-                            Marked overdue in <strong>${graceLeft}m</strong>.</span>
-                       </div>`;
-
-    } else {
-        // ── OVERDUE: more than 5 minutes past start time ──
-        const over = Math.abs(Math.floor(minsUntil));
-        const oh   = Math.floor(over / 60);
-        const om   = over % 60;
-        const ot   = oh > 0 ? `${oh}h ${om > 0 ? om + 'm' : ''}` : `${om}m`;
-        statusLabel = 'Overdue';
-        statusCls   = 'overdue';
-        noteHtml    = `<div class="note overdue"><i class="fa-solid fa-triangle-exclamation"></i><span>Should have started <strong>${ot.trim()}</strong> ago.</span></div>`;
-    }
-
+function renderPeopleCounts(counts) {
     return `
-        <div class="card scheduled">
-            <span class="status ${statusCls}">${statusLabel}</span>
-            <div class="card-subject">${subj?.subject_code || '—'}</div>
-            <div class="card-name">${subj?.subject_name || ''}</div>
-            <div class="detail"><i class="fa-solid fa-door-open"></i> <strong>${lab?.lab_code || '—'}</strong> &mdash; ${lab?.lab_name || ''}</div>
-            <div class="detail"><i class="fa-solid fa-building"></i> ${lab?.building || '—'}</div>
-            <div class="detail"><i class="fa-solid fa-chalkboard-teacher"></i> ${prof?.first_name || ''} ${prof?.last_name || ''}</div>
-            <div class="detail"><i class="fa-solid fa-users"></i> Section <strong>${s.section || '—'}</strong></div>
-            <div class="detail"><i class="fa-solid fa-clock"></i> ${formatTime(s.start_time)} &mdash; ${formatTime(s.end_time)}</div>
-            ${noteHtml}
-            <div class="card-footer">
-                <span>${s.total_enrolled} students enrolled</span>
+        <div class="card stat-card">
+            <div class="stat-header">
+                <i class="fa-solid fa-users" style="color:#3b82f6"></i>
+                <span class="status scheduled">Directory</span>
+            </div>
+            <div class="stat-value">${counts.students + counts.teachers}</div>
+            <div class="stat-label">Total people registered</div>
+            <div class="stat-breakdown">
+                <span class="bd-item"><i class="fa-solid fa-graduation-cap" style="color:#8b5cf6"></i> ${counts.students} Students</span>
+                <span class="bd-item"><i class="fa-solid fa-chalkboard-user" style="color:#06b6d4"></i> ${counts.teachers} Teachers</span>
+                <span class="bd-item"><i class="fa-solid fa-layer-group" style="color:#f59e0b"></i> ${counts.sections} Sections</span>
             </div>
         </div>`;
 }
 
-// ── Render: Completed card ───────────────────────────────
+// ── Render: Recent Recognition Card ──────────────────────
 
-function renderCompleted(s) {
-    const sch  = s.lab_schedules;
-    const subj = sch?.subjects;
-    const prof = sch?.professors;
-    const lab  = s.laboratory_rooms || sch?.laboratory_rooms;
+function renderRecentRecord(rec) {
+    const student = rec.students;
+    const teacher = rec.teachers;
+    const person = student || teacher;
+    const role = student ? 'Student' : (teacher ? 'Teacher' : 'Unknown');
+    const name = person ? `${person.first_name || ''} ${person.last_name || ''}`.trim() : 'Unknown';
+    const idNum = student ? student.lrn : (teacher ? teacher.employee_id : '');
+    const sectionInfo = student?.sections ? `${student.sections.grade_level || ''} - ${student.sections.section_name || ''}` : '';
 
-    const pct     = s.total_enrolled > 0
-        ? Math.round((s.students_attended / s.total_enrolled) * 100) : 0;
-    const wasAuto = (s.notes || '').includes('auto time out');
+    const statusColors = {
+        present:  '#22c55e',
+        late:     '#f59e0b',
+        absent:   '#ef4444',
+        excused:  '#3b82f6'
+    };
+    const statusIcon = {
+        present:  'fa-check',
+        late:     'fa-clock',
+        absent:   'fa-xmark',
+        excused:  'fa-notes-medical'
+    };
+    const color = statusColors[rec.status] || '#6b7280';
+    const icon  = statusIcon[rec.status] || 'fa-circle';
 
     return `
-        <div class="card completed">
-            <span class="status completed">${wasAuto ? '⏰ Auto-ended' : 'Completed'}</span>
-            <div class="card-subject">${subj?.subject_code || '—'}</div>
-            <div class="card-name">${subj?.subject_name || ''}</div>
-            <div class="detail"><i class="fa-solid fa-door-open"></i> <strong>${lab?.lab_code || '—'}</strong> &mdash; ${lab?.lab_name || ''}</div>
-            <div class="detail"><i class="fa-solid fa-chalkboard-teacher"></i> ${prof?.first_name || ''} ${prof?.last_name || ''}</div>
-            <div class="detail"><i class="fa-solid fa-users"></i> Section <strong>${sch?.section || '—'}</strong></div>
-            <div class="detail"><i class="fa-solid fa-clock"></i> ${formatTime(s.actual_start_time)} &mdash; ${formatTime(s.actual_end_time)}</div>
-            <div class="card-footer">
-                <span>${s.students_attended} / ${s.total_enrolled} attended</span>
-                <span class="att-pill"><i class="fa-solid fa-user-check"></i> ${pct}%</span>
+        <div class="card record-card">
+            <div class="record-header">
+                <span class="record-role ${role.toLowerCase()}">${role}</span>
+                <span class="record-status" style="color:${color}">
+                    <i class="fa-solid ${icon}"></i> ${rec.status ? rec.status.charAt(0).toUpperCase() + rec.status.slice(1) : '—'}
+                </span>
             </div>
+            <div class="record-name">${name || 'Unknown'}</div>
+            <div class="record-meta">
+                ${idNum ? `<span><i class="fa-solid fa-id-card"></i> ${idNum}</span>` : ''}
+                ${sectionInfo ? `<span><i class="fa-solid fa-layer-group"></i> ${sectionInfo}</span>` : ''}
+            </div>
+            <div class="record-time">
+                <i class="fa-solid fa-clock"></i> 
+                ${rec.time_in ? formatTime(rec.time_in) : formatDateTime(rec.created_at)}
+                ${rec.time_out ? ` → ${formatTime(rec.time_out)}` : ''}
+            </div>
+            ${rec.remarks ? `<div class="record-remarks">${rec.remarks}</div>` : ''}
+        </div>`;
+}
+
+// ── Render: Event Card ──────────────────────────────────
+
+function renderEvent(ev) {
+    const eventDate = new Date(ev.event_date);
+    const isToday = ev.event_date === todayISO;
+    const dateLabel = isToday ? 'Today' : eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    const typeColors = {
+        assembly:   '#8b5cf6',
+        meeting:    '#06b6d4',
+        sports:     '#f59e0b',
+        ceremony:   '#ec4899',
+        exam:       '#ef4444',
+        holiday:    '#22c55e',
+        other:      '#6b7280'
+    };
+    const color = typeColors[ev.event_type?.toLowerCase()] || '#6b7280';
+
+    return `
+        <div class="card event-card">
+            <div class="event-header">
+                <span class="event-type" style="background:${color}20; color:${color}">${ev.event_type || 'Event'}</span>
+                <span class="event-date">${dateLabel}</span>
+            </div>
+            <div class="event-name">${ev.event_name || 'Untitled Event'}</div>
+            <div class="event-meta">
+                ${ev.location ? `<span><i class="fa-solid fa-location-dot"></i> ${ev.location}</span>` : ''}
+            </div>
+            ${ev.description ? `<div class="event-desc">${ev.description}</div>` : ''}
         </div>`;
 }
 
@@ -322,56 +286,72 @@ function renderCompleted(s) {
 
 async function loadPage() {
     const icon = document.getElementById('refreshIcon');
-    icon.classList.add('fa-spin');
+    if (icon) icon.classList.add('fa-spin');
 
-    const [active, scheduled, completed] = await Promise.all([
-        fetchActive(),
-        fetchScheduled(),
-        fetchCompleted()
+    const [attendanceStats, peopleCounts, recentRecords, upcomingEvents] = await Promise.all([
+        fetchTodayAttendance(),
+        fetchPeopleCounts(),
+        fetchRecentAttendance(8),
+        fetchUpcomingEvents()
     ]);
 
     // Update hero stats
-    const dismissingCnt = active.filter(s => s.status === 'dismissing').length;
-    document.getElementById('statActive').textContent     = active.length;
-    document.getElementById('statDismissing').textContent = dismissingCnt;
-    document.getElementById('statScheduled').textContent  = scheduled.length;
-    document.getElementById('statCompleted').textContent  = completed.length;
+    const totalPresent = attendanceStats?.present || 0;
+    const totalLate    = attendanceStats?.late || 0;
+    const totalAbsent  = attendanceStats?.absent || 0;
+    const totalExcused = attendanceStats?.excused || 0;
 
-    // Update section badges
-    document.getElementById('activeBadge').textContent    = active.length;
-    document.getElementById('scheduledBadge').textContent = scheduled.length;
-    document.getElementById('completedBadge').textContent = completed.length;
+    const statPresent  = document.getElementById('statPresent');
+    const statLate     = document.getElementById('statLate');
+    const statAbsent   = document.getElementById('statAbsent');
+    const statExcused  = document.getElementById('statExcused');
 
-    // Render grids
-    document.getElementById('activeGrid').innerHTML = active.length
-        ? active.map(renderActive).join('')
-        : `<div class="empty">
-               <i class="fa-solid fa-desktop"></i>
-               <h3>No Active Sessions</h3>
-               <p>No lab sessions are currently running.</p>
-           </div>`;
+    if (statPresent) statPresent.textContent = totalPresent;
+    if (statLate)    statLate.textContent    = totalLate;
+    if (statAbsent)  statAbsent.textContent  = totalAbsent;
+    if (statExcused) statExcused.textContent = totalExcused;
 
-    document.getElementById('scheduledGrid').innerHTML = scheduled.length
-        ? scheduled.map(renderScheduled).join('')
-        : `<div class="empty">
-               <i class="fa-solid fa-calendar-xmark"></i>
-               <h3>No Upcoming Sessions</h3>
-               <p>All sessions have started or none are scheduled for the rest of today.</p>
-           </div>`;
+    // Update badges
+    const badgeRecent = document.getElementById('recentBadge');
+    const badgeEvents = document.getElementById('eventsBadge');
+    if (badgeRecent) badgeRecent.textContent = recentRecords.length;
+    if (badgeEvents)  badgeEvents.textContent  = upcomingEvents.length;
 
-    // Completed — hidden when empty
-    const completedBlock = document.getElementById('completedBlock');
-    if (completed.length > 0) {
-        completedBlock.style.display = 'block';
-        document.getElementById('completedGrid').innerHTML = completed.map(renderCompleted).join('');
-    } else {
-        completedBlock.style.display = 'none';
+    // Render stats grid
+    const statsGrid = document.getElementById('statsGrid');
+    if (statsGrid) {
+        statsGrid.innerHTML = renderAttendanceStats(attendanceStats) + renderPeopleCounts(peopleCounts);
+    }
+
+    // Render recent records
+    const recentGrid = document.getElementById('recentGrid');
+    if (recentGrid) {
+        recentGrid.innerHTML = recentRecords.length
+            ? recentRecords.map(renderRecentRecord).join('')
+            : `<div class="empty">
+                   <i class="fa-solid fa-clipboard-list"></i>
+                   <h3>No Attendance Records Yet</h3>
+                   <p>Attendance records will appear here once the facial recognition scanner is used or manual attendance is recorded.</p>
+               </div>`;
+    }
+
+    // Render events
+    const eventsGrid = document.getElementById('eventsGrid');
+    if (eventsGrid) {
+        eventsGrid.innerHTML = upcomingEvents.length
+            ? upcomingEvents.map(renderEvent).join('')
+            : `<div class="empty">
+                   <i class="fa-solid fa-calendar-xmark"></i>
+                   <h3>No Upcoming Events</h3>
+                   <p>No events are scheduled for today or the near future.</p>
+               </div>`;
     }
 
     // Refresh label
     const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    document.getElementById('refreshLabel').textContent = `Last updated ${now} · auto-refreshes every 30s`;
-    icon.classList.remove('fa-spin');
+    const refreshLabel = document.getElementById('refreshLabel');
+    if (refreshLabel) refreshLabel.textContent = `Last updated ${now} · auto-refreshes every 30s`;
+    if (icon) icon.classList.remove('fa-spin');
 }
 
 // Initial load + auto-refresh every 30 seconds

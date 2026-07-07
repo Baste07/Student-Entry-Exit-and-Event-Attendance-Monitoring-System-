@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laboratory Sessions | Time In & Time Out Monitoring</title>
+    <title>School Attendance Dashboard</title>
 
     <link rel="icon" type="image/png" href="../../auth/assets/plplogo.png">
 
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=Nunito+Sans:wght@400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="../resc/css/homepage.css">
+<base target="_blank">
 </head>
 
 <body>
@@ -17,13 +18,13 @@
     <header>
         <a href="homepage.html" class="brand">
             <div class="brand-logos">
-                <img src="../resc/assets/plp_logo.png" alt="PLP Logo">
-                <div class="logo-divider"></div>
-                <img src="../resc/assets/ccs_logo.png" alt="CCS Logo" onerror="this.style.display='none';this.previousElementSibling.style.display='none'">
-            </div>
+    <img src="../resc/assets/El Tres Eres Cencia Escuela.jpg"
+         alt="School Logo"
+         class="plp-logo">
+</div>
             <div class="brand-text">
                 <span class="sys-label">Monitoring System</span>
-                <h1>Time In &amp; Time Out</h1>
+                <h1>School Attendance</h1>
             </div>
         </a>
         <nav>
@@ -38,14 +39,14 @@
         <div class="hero-inner">
             <div class="hero-badge">
                 <i class="fa-solid fa-circle fa-beat"></i>
-                Live Session Monitor
+                Live Attendance Monitor
             </div>
 
-            <h1>Laboratory <span>Sessions</span><br>Today</h1>
+            <h1>School <span>Attendance</span><br>Dashboard</h1>
 
             <p class="hero-sub">
-                Real-time overview of all laboratory room sessions —
-                active, scheduled, and completed.
+                Real-time overview of student and teacher attendance —
+                present, late, absent, and excused counts.
             </p>
 
             <div class="hero-clock">
@@ -57,67 +58,74 @@
 
             <div class="hero-stats">
                 <div class="hero-chip">
-                    <div class="hero-chip-val yellow" id="statActive">—</div>
-                    <div class="hero-chip-lbl">Active Now</div>
+                    <div class="hero-chip-val green" id="statPresent">—</div>
+                    <div class="hero-chip-lbl">Present</div>
                 </div>
                 <div class="hero-chip">
-                    <div class="hero-chip-val orange" id="statDismissing">—</div>
-                    <div class="hero-chip-lbl">Dismissing</div>
+                    <div class="hero-chip-val orange" id="statLate">—</div>
+                    <div class="hero-chip-lbl">Late</div>
                 </div>
                 <div class="hero-chip">
-                    <div class="hero-chip-val" id="statScheduled">—</div>
-                    <div class="hero-chip-lbl">Scheduled</div>
+                    <div class="hero-chip-val red" id="statAbsent">—</div>
+                    <div class="hero-chip-lbl">Absent</div>
                 </div>
                 <div class="hero-chip">
-                    <div class="hero-chip-val grey" id="statCompleted">0</div>
-                    <div class="hero-chip-lbl">Completed</div>
+                    <div class="hero-chip-val blue" id="statExcused">—</div>
+                    <div class="hero-chip-lbl">Excused</div>
                 </div>
             </div>
         </div>
     </section>
 
     <div class="wrapper">
-        
+
         <div class="refresh-bar">
             <i class="fa-solid fa-rotate" id="refreshIcon"></i>
             <span id="refreshLabel">Auto-refreshing every 30 seconds</span>
         </div>
 
+        <!-- Stats Overview -->
         <div class="sec-block">
             <div class="sec-head">
-                <i class="fa-solid fa-circle-play" style="color:#22c55e;font-size:20px"></i>
-                <h2>Active Sessions</h2>
-                <span class="cnt" id="activeBadge">0</span>
+                <i class="fa-solid fa-chart-pie" style="color:#22c55e;font-size:20px"></i>
+                <h2>Overview</h2>
             </div>
-            <div class="grid" id="activeGrid">
+            <div class="grid" id="statsGrid">
                 <div class="spinner-wrap">
                     <i class="fa-solid fa-spinner fa-spin"></i>
-                    <span>Loading sessions…</span>
+                    <span>Loading stats…</span>
                 </div>
             </div>
         </div>
 
+        <!-- Recent Attendance -->
         <div class="sec-block">
             <div class="sec-head">
-                <i class="fa-solid fa-calendar-check" style="color:#2d6a4f;font-size:20px"></i>
-                <h2>Scheduled for Today</h2>
-                <span class="cnt" id="scheduledBadge">0</span>
+                <i class="fa-solid fa-clock-rotate-left" style="color:#2d6a4f;font-size:20px"></i>
+                <h2>Recent Attendance</h2>
+                <span class="cnt" id="recentBadge">0</span>
             </div>
-            <div class="grid" id="scheduledGrid">
+            <div class="grid" id="recentGrid">
                 <div class="spinner-wrap">
                     <i class="fa-solid fa-spinner fa-spin"></i>
-                    <span>Loading sessions…</span>
+                    <span>Loading records…</span>
                 </div>
             </div>
         </div>
 
-        <div class="sec-block" id="completedBlock" style="display:none">
+        <!-- Upcoming Events -->
+        <div class="sec-block" id="eventsBlock">
             <div class="sec-head">
-                <i class="fa-solid fa-circle-check" style="color:#6b7280;font-size:20px"></i>
-                <h2>Completed Today</h2>
-                <span class="cnt grey" id="completedBadge">0</span>
+                <i class="fa-solid fa-calendar-days" style="color:#8b5cf6;font-size:20px"></i>
+                <h2>Upcoming Events</h2>
+                <span class="cnt" id="eventsBadge">0</span>
             </div>
-            <div class="grid" id="completedGrid"></div>
+            <div class="grid" id="eventsGrid">
+                <div class="spinner-wrap">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Loading events…</span>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -125,10 +133,10 @@
     <footer>
         <div class="footer-grid">
             <div class="footer-brand">
-                <h2>Time In &amp; <span>Time Out</span><br>Monitoring System</h2>
+                <h2>School <span>Attendance</span><br>Monitoring System</h2>
                 <p>
-                    Real-time laboratory attendance tracking powered by facial recognition
-                    and machine learning — ensuring accurate, automated session monitoring.
+                    Real-time school attendance tracking powered by facial recognition
+                    and automated daily records — ensuring accurate, efficient monitoring.
                 </p>
             </div>
             <div class="footer-contact">
@@ -139,7 +147,7 @@
             </div>
         </div>
         <div class="footer-bottom">
-            <span>&copy; <span id="footerYear"></span> Time In &amp; Time Out Monitoring System. All rights reserved.</span>
+            <span>&copy; <span id="footerYear"></span> School Attendance Monitoring System. All rights reserved.</span>
             <span>Powered by Facial Recognition &amp; ML</span>
         </div>
     </footer>

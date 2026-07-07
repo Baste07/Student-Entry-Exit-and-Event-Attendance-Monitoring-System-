@@ -559,7 +559,7 @@ async function bootRegistrationEngine() {
     startBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Booting...';
 
     try {
-        const triggerRes = await fetch('http://localhost/INTEG%20SYSTEM/SmartAcademicManagementSystem/TimeInAndTimeOutMonitoring/students/trigger_registration.php', { method: 'POST' });
+        const triggerRes = await fetch('trigger_registration.php', { method: 'POST' });
         const triggerJson = await triggerRes.json().catch(() => ({}));
 
         if ((triggerJson.status || '') === 'running') {

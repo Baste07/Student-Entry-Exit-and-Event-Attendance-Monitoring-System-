@@ -11,7 +11,7 @@ if ($sock) {
 }
 
 // Point directly to your new BAT file
-$bat_file = 'C:\xampp\htdocs\INTEG SYSTEM\SmartAcademicManagementSystem\TimeInAndTimeOutMonitoring\students\START_ATTENDANCE.bat';
+$bat_file = 'C:\xampp\htdocs\CAPSTONEFINAL\EVENTMONITORING\TimeInAndTimeOutMonitoring\students\START_ATTENDANCE.bat';
 
 // Execute the BAT file in the background
 pclose(popen('start /B "" "' . $bat_file . '"', "r"));
