@@ -5,12 +5,15 @@ let departmentsCache = [];
 let singleStudentModal = null;
 let duplicateRowsModal = null;
 let editStudentModal = null;
+let viewGuardiansModal = null;
 let duplicateRowsInFileCount = 0;
 let duplicateRowsInDatabaseCount = 0;
 let duplicateRowsInFile = [];
 let duplicateRowsInDatabase = [];
 let allStudents = [];
+let activeSchoolYear = null;
 const QR_EMAIL_ENDPOINT = 'send-student-qr-email.php';
+const EMAIL_LIKE_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -29,42 +32,77 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.preventDefault();
     });
 });
-
 async function loadDepartments() {
     try {
         if (!supabaseClient) return;
 
-        const { data: departments, error } = await supabaseClient
-            .from('departments')
-            .select('id, department_name, department_code')
+        // Fetch and assign directly to the global variable
+        const { data: fetchedSY, error: schoolYearError } = await supabaseClient
+            .from('school_years')
+            .select('id, name')
             .eq('is_active', true)
-            .order('department_name', { ascending: true });
+            .maybeSingle();
+
+        activeSchoolYear = fetchedSY; // Save it globally
+        const syDisplay = document.getElementById('activeSchoolYearDisplay');
+
+        if (schoolYearError || !activeSchoolYear) {
+            console.warn('No active school year found:', schoolYearError);
+            showAlert('No active school year set. Please set one in System Settings before importing.', 'warning');
+            
+            if (syDisplay) syDisplay.value = 'No Active School Year';
+            document.getElementById('departmentSelect').innerHTML = '<option value="" disabled selected>No Active School Year</option>';
+            return;
+        }
+
+        if (syDisplay) {
+            syDisplay.value = activeSchoolYear.name;
+        }
+
+        const { data: depts, error } = await supabaseClient
+            .from('sections')
+            .select('section_id, grade_level, section_name')
+            .eq('school_year_id', activeSchoolYear.id)
+            .order('grade_level', { ascending: true })
+            .order('section_name', { ascending: true });
 
         if (error) throw error;
-
-        departmentsCache = departments || [];
+        departmentsCache = depts || [];
 
         const select = document.getElementById('departmentSelect');
-        select.innerHTML = '<option value="">Select a department...</option>';
-
+        select.innerHTML = '<option value="" disabled selected>Select grade level and section...</option>';
+        
         departmentsCache.forEach(dept => {
             const opt = document.createElement('option');
-            opt.value = dept.id;
-            opt.textContent = `${dept.department_name} (${dept.department_code})`;
-            opt.dataset.name = dept.department_name;
+            opt.value = dept.section_id;
+            opt.textContent = `${dept.grade_level} - ${dept.section_name}`;
             select.appendChild(opt);
         });
 
+        // RESTORED: This populates the dropdown inside the Single Student Modal!
         populateSingleStudentDepartments();
-    } catch (err) {
-        console.error('Error loading departments:', err);
+        checkReadyToParse();
+
+    } catch (error) {
+        console.error('Error loading sections:', error);
+        showAlert('Error loading sections: ' + error.message, 'danger');
     }
 }
 
-
 function setupEventListeners() {
 
-    
+
+    // Inside setupEventListeners(), alongside the other modal inits:
+const addGuardianModalElement = document.getElementById('addGuardianModal');
+if (addGuardianModalElement && window.bootstrap) {
+    addGuardianModal = new bootstrap.Modal(addGuardianModalElement);
+}
+
+document.getElementById('addGuardianForm')?.addEventListener('submit', submitAddGuardianForm);
+document.getElementById('modalGuardianPhone')?.addEventListener('blur', handleModalGuardianPhoneLookup);
+    // Add inside setupEventListeners(), alongside the other single-student listeners:
+const guardianPhoneInput = document.getElementById('singleGuardianPhone');
+guardianPhoneInput?.addEventListener('blur', handleGuardianPhoneLookup);
     const dropZone    = document.getElementById('fileDropZone');
     const fileInput   = document.getElementById('fileInput');
     const removeBtn   = document.getElementById('fileRemoveBtn');
@@ -100,6 +138,11 @@ function setupEventListeners() {
         const editModalElement = document.getElementById('editStudentModal');
         if (editModalElement) {
             editStudentModal = new bootstrap.Modal(editModalElement);
+        }
+
+        const viewGuardiansModalElement = document.getElementById('viewGuardiansModal');
+        if (viewGuardiansModalElement) {
+            viewGuardiansModal = new bootstrap.Modal(viewGuardiansModalElement);
         }
     }
 
@@ -202,25 +245,28 @@ function setupEventListeners() {
         }
     });
 
-    // ── Auto-format Student ID (inserts dash after 2 digits) ──
+    // Add guardian button in single student modal
+    const addGuardian2Btn = document.getElementById('addGuardian2Btn');
+    addGuardian2Btn?.addEventListener('click', showGuardian2Form);
+
+    // Form step navigation
+    const nextToGuardianBtn = document.getElementById('nextToGuardianBtn');
+    const backToStudentBtn = document.getElementById('backToStudentBtn');
+    nextToGuardianBtn?.addEventListener('click', proceedToGuardianStep);
+    backToStudentBtn?.addEventListener('click', goBackToStudentStep);
+
+    // LRN: allow digits only (up to 12).
 const singleIdInput = document.getElementById('singleStudentId');
 singleIdInput?.addEventListener('input', (e) => {
-    let digits = e.target.value.replace(/\D/g, '').slice(0, 7);
-    e.target.value = digits.length > 2
-        ? digits.slice(0, 2) + '-' + digits.slice(2)
-        : digits;
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 12);
 });
 
-// ── Course: uppercase acronyms only (letters, no spaces) ──
-const singleCourseInput = document.getElementById('singleCourse');
-singleCourseInput?.addEventListener('input', (e) => {
-    e.target.value = e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase();
-});
 
-// ── Section: single letter A–Z only ──
-const singleSectionInput = document.getElementById('singleSection');
-singleSectionInput?.addEventListener('input', (e) => {
-    e.target.value = e.target.value.replace(/[^A-Za-z]/g, '').slice(0, 1).toUpperCase();
+
+// Normalize gender values.
+const singleGenderInput = document.getElementById('singleSection');
+singleGenderInput?.addEventListener('change', (e) => {
+    e.target.value = String(e.target.value || '').trim().toLowerCase();
 });
 
 // ── Suffix: auto-format with first letter uppercase (e.g. Sr, Jr, III) ──
@@ -241,10 +287,105 @@ editSuffixInput?.addEventListener('input', (e) => {
     }
     e.target.value = value;
 });
+
+const editGenderInput = document.getElementById('editSection');
+editGenderInput?.addEventListener('change', (e) => {
+    e.target.value = String(e.target.value || '').trim().toLowerCase();
+});
+}
+
+// Add near the other module-level lets:
+let addGuardianModal = null;
+
+async function handleGuardianPhoneLookup(e) {
+    const phone = String(e.target.value || '').trim();
+    const statusEl = document.getElementById('guardianLookupStatus');
+    if (!phone || !supabaseClient) {
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+        return;
+    }
+
+    if (statusEl) {
+        statusEl.textContent = 'Checking existing guardians...';
+        statusEl.className = 'searching';
+    }
+
+    try {
+        const { data: existing, error } = await supabaseClient
+            .from('guardians')
+            .select('guardian_id, first_name, middle_name, last_name, relationship')
+            .eq('phone_number', phone)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (existing) {
+            document.getElementById('singleGuardianFirstName').value = existing.first_name || '';
+            document.getElementById('singleGuardianMiddleName').value = existing.middle_name || '';
+            document.getElementById('singleGuardianLastName').value = existing.last_name || '';
+            document.getElementById('singleGuardianRelationship').value = existing.relationship || '';
+
+            if (statusEl) {
+                statusEl.textContent = `Existing guardian found: ${existing.first_name} ${existing.last_name}. They'll be linked to this student.`;
+                statusEl.className = 'found';
+            }
+        } else if (statusEl) {
+            statusEl.textContent = 'No existing guardian found with this number — a new guardian record will be created.';
+            statusEl.className = '';
+        }
+    } catch (err) {
+        console.error('Guardian lookup failed:', err);
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+    }
+}
+
+async function upsertAndLinkGuardian(studentId, guardianData, isPrimary = true) {
+    const { data: existing, error: findError } = await supabaseClient
+        .from('guardians')
+        .select('guardian_id')
+        .eq('phone_number', guardianData.phone_number)
+        .maybeSingle();
+
+    if (findError) throw findError;
+
+    let guardianId = existing?.guardian_id;
+
+    if (!guardianId) {
+        const { data: inserted, error: insertError } = await supabaseClient
+            .from('guardians')
+            .insert({
+                first_name: guardianData.first_name,
+                middle_name: guardianData.middle_name || null,
+                last_name: guardianData.last_name,
+                relationship: guardianData.relationship,
+                phone_number: guardianData.phone_number,
+                alternate_phone_number: guardianData.alternate_phone_number || null,
+                email: guardianData.email || null,
+                address: guardianData.address || null,
+            })
+            .select('guardian_id')
+            .single();
+
+        if (insertError) throw insertError;
+        guardianId = inserted.guardian_id;
+    }
+
+    const { error: linkError } = await supabaseClient
+        .from('student_guardians')
+        .insert({
+            student_id: studentId,
+            guardian_id: guardianId,
+            is_primary_contact: isPrimary,
+        });
+
+    if (linkError) throw linkError;
+
+    return guardianId;
 }
 
 
 let selectedFile = null;
+
 
 function handleFileSelected(file) {
     if (!file) {
@@ -323,17 +464,16 @@ async function parseFile() {
                 showImportAlert('The file appears to be empty or has no data rows.', 'warning');
                 return;
             }
-            rows = raw.slice(1).map(r => ({
-                studentId:   String(r[0] || '').trim(),
-                lastName:    String(r[1] || '').trim(),
-                firstName:   String(r[2] || '').trim(),
-                middleName:  String(r[3] || '').trim(),
-                suffix:      String(r[4] || '').trim(),
-                course:      String(r[5] || '').trim(),
-                yearLevel:   String(r[6] || '').trim(),
-                section:     String(r[7] || '').trim(),
-                email:       String(r[8] || '').trim(),
-            }));
+           rows = raw.slice(1).map(r => ({
+    studentId:   String(r[0] || '').trim(),
+    lastName:    String(r[1] || '').trim(),
+    firstName:   String(r[2] || '').trim(),
+    middleName:  String(r[3] || '').trim(),
+    suffix:      String(r[4] || '').trim(),
+    birthDate:   String(r[5] || '').trim(),
+    gender:      String(r[6] || '').trim(),
+    email:       String(r[7] || '').trim(),
+}));
         }
 
         rows = rows.filter(r => r.studentId || r.firstName || r.lastName);
@@ -358,7 +498,6 @@ async function parseFile() {
         showImportAlert('Failed to parse file: ' + err.message, 'danger');
     }
 }
-
 function parseCSV(text) {
     const lines = text.split(/\r?\n/).filter(l => l.trim());
     if (lines.length < 2) return [];
@@ -371,10 +510,9 @@ function parseCSV(text) {
             firstName:  cols[2] || '',
             middleName: cols[3] || '',
             suffix:     cols[4] || '',
-            course:     cols[5] || '',
-            yearLevel:  cols[6] || '',
-            section:    cols[7] || '',
-            email:      cols[8] || '',
+            birthDate:  cols[5] || '',
+            gender:     cols[6] || '',
+            email:      cols[7] || '',
         };
     });
 }
@@ -383,36 +521,47 @@ function parseCSV(text) {
 function validateRow(row, index) {
     const errors   = [];
     const warnings = [];
-    const normalizedId = String(row.studentId || '').trim();
+    const normalizedId = String(row.studentId || '').replace(/\D/g, '').trim();
 
     if (!normalizedId) {
-        errors.push('Student ID is required');
-    } else if (!/^\d{2}-\d{5}$/.test(normalizedId)) {
-        errors.push('Student ID must be in format NN-NNNNN (e.g. 23-00269)');
+        errors.push('LRN is required');
+    } else if (!/^\d{12}$/.test(normalizedId)) {
+        errors.push('LRN must be exactly 12 digits');
     }
 
     if (!row.firstName)  errors.push('First Name is required');
     if (!row.lastName)   errors.push('Last Name is required');
 
-    if (row.yearLevel && (isNaN(row.yearLevel) || +row.yearLevel < 1 || +row.yearLevel > 5)) {
-        errors.push('Year Level must be between 1 and 5');
+    if (row.birthDate && Number.isNaN(Date.parse(row.birthDate))) {
+        errors.push('Birth Date must be valid (YYYY-MM-DD)');
     }
 
-    if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
-        warnings.push('Email format looks invalid');
+    const normalizedGender = String(row.gender || '').trim().toLowerCase();
+    if (normalizedGender && !['male', 'female', 'other'].includes(normalizedGender)) {
+        warnings.push('Gender value is uncommon (recommended: male, female, other)');
     }
 
-    let email = row.email;
-    if (!email && row.firstName && row.lastName) {
-        email = `${row.lastName.toLowerCase()}_${row.firstName.toLowerCase()}@plpasig.edu.ph`;
-        warnings.push('Email auto-generated');
+    const email = String(row.email || '').trim();
+    if (email && !EMAIL_LIKE_PATTERN.test(email)) {
+        warnings.push('Email may not be deliverable; QR email can be skipped');
     }
 
     const status = errors.length > 0 ? 'error'
                  : warnings.length > 0 ? 'warning'
                  : 'ok';
 
-    return { ...row, studentId: normalizedId, email, errors, warnings, status, rowIndex: index + 2 };
+    return {
+        ...row,
+        studentId: normalizedId,
+        birthDate: String(row.birthDate || '').trim(),
+        gender: normalizedGender,
+        section: selectedDepartmentName || String(row.section || '').trim(),
+        email,
+        errors,
+        warnings,
+        status,
+        rowIndex: index + 2,
+    };
 }
 
 function renderPreview() {
@@ -495,8 +644,8 @@ function renderPreview() {
                 ${cell(row.firstName)}
                 ${cell(row.middleName)}
                 ${cell(row.suffix)}
-                ${cell(row.course)}
-                ${cell(row.yearLevel)}
+                ${cell(row.birthDate)}
+                ${cell(row.gender)}
                 ${cell(row.section)}
                 <td style="font-size:0.82rem;">${escapeHtml(row.email)}${warnNote}</td>
                 <td>${statusBadge}</td>
@@ -505,12 +654,17 @@ function renderPreview() {
     }).join('');
 }
 
-
 async function startImport() {
     const validRows = parsedRows.filter(r => r.status !== 'error');
 
     if (validRows.length === 0) {
         showImportAlert('No valid rows to import.', 'warning');
+        return;
+    }
+
+    // Safety check: Ensure active school year exists before bulk importing
+    if (!activeSchoolYear || !activeSchoolYear.id) {
+        showImportAlert('No active school year found. Please set one in System Settings first.', 'danger');
         return;
     }
 
@@ -529,9 +683,9 @@ async function startImport() {
     const studentIds = validRows.map(r => r.studentId);
     const { data: existing } = await supabaseClient
         .from('students')
-        .select('id_number')
-        .in('id_number', studentIds);
-    const existingIds = new Set((existing || []).map(e => e.id_number));
+        .select('lrn')
+        .in('lrn', studentIds);
+    const existingIds = new Set((existing || []).map(e => e.lrn));
 
     for (let i = 0; i < validRows.length; i++) {
         const row = validRows[i];
@@ -540,17 +694,15 @@ async function startImport() {
 
         try {
             const studentData = {
-                id_number:    row.studentId,
+                lrn:          row.studentId,
                 first_name:   row.firstName,
                 middle_name:  row.middleName || null,
                 last_name:    row.lastName,
                 suffix:       row.suffix || null,
-                email:        row.email,
-                course:       row.course || null,
-                year_level:   row.yearLevel ? parseInt(row.yearLevel) : null,
-                section:      row.section || null,
-                department_id: selectedDepartmentId,
-                password:     row.studentId,  
+                birth_date:   row.birthDate || null,
+                gender:       row.gender || null,
+                section_id:   selectedDepartmentId,
+                school_year_id: activeSchoolYear.id, // <-- ADDED THIS LINE
                 status:       'active',
                 updated_at:   new Date().toISOString(),
             };
@@ -561,7 +713,7 @@ async function startImport() {
                 const res = await supabaseClient
                     .from('students')
                     .update(studentData)
-                    .eq('id_number', row.studentId);
+                    .eq('lrn', row.studentId);
                 error = res.error;
             } else {
                 // Insert new record
@@ -584,9 +736,9 @@ async function startImport() {
                 firstName: row.firstName,
                 middleName: row.middleName,
                 lastName: row.lastName,
-                course: row.course,
-                yearLevel: row.yearLevel,
-                section: row.section,
+                birthDate: row.birthDate,
+                gender: row.gender,
+                sectionLabel: selectedDepartmentName,
                 email: row.email,
             });
 
@@ -625,14 +777,18 @@ async function loadAllStudentsTable() {
 
     tbody.innerHTML = `
         <tr>
-            <td colspan="8" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
+            <td colspan="9" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
         </tr>
     `;
 
     try {
         const { data, error } = await supabaseClient
             .from('students')
-            .select('student_id, id_number, first_name, middle_name, last_name, suffix, department_id, course, year_level, section, email, status')
+            .select(`
+                student_id, lrn, first_name, middle_name, last_name, suffix, birth_date, gender, section_id, status,
+                sections:section_id(grade_level, section_name),
+                student_guardians(is_primary_contact, guardians:guardian_id(first_name, last_name, relationship, phone_number, email, address))
+            `)
             .order('last_name', { ascending: true })
             .order('first_name', { ascending: true });
 
@@ -645,13 +801,12 @@ async function loadAllStudentsTable() {
         console.error('Error loading students table:', error);
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align:center;padding:1rem;color:#dc3545;">Failed to load students list.</td>
+                <td colspan="9" style="text-align:center;padding:1rem;color:#dc3545;">Failed to load students list.</td>
             </tr>
         `;
         countEl.textContent = '0';
     }
 }
-
 function renderAllStudentsTable() {
     const tbody = document.getElementById('allStudentsTableBody');
     const countEl = document.getElementById('allStudentsCount');
@@ -663,16 +818,17 @@ function renderAllStudentsTable() {
     const year = String(document.getElementById('studentYearFilter')?.value || '').trim();
 
     const filteredStudents = allStudents.filter(student => {
-        // Format: lastName, firstName middleName suffix
         const nameParts = [student.first_name, student.middle_name, student.suffix].filter(Boolean);
         const fullName = student.last_name ? (student.last_name + ', ' + nameParts.join(' ')).toLowerCase() : nameParts.join(' ').toLowerCase();
         const matchesSearch = !search
             || fullName.includes(search)
-            || String(student.id_number || '').toLowerCase().includes(search)
-            || String(student.email || '').toLowerCase().includes(search);
-        const matchesDept = !dept || String(student.department_id || '') === dept;
-        const matchesCourse = !course || String(student.course || '').toLowerCase() === course.toLowerCase();
-        const matchesYear = !year || String(student.year_level || '') === year;
+            || String(student.lrn || '').toLowerCase().includes(search);
+        const gradeLevel = String(student.sections?.grade_level || '').trim();
+        const sectionName = String(student.sections?.section_name || '').trim();
+        const gender = String(student.gender || '').trim().toLowerCase();
+        const matchesDept = !dept || gradeLevel === dept;
+        const matchesCourse = !course || sectionName.toLowerCase() === course.toLowerCase();
+        const matchesYear = !year || gender === year.toLowerCase();
         return matchesSearch && matchesDept && matchesCourse && matchesYear;
     });
 
@@ -687,30 +843,52 @@ function renderAllStudentsTable() {
         return;
     }
 
-    const deptMap = new Map(departmentsCache.map(d => [String(d.id), `${d.department_name} (${d.department_code})`]));
-
     tbody.innerHTML = filteredStudents.map((student) => {
-        // Format: lastName, firstName middleName suffix
         const nameParts = [student.first_name, student.middle_name, student.suffix].filter(Boolean);
         const fullName = student.last_name ? (student.last_name + ', ' + nameParts.join(' ')) : nameParts.join(' ');
-        const departmentName = deptMap.get(String(student.department_id)) || 'N/A';
+        const gradeLevel = student.sections?.grade_level || 'N/A';
+        const sectionName = student.sections?.section_name || 'N/A';
         const status = student.status || 'inactive';
+
+        const guardianLinks = student.student_guardians || [];
+        let guardianCell = '';
+        if (guardianLinks.length === 0) {
+            guardianCell = `<button type="button" class="status-badge warning" style="border:none;cursor:pointer;" data-action="addGuardian" data-id="${escapeHtml(student.lrn || '')}">
+                 Not Added — Add
+               </button>`;
+        } else if (guardianLinks.length === 1) {
+            const guardian = guardianLinks[0].guardians;
+            guardianCell = `<button type="button" class="status-badge valid" style="border:none;cursor:pointer;" data-action="viewGuardians" data-student-id="${escapeHtml(student.student_id || '')}" data-student-name="${escapeHtml((student.first_name || '') + ' ' + (student.last_name || ''))}" data-student-lrn="${escapeHtml(student.lrn || '')}" title="${escapeHtml(guardian.relationship || '')}">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:0.3rem;vertical-align:middle;">
+                    <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+                </svg>
+                ${escapeHtml(guardian.first_name + ' ' + guardian.last_name)}
+               </button>`;
+        } else {
+            guardianCell = `<button type="button" class="status-badge valid" style="border:none;cursor:pointer;" data-action="viewGuardians" data-student-id="${escapeHtml(student.student_id || '')}" data-student-name="${escapeHtml((student.first_name || '') + ' ' + (student.last_name || ''))}" data-student-lrn="${escapeHtml(student.lrn || '')}">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:0.3rem;vertical-align:middle;">
+                    <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+                </svg>
+                ${guardianLinks.length} Guardian${guardianLinks.length > 1 ? 's' : ''}
+               </button>`;
+        }
+
         return `
             <tr>
-                <td><strong>${escapeHtml(student.id_number || 'N/A')}</strong></td>
+                <td><strong>${escapeHtml(student.lrn || 'N/A')}</strong></td>
                 <td>${escapeHtml(fullName || 'N/A')}</td>
-                <td>${escapeHtml(departmentName)}</td>
-                <td>${escapeHtml(student.course || '—')}</td>
-                <td>${escapeHtml(student.year_level ?? '—')}</td>
-                <td>${escapeHtml(student.section || '—')}</td>
-                <td>${escapeHtml(student.email || '—')}</td>
+                <td>${escapeHtml(gradeLevel)}</td>
+                <td>${escapeHtml(sectionName)}</td>
+                <td>${escapeHtml(student.birth_date || '—')}</td>
+                <td>${escapeHtml(student.gender || '—')}</td>
+                <td>${guardianCell}</td>
                 <td>${escapeHtml(status)}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn-icon" title="Edit" data-action="edit" data-id="${escapeHtml(student.id_number || '')}">
+                        <button class="btn-icon" title="Edit" data-action="edit" data-id="${escapeHtml(student.lrn || '')}">
                             <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
-                        <button class="btn-icon danger" title="Delete" data-action="delete" data-id="${escapeHtml(student.id_number || '')}">
+                        <button class="btn-icon danger" title="Delete" data-action="delete" data-id="${escapeHtml(student.lrn || '')}">
                             <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
                     </div>
@@ -730,17 +908,19 @@ function populateStudentsFilterOptions() {
     const selectedCourse = courseFilter.value;
     const selectedYear = yearFilter.value;
 
-    deptFilter.innerHTML = '<option value="">All Departments</option>';
-    departmentsCache.forEach(dept => {
+    const uniqueGrades = [...new Set(allStudents.map(s => String(s.sections?.grade_level || '').trim()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    deptFilter.innerHTML = '<option value="">All Grade Levels</option>';
+    uniqueGrades.forEach(grade => {
         const option = document.createElement('option');
-        option.value = String(dept.id);
-        option.textContent = `${dept.department_name} (${dept.department_code})`;
+        option.value = grade;
+        option.textContent = grade;
         deptFilter.appendChild(option);
     });
 
-    const uniqueCourses = [...new Set(allStudents.map(s => String(s.course || '').trim()).filter(Boolean))]
+    const uniqueCourses = [...new Set(allStudents.map(s => String(s.sections?.section_name || '').trim()).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b));
-    courseFilter.innerHTML = '<option value="">All Courses</option>';
+    courseFilter.innerHTML = '<option value="">All Sections</option>';
     uniqueCourses.forEach(course => {
         const option = document.createElement('option');
         option.value = course;
@@ -748,13 +928,13 @@ function populateStudentsFilterOptions() {
         courseFilter.appendChild(option);
     });
 
-    const uniqueYears = [...new Set(allStudents.map(s => String(s.year_level || '').trim()).filter(Boolean))]
-        .sort((a, b) => Number(a) - Number(b));
-    yearFilter.innerHTML = '<option value="">All Years</option>';
+    const uniqueYears = [...new Set(allStudents.map(s => String(s.gender || '').trim().toLowerCase()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b));
+    yearFilter.innerHTML = '<option value="">All Genders</option>';
     uniqueYears.forEach(year => {
         const option = document.createElement('option');
         option.value = year;
-        option.textContent = `Year ${year}`;
+        option.textContent = year;
         yearFilter.appendChild(option);
     });
 
@@ -774,12 +954,21 @@ function clearStudentsFilters() {
     if (yearFilter) yearFilter.value = '';
     renderAllStudentsTable();
 }
-
 function handleStudentsTableActions(event) {
     const actionBtn = event.target.closest('[data-action]');
     if (!actionBtn) return;
 
     const action = actionBtn.dataset.action;
+    
+    // Handle viewGuardians action (doesn't need studentId from data-id)
+    if (action === 'viewGuardians') {
+        const studentUuid = actionBtn.dataset.studentId;
+        const studentName = actionBtn.dataset.studentName;
+        const studentLrn = actionBtn.dataset.studentLrn;
+        openViewGuardiansModal(studentUuid, studentName, studentLrn);
+        return;
+    }
+    
     const studentId = actionBtn.dataset.id;
     if (!studentId) return;
 
@@ -789,11 +978,203 @@ function handleStudentsTableActions(event) {
     }
     if (action === 'delete') {
         deleteStudentRow(studentId);
+        return;
+    }
+    if (action === 'addGuardian') {
+        const student = allStudents.find(s => String(s.lrn) === String(studentId));
+        const displayName = student
+            ? [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ')
+            : studentId;
+        openAddGuardianModal(student?.student_id, displayName, studentId);
+    }
+}
+
+function openViewGuardiansModal(studentUuid, studentName, studentLrn) {
+    if (!viewGuardiansModal) {
+        showImportAlert('View Guardians modal is not available right now.', 'danger');
+        return;
+    }
+
+    document.getElementById('viewGuardiansStudentName').textContent = studentName || '—';
+    document.getElementById('viewGuardiansStudentLRN').textContent = studentLrn || '—';
+
+    // Find student and populate guardians
+    const student = allStudents.find(s => String(s.student_id) === String(studentUuid));
+    if (!student || !student.student_guardians || student.student_guardians.length === 0) {
+        document.getElementById('guardiansListContent').innerHTML = `
+            <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                <p>No guardians added yet.</p>
+            </div>
+        `;
+    } else {
+        const guardiansHtml = student.student_guardians.map((link, index) => {
+            const g = link.guardians;
+            const isPrimary = link.is_primary_contact;
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 1.25rem; background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.1); border-radius: 0.625rem; transition: all 0.2s ease;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <h6 style="margin: 0; color: var(--text-main); font-weight: 600;">Guardian ${index + 1}</h6>
+                            ${isPrimary ? '<span style="display: inline-block; background: #10b981; color: white; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 600;">Primary</span>' : ''}
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 0.75rem;">
+                            <div>
+                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Name</p>
+                                <p style="margin: 0; font-weight: 600; color: var(--text-main);">${escapeHtml(g.first_name)} ${escapeHtml(g.last_name)}</p>
+                            </div>
+                            <div>
+                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Relationship</p>
+                                <p style="margin: 0; font-weight: 600; color: var(--text-main);">${escapeHtml(g.relationship || '—')}</p>
+                            </div>
+                            <div>
+                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Phone</p>
+                                <p style="margin: 0; font-weight: 600; color: var(--text-main);">${escapeHtml(g.phone_number || '—')}</p>
+                            </div>
+                            ${g.email ? `<div>
+                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Email</p>
+                                <p style="margin: 0; font-weight: 600; color: var(--text-main);">${escapeHtml(g.email)}</p>
+                            </div>` : '<div></div>'}
+                            ${g.address ? `<div style="grid-column: 1 / -1;">
+                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Address</p>
+                                <p style="margin: 0; font-weight: 600; color: var(--text-main);">${escapeHtml(g.address)}</p>
+                            </div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        document.getElementById('guardiansListContent').innerHTML = guardiansHtml;
+    }
+
+    // Update the "Add Guardian" button to trigger the add modal
+    const addGuardianBtn = document.getElementById('addGuardianFromViewBtn');
+    if (addGuardianBtn) {
+        addGuardianBtn.onclick = () => {
+            viewGuardiansModal.hide();
+            openAddGuardianModal(studentUuid, studentName, studentLrn);
+        };
+    }
+
+    viewGuardiansModal.show();
+}
+
+function openAddGuardianModal(studentUuid, displayName, lrn) {
+    if (!addGuardianModal) {
+        showImportAlert('Add Guardian form is not available right now.', 'danger');
+        return;
+    }
+    document.getElementById('addGuardianForm')?.reset();
+    const statusEl = document.getElementById('modalGuardianLookupStatus');
+    if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+
+    document.getElementById('guardianModalStudentId').value = studentUuid || '';
+    document.getElementById('guardianModalStudentId').dataset.lrn = lrn || '';
+    document.getElementById('guardianModalStudentName').textContent = displayName || lrn;
+
+    addGuardianModal.show();
+}
+
+async function handleModalGuardianPhoneLookup(e) {
+    const phone = String(e.target.value || '').trim();
+    const statusEl = document.getElementById('modalGuardianLookupStatus');
+    if (!phone || !supabaseClient) {
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+        return;
+    }
+
+    if (statusEl) {
+        statusEl.textContent = 'Checking existing guardians...';
+        statusEl.className = 'searching';
+    }
+
+    try {
+        const { data: existing, error } = await supabaseClient
+            .from('guardians')
+            .select('guardian_id, first_name, middle_name, last_name, relationship')
+            .eq('phone_number', phone)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (existing) {
+            document.getElementById('modalGuardianFirstName').value = existing.first_name || '';
+            document.getElementById('modalGuardianMiddleName').value = existing.middle_name || '';
+            document.getElementById('modalGuardianLastName').value = existing.last_name || '';
+            document.getElementById('modalGuardianRelationship').value = existing.relationship || '';
+
+            if (statusEl) {
+                statusEl.textContent = `Existing guardian found: ${existing.first_name} ${existing.last_name}. They'll be linked to this student.`;
+                statusEl.className = 'found';
+            }
+        } else if (statusEl) {
+            statusEl.textContent = 'No existing guardian found with this number — a new guardian record will be created.';
+            statusEl.className = '';
+        }
+    } catch (err) {
+        console.error('Guardian lookup failed:', err);
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+    }
+}
+
+async function submitAddGuardianForm(event) {
+    event.preventDefault();
+
+    const submitBtn = document.getElementById('addGuardianSubmitBtn');
+    const overlay = document.getElementById('addGuardianLoadingOverlay');
+    const studentUuid = document.getElementById('guardianModalStudentId')?.value || '';
+    const lrn = document.getElementById('guardianModalStudentId')?.dataset.lrn || '';
+
+    const firstName = String(document.getElementById('modalGuardianFirstName')?.value || '').trim();
+    const middleName = String(document.getElementById('modalGuardianMiddleName')?.value || '').trim();
+    const lastName = String(document.getElementById('modalGuardianLastName')?.value || '').trim();
+    const relationship = String(document.getElementById('modalGuardianRelationship')?.value || '').trim();
+    const phone = String(document.getElementById('modalGuardianPhone')?.value || '').trim();
+    const altPhone = String(document.getElementById('modalGuardianAltPhone')?.value || '').trim();
+    const email = String(document.getElementById('modalGuardianEmail')?.value || '').trim();
+    const address = String(document.getElementById('modalGuardianAddress')?.value || '').trim();
+
+    if (!firstName || !lastName || !relationship || !phone || !address) {
+        showImportAlert('Please fill in First Name, Last Name, Relationship, Phone, and Address.', 'warning');
+        return;
+    }
+    if (!['mother', 'father', 'legal_guardian', 'other'].includes(relationship)) {
+        showImportAlert('Relationship must be Mother, Father, Legal Guardian, or Other.', 'warning');
+        return;
+    }
+    if (!studentUuid) {
+        showImportAlert('Could not identify the student record. Please refresh and try again.', 'danger');
+        return;
+    }
+
+    try {
+        if (overlay) overlay.classList.add('active');
+        if (submitBtn) submitBtn.disabled = true;
+
+        await upsertAndLinkGuardian(studentUuid, {
+            first_name: firstName,
+            middle_name: middleName,
+            last_name: lastName,
+            relationship,
+            phone_number: phone,
+            alternate_phone_number: altPhone,
+            email,
+            address,
+        }, true);
+
+        showImportAlert(`Guardian linked successfully for ${lrn}.`, 'success');
+        addGuardianModal?.hide();
+        await loadAllStudentsTable();
+    } catch (error) {
+        console.error('Failed to add guardian:', error);
+        showImportAlert(`Failed to add guardian: ${error.message}`, 'danger');
+    } finally {
+        if (overlay) overlay.classList.remove('active');
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
 function openEditStudentModal(idNumber) {
-    const student = allStudents.find(s => String(s.id_number) === String(idNumber));
+    const student = allStudents.find(s => String(s.lrn) === String(idNumber));
     if (!student || !editStudentModal) return;
 
     const editDepartment = document.getElementById('editDepartment');
@@ -801,23 +1182,21 @@ function openEditStudentModal(idNumber) {
         editDepartment.innerHTML = '';
         departmentsCache.forEach(dept => {
             const option = document.createElement('option');
-            option.value = String(dept.id);
-            option.textContent = `${dept.department_name} (${dept.department_code})`;
+            option.value = String(dept.section_id);
+            option.textContent = `${dept.grade_level} - ${dept.section_name}`;
             editDepartment.appendChild(option);
         });
     }
 
     document.getElementById('editStudentUid').value = student.student_id || '';
-    document.getElementById('editStudentId').value = student.id_number || '';
-    document.getElementById('editDepartment').value = String(student.department_id || '');
+    document.getElementById('editStudentId').value = student.lrn || '';
+    document.getElementById('editDepartment').value = String(student.section_id || '');
     document.getElementById('editFirstName').value = student.first_name || '';
     document.getElementById('editMiddleName').value = student.middle_name || '';
     document.getElementById('editLastName').value = student.last_name || '';
     document.getElementById('editSuffix').value = student.suffix || '';
-    document.getElementById('editCourse').value = student.course || '';
-    document.getElementById('editYearLevel').value = student.year_level || '';
-    document.getElementById('editSection').value = student.section || '';
-    document.getElementById('editEmail').value = student.email || '';
+    document.getElementById('editYearLevel').value = student.birth_date || '';
+    document.getElementById('editSection').value = (student.gender || '').toLowerCase();
     document.getElementById('editStatus').value = student.status || 'inactive';
 
     editStudentModal.show();
@@ -829,30 +1208,27 @@ async function submitEditStudentForm(event) {
     const saveBtn = document.getElementById('saveStudentEditBtn');
     const studentUid = String(document.getElementById('editStudentUid')?.value || '').trim();
     const idNumber = String(document.getElementById('editStudentId')?.value || '').trim();
-    const departmentId = String(document.getElementById('editDepartment')?.value || '').trim();
+    const sectionId = String(document.getElementById('editDepartment')?.value || '').trim();
     const firstName = String(document.getElementById('editFirstName')?.value || '').trim();
     const middleName = String(document.getElementById('editMiddleName')?.value || '').trim();
     const lastName = String(document.getElementById('editLastName')?.value || '').trim();
     const suffix = String(document.getElementById('editSuffix')?.value || '').trim();
-    const course = String(document.getElementById('editCourse')?.value || '').trim();
-    const yearLevelRaw = String(document.getElementById('editYearLevel')?.value || '').trim();
-    const section = String(document.getElementById('editSection')?.value || '').trim();
-    const email = String(document.getElementById('editEmail')?.value || '').trim();
+    const birthDate = String(document.getElementById('editYearLevel')?.value || '').trim();
+    const gender = String(document.getElementById('editSection')?.value || '').trim().toLowerCase();
     const status = String(document.getElementById('editStatus')?.value || 'inactive').trim();
 
-    if (!departmentId || !firstName || !lastName || !email) {
-        showImportAlert('Department, First Name, Last Name, and Email are required.', 'warning');
+    if (!sectionId || !firstName || !lastName) {
+        showImportAlert('Section, First Name, and Last Name are required.', 'warning');
         return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showImportAlert('Please provide a valid email address.', 'warning');
+    if (birthDate && Number.isNaN(Date.parse(birthDate))) {
+        showImportAlert('Birth Date must be valid.', 'warning');
         return;
     }
 
-    const yearLevel = yearLevelRaw ? Number(yearLevelRaw) : null;
-    if (yearLevelRaw && (!Number.isInteger(yearLevel) || yearLevel < 1 || yearLevel > 5)) {
-        showImportAlert('Year Level must be an integer from 1 to 5.', 'warning');
+    if (gender && !['male', 'female', 'other'].includes(gender)) {
+        showImportAlert('Gender must be male, female, or other.', 'warning');
         return;
     }
 
@@ -861,11 +1237,9 @@ async function submitEditStudentForm(event) {
         middle_name: middleName || null,
         last_name: lastName,
         suffix: suffix || null,
-        email,
-        course: course || null,
-        year_level: yearLevel,
-        section: section || null,
-        department_id: departmentId,
+        birth_date: birthDate || null,
+        gender: gender || null,
+        section_id: sectionId,
         status,
         updated_at: new Date().toISOString(),
     };
@@ -880,7 +1254,7 @@ async function submitEditStudentForm(event) {
         if (studentUid) {
             query = query.eq('student_id', studentUid);
         } else {
-            query = query.eq('id_number', idNumber);
+            query = query.eq('lrn', idNumber);
         }
 
         const { error } = await query;
@@ -901,7 +1275,7 @@ async function submitEditStudentForm(event) {
 }
 
 async function deleteStudentRow(idNumber) {
-    const student = allStudents.find(s => String(s.id_number) === String(idNumber));
+    const student = allStudents.find(s => String(s.lrn) === String(idNumber));
     // Format: lastName, firstName middleName suffix
     const displayName = student
         ? (student.last_name ? (student.last_name + ', ' + [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' ')) : [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' '))
@@ -916,7 +1290,7 @@ async function deleteStudentRow(idNumber) {
         if (student?.student_id) {
             query = query.eq('student_id', student.student_id);
         } else {
-            query = query.eq('id_number', idNumber);
+            query = query.eq('lrn', idNumber);
         }
 
         const { error } = await query;
@@ -963,164 +1337,426 @@ function populateSingleStudentDepartments() {
     const select = document.getElementById('singleDepartment');
     if (!select) return;
 
-    select.innerHTML = '<option value="">Select department...</option>';
+    select.innerHTML = '<option value="">Select section...</option>';
     departmentsCache.forEach(dept => {
         const option = document.createElement('option');
-        option.value = dept.id;
-        option.textContent = `${dept.department_name} (${dept.department_code})`;
+        option.value = dept.section_id;
+        option.textContent = `${dept.grade_level} - ${dept.section_name}`;
         select.appendChild(option);
     });
 }
-
 function openSingleStudentModal() {
     if (!singleStudentModal) {
         showImportAlert('Single student form is not available right now.', 'danger');
         return;
     }
-
+    setSingleStudentLoading(false); // ensure a clean state
+    const syDisplay = document.getElementById('singleActiveSchoolYear');
+    if (syDisplay) {
+        syDisplay.value = activeSchoolYear && activeSchoolYear.name ? activeSchoolYear.name : 'No Active School Year';
+    }
     const deptSelect = document.getElementById('singleDepartment');
     if (deptSelect && selectedDepartmentId) {
         deptSelect.value = selectedDepartmentId;
     }
-
+    
+    // Reset student form fields
+    document.getElementById('singleStudentId').value = '';
+    document.getElementById('singleFirstName').value = '';
+    document.getElementById('singleMiddleName').value = '';
+    document.getElementById('singleLastName').value = '';
+    document.getElementById('singleSuffix').value = '';
+    document.getElementById('singleYearLevel').value = '';
+    document.getElementById('singleSection').value = '';
+    document.getElementById('singleEmail').value = '';
+    document.getElementById('singleAddress').value = '';
+    
+    // Reset form steps to student step
+    const studentStep = document.getElementById('studentFormStep');
+    const guardianStep = document.getElementById('guardianFormStep');
+    const studentFooter = document.getElementById('studentFormFooter');
+    const guardianFooter = document.getElementById('guardianFormFooter');
+    if (studentStep) studentStep.style.display = 'block';
+    if (guardianStep) guardianStep.style.display = 'none';
+    if (studentFooter) studentFooter.style.display = 'flex';
+    if (guardianFooter) guardianFooter.style.display = 'none';
+    
+    // Reset guardian forms
+    clearGuardian1Form();
+    clearGuardian2Form();
+    const guardian2Section = document.getElementById('guardian2Section');
+    const addGuardian2Container = document.getElementById('addGuardian2ButtonContainer');
+    if (guardian2Section) guardian2Section.style.display = 'none';
+    if (addGuardian2Container) addGuardian2Container.style.display = 'block';
+    
     singleStudentModal.show();
+}
+
+function setSingleStudentLoading(isLoading, text) {
+    const overlay = document.getElementById('singleStudentLoadingOverlay');
+    const loadingText = document.getElementById('singleStudentLoadingText');
+    const form = document.getElementById('singleStudentForm');
+
+    if (overlay) overlay.classList.toggle('active', isLoading);
+    if (loadingText && text) loadingText.textContent = text;
+    if (form) {
+        form.querySelectorAll('input, select, button').forEach(el => { el.disabled = isLoading; });
+    }
+}
+
+function showEmailStatusToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `email-status-toast ${type}`;
+    const icon = type === 'success'
+        ? '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+    toast.innerHTML = `
+        ${icon}
+        <span class="email-status-toast-text">${escapeHtml(message)}</span>
+        <button type="button" class="email-status-toast-close" aria-label="Dismiss">&times;</button>
+    `;
+    document.body.appendChild(toast);
+    toast.querySelector('.email-status-toast-close')?.addEventListener('click', () => toast.remove());
+    setTimeout(() => toast.remove(), 8000);
+}
+
+// ====== FORM STEP NAVIGATION ======
+function proceedToGuardianStep(e) {
+    e?.preventDefault?.();
+
+    // Validate student form
+    const sectionId = document.getElementById('singleDepartment')?.value || '';
+    const studentId = String(document.getElementById('singleStudentId')?.value || '').replace(/\D/g, '').trim();
+    const firstName = String(document.getElementById('singleFirstName')?.value || '').trim();
+    const lastName = String(document.getElementById('singleLastName')?.value || '').trim();
+    const birthDate = String(document.getElementById('singleYearLevel')?.value || '').trim();
+    const gender = String(document.getElementById('singleSection')?.value || '').trim().toLowerCase();
+    const email = String(document.getElementById('singleEmail')?.value || '').trim();
+
+    if (!sectionId || !studentId || !firstName || !lastName) {
+        showImportAlert('Please fill in Section, LRN, First Name, and Last Name.', 'warning');
+        return;
+    }
+    if (!/^\d{12}$/.test(studentId)) {
+        showImportAlert('LRN must be exactly 12 digits.', 'warning');
+        return;
+    }
+    if (!email) {
+        showImportAlert('Email is required for QR code notification.', 'warning');
+        return;
+    }
+    if (birthDate && Number.isNaN(Date.parse(birthDate))) {
+        showImportAlert('Birth Date must be valid.', 'warning');
+        return;
+    }
+    if (gender && !['male', 'female', 'other'].includes(gender)) {
+        showImportAlert('Gender must be male, female, or other.', 'warning');
+        return;
+    }
+
+    // All validations passed, move to guardian step
+    const studentStep = document.getElementById('studentFormStep');
+    const guardianStep = document.getElementById('guardianFormStep');
+    const studentFooter = document.getElementById('studentFormFooter');
+    const guardianFooter = document.getElementById('guardianFormFooter');
+
+    studentStep.style.display = 'none';
+    guardianStep.style.display = 'block';
+    studentFooter.style.display = 'none';
+    guardianFooter.style.display = 'flex';
+
+    // Set up "same as student" checkbox listeners
+    setupSameAsStudentCheckboxes();
+}
+
+function goBackToStudentStep(e) {
+    e?.preventDefault?.();
+
+    const studentStep = document.getElementById('studentFormStep');
+    const guardianStep = document.getElementById('guardianFormStep');
+    const studentFooter = document.getElementById('studentFormFooter');
+    const guardianFooter = document.getElementById('guardianFormFooter');
+
+    studentStep.style.display = 'block';
+    guardianStep.style.display = 'none';
+    studentFooter.style.display = 'flex';
+    guardianFooter.style.display = 'none';
+}
+
+// ====== SAME AS STUDENT CHECKBOX ======
+function setupSameAsStudentCheckboxes() {
+    const studentAddress = document.getElementById('singleAddress');
+    const guardian1Checkbox = document.getElementById('guardian1SameAsStudent');
+    const guardian1Address = document.getElementById('guardian1Address');
+    const guardian2Checkbox = document.getElementById('guardian2SameAsStudent');
+    const guardian2Address = document.getElementById('guardian2Address');
+
+    if (!guardian1Checkbox || !guardian1Address) return;
+
+    // Handle Guardian 1 checkbox
+    guardian1Checkbox.addEventListener('change', () => {
+        if (guardian1Checkbox.checked) {
+            const address = studentAddress?.value || '';
+            if (address) {
+                guardian1Address.value = address;
+            } else {
+                guardian1Checkbox.checked = false;
+                showImportAlert('Student address is empty. Please go back and fill in the student address.', 'warning');
+            }
+        } else {
+            guardian1Address.value = '';
+        }
+    });
+
+    // Handle Guardian 2 checkbox if visible
+    if (guardian2Checkbox && guardian2Address) {
+        guardian2Checkbox.addEventListener('change', () => {
+            if (guardian2Checkbox.checked) {
+                const address = studentAddress?.value || '';
+                if (address) {
+                    guardian2Address.value = address;
+                } else {
+                    guardian2Checkbox.checked = false;
+                    showImportAlert('Student address is empty. Please go back and fill in the student address.', 'warning');
+                }
+            } else {
+                guardian2Address.value = '';
+            }
+        });
+    }
+
+    // Update guardian addresses when student address changes (if checkbox is checked)
+    if (studentAddress) {
+        studentAddress.addEventListener('change', () => {
+            if (guardian1Checkbox.checked) {
+                guardian1Address.value = studentAddress.value;
+            }
+            if (guardian2Checkbox && guardian2Checkbox.checked) {
+                guardian2Address.value = studentAddress.value;
+            }
+        });
+    }
+}
+
+// ====== GUARDIAN MANAGEMENT FUNCTIONS ======
+function showGuardian2Form(e) {
+    e?.preventDefault?.();
+    
+    const guardian2Section = document.getElementById('guardian2Section');
+    const addGuardian2Container = document.getElementById('addGuardian2ButtonContainer');
+    
+    if (guardian2Section) {
+        guardian2Section.style.display = 'block';
+        guardian2Section.style.animation = 'slideInUp 0.3s ease-out';
+    }
+    if (addGuardian2Container) {
+        addGuardian2Container.style.display = 'none';
+    }
+}
+
+function clearGuardian1Form() {
+    document.getElementById('guardian1Phone').value = '';
+    document.getElementById('guardian1Relationship').value = '';
+    document.getElementById('guardian1FirstName').value = '';
+    document.getElementById('guardian1LastName').value = '';
+    document.getElementById('guardian1MiddleName').value = '';
+    document.getElementById('guardian1AltPhone').value = '';
+    document.getElementById('guardian1Email').value = '';
+    document.getElementById('guardian1Address').value = '';
+    const checkbox1 = document.getElementById('guardian1SameAsStudent');
+    if (checkbox1) checkbox1.checked = false;
+    const statusEl = document.getElementById('guardian1LookupStatus');
+    if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+}
+
+function clearGuardian2Form() {
+    document.getElementById('guardian2Phone').value = '';
+    document.getElementById('guardian2Relationship').value = '';
+    document.getElementById('guardian2FirstName').value = '';
+    document.getElementById('guardian2LastName').value = '';
+    document.getElementById('guardian2MiddleName').value = '';
+    document.getElementById('guardian2AltPhone').value = '';
+    document.getElementById('guardian2Email').value = '';
+    document.getElementById('guardian2Address').value = '';
+    const checkbox2 = document.getElementById('guardian2SameAsStudent');
+    if (checkbox2) checkbox2.checked = false;
+    const statusEl = document.getElementById('guardian2LookupStatus');
+    if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+    
+    // Hide guardian 2 section
+    const guardian2Section = document.getElementById('guardian2Section');
+    const addGuardian2Container = document.getElementById('addGuardian2ButtonContainer');
+    if (guardian2Section) guardian2Section.style.display = 'none';
+    if (addGuardian2Container) addGuardian2Container.style.display = 'block';
+}
+
+function getGuardianDataFromForm(guardianNum) {
+    const prefix = `guardian${guardianNum}`;
+    return {
+        phone_number: String(document.getElementById(`${prefix}Phone`)?.value || '').trim(),
+        relationship: String(document.getElementById(`${prefix}Relationship`)?.value || '').trim(),
+        first_name: String(document.getElementById(`${prefix}FirstName`)?.value || '').trim(),
+        last_name: String(document.getElementById(`${prefix}LastName`)?.value || '').trim(),
+        middle_name: String(document.getElementById(`${prefix}MiddleName`)?.value || '').trim() || null,
+        alternate_phone_number: String(document.getElementById(`${prefix}AltPhone`)?.value || '').trim() || null,
+        email: String(document.getElementById(`${prefix}Email`)?.value || '').trim() || null,
+        address: String(document.getElementById(`${prefix}Address`)?.value || '').trim() || null,
+    };
 }
 
 async function submitSingleStudentForm(event) {
     event.preventDefault();
 
     const submitBtn = document.getElementById('singleStudentSubmitBtn');
-    const departmentId = document.getElementById('singleDepartment')?.value || '';
-    const studentId = String(document.getElementById('singleStudentId')?.value || '').trim();
+    const sectionId = document.getElementById('singleDepartment')?.value || '';
+    const studentId = String(document.getElementById('singleStudentId')?.value || '').replace(/\D/g, '').trim();
     const firstName = String(document.getElementById('singleFirstName')?.value || '').trim();
     const middleName = String(document.getElementById('singleMiddleName')?.value || '').trim();
     const lastName = String(document.getElementById('singleLastName')?.value || '').trim();
     const suffix = String(document.getElementById('singleSuffix')?.value || '').trim();
-    const course = String(document.getElementById('singleCourse')?.value || '').trim();
-    const yearLevelRaw = String(document.getElementById('singleYearLevel')?.value || '').trim();
-    const section = String(document.getElementById('singleSection')?.value || '').trim();
-    const emailRaw = String(document.getElementById('singleEmail')?.value || '').trim();
+    const birthDate = String(document.getElementById('singleYearLevel')?.value || '').trim();
+    const gender = String(document.getElementById('singleSection')?.value || '').trim().toLowerCase();
+    const email = String(document.getElementById('singleEmail')?.value || '').trim();
 
-    if (!departmentId || !studentId || !firstName || !lastName || !emailRaw) {
-        showImportAlert('Please fill in Department, Student ID, First Name, Last Name, and Email.', 'warning');
+    if (!activeSchoolYear || !activeSchoolYear.id) {
+        showImportAlert('No active school year found. Please set one in System Settings first.', 'danger');
+        return;
+    }
+    if (!sectionId || !studentId || !firstName || !lastName) {
+        showImportAlert('Please fill in Section, LRN, First Name, and Last Name.', 'warning');
+        return;
+    }
+    if (!/^\d{12}$/.test(studentId)) {
+        showImportAlert('LRN must be exactly 12 digits.', 'warning');
+        return;
+    }
+    if (birthDate && Number.isNaN(Date.parse(birthDate))) {
+        showImportAlert('Birth Date must be valid.', 'warning');
+        return;
+    }
+    if (gender && !['male', 'female', 'other'].includes(gender)) {
+        showImportAlert('Gender must be male, female, or other.', 'warning');
         return;
     }
 
-    if (!/^\d{2}-\d{5}$/.test(studentId)) {
-        showImportAlert('Student ID must be in format NN-NNNNN (example: 23-00269).', 'warning');
+    // Get guardian data from forms
+    const guardian1Data = getGuardianDataFromForm(1);
+    const guardian2Data = getGuardianDataFromForm(2);
+    const guardian2Visible = document.getElementById('guardian2Section')?.style.display !== 'none';
+
+    // Validate guardian 1
+    if (!guardian1Data.phone_number || !guardian1Data.relationship || !guardian1Data.first_name || !guardian1Data.last_name || !guardian1Data.address) {
+        showImportAlert('Please fill in all required Guardian 1 fields (Phone, Relationship, First Name, Last Name, Address).', 'warning');
         return;
     }
 
-    if (course && !/^[A-Z]{2,10}$/.test(course)) {
-    showImportAlert('Course must be an uppercase acronym (letters only, e.g. BSCS, IT).', 'warning');
-    return;
-}
-
-if (section && !/^[A-Z]$/.test(section)) {
-    showImportAlert('Section must be a single letter (A–Z).', 'warning');
-    return;
-}
-
-    const yearLevel = yearLevelRaw ? Number(yearLevelRaw) : null;
-    if (yearLevelRaw && (!Number.isInteger(yearLevel) || yearLevel < 1 || yearLevel > 5)) {
-        showImportAlert('Year Level must be an integer from 1 to 5.', 'warning');
-        return;
-    }
-
-    const email = emailRaw;
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showImportAlert('Please provide a valid email address.', 'warning');
-        return;
+    // Guardian 2 is optional but if some fields are filled, validate all required fields
+    if (guardian2Visible) {
+        const guardian2HasData = guardian2Data.phone_number || guardian2Data.relationship || guardian2Data.first_name || guardian2Data.last_name || guardian2Data.address;
+        if (guardian2HasData) {
+            if (!guardian2Data.phone_number || !guardian2Data.relationship || !guardian2Data.first_name || !guardian2Data.last_name || !guardian2Data.address) {
+                showImportAlert('Please fill in all required Guardian 2 fields or leave them all empty.', 'warning');
+                return;
+            }
+            // Check duplicate phones
+            if (guardian1Data.phone_number === guardian2Data.phone_number) {
+                showImportAlert('Guardian 1 and Guardian 2 cannot have the same phone number.', 'warning');
+                return;
+            }
+        }
     }
 
     try {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving...';
+        setSingleStudentLoading(true, 'Saving student...');
 
         if (!supabaseClient) throw new Error('Database connection not available. Please refresh the page and try again.');
 
         const { data: existingStudent, error: existingError } = await supabaseClient
             .from('students')
-            .select('id_number')
-            .eq('id_number', studentId)
+            .select('lrn')
+            .eq('lrn', studentId)
             .maybeSingle();
 
         if (existingError) throw existingError;
         if (existingStudent) {
-            showImportAlert(`Student ID ${studentId} already exists. Use import to update existing records.`, 'warning');
+            showImportAlert(`LRN ${studentId} already exists. Use import to update existing records.`, 'warning');
             return;
         }
 
-        // Also check for duplicate email
-        const { data: existingEmail, error: emailCheckError } = await supabaseClient
-            .from('students')
-            .select('id_number')
-            .eq('email', email)
-            .maybeSingle();
-        if (emailCheckError) throw emailCheckError;
-        if (existingEmail) {
-            showImportAlert(`A student with email "${email}" already exists (ID: ${existingEmail.id_number}).`, 'warning');
-            return;
-        }
-
+        const studentUuid = crypto.randomUUID();
         const payload = {
-            student_id: crypto.randomUUID(),
-            id_number: studentId,
+            student_id: studentUuid,
+            lrn: studentId,
             first_name: firstName,
             middle_name: middleName || null,
             last_name: lastName,
             suffix: suffix || null,
-            email,
-            course: course || null,
-            year_level: yearLevel,
-            section: section || null,
-            department_id: departmentId,
-            password: studentId,
+            birth_date: birthDate || null,
+            gender: gender || null,
+            section_id: sectionId,
+            school_year_id: activeSchoolYear.id,
             status: 'active',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         };
 
-        const { error: insertError } = await supabaseClient
-            .from('students')
-            .insert(payload);
-
+        const { error: insertError } = await supabaseClient.from('students').insert(payload);
         if (insertError) throw insertError;
 
-        const emailResult = await sendStudentQrEmail({
-            studentId,
-            firstName,
-            middleName,
-            lastName,
-            suffix,
-            course,
-            yearLevel,
-            section,
-            email,
-        });
-
-        if (emailResult.sent) {
-            showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully. QR code was emailed to ${email}.`, 'success');
-        } else {
-            showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully, but QR email failed: ${emailResult.message}.`, 'warning');
+        // Link guardian 1 (primary)
+        setSingleStudentLoading(true, 'Linking guardians...');
+        let guardiansAdded = 0;
+        try {
+            await upsertAndLinkGuardian(studentUuid, guardian1Data, true);
+            guardiansAdded = 1;
+        } catch (guardianErr) {
+            console.error('Guardian 1 link failed:', guardianErr);
+            showImportAlert(`Student saved, but Guardian 1 could not be linked: ${guardianErr.message}.`, 'warning');
         }
 
+        // Link guardian 2 (if filled)
+        if (guardian2Visible && guardian2Data.phone_number && guardian2Data.relationship && guardian2Data.first_name && guardian2Data.last_name) {
+            try {
+                await upsertAndLinkGuardian(studentUuid, guardian2Data, false);
+                guardiansAdded = 2;
+            } catch (guardianErr) {
+                console.error('Guardian 2 link failed:', guardianErr);
+                showImportAlert(`Student and Guardian 1 saved, but Guardian 2 could not be linked: ${guardianErr.message}.`, 'warning');
+            }
+        }
+
+        showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully with ${guardiansAdded} guardian(s).`, 'success');
         document.getElementById('singleStudentForm')?.reset();
+        clearGuardian1Form();
+        clearGuardian2Form();
+        setSingleStudentLoading(false);
         singleStudentModal?.hide();
         await loadAllStudentsTable();
 
+        if (email) {
+            const sectionLabel = departmentsCache.find(s => String(s.section_id) === String(sectionId))
+                ? `${departmentsCache.find(s => String(s.section_id) === String(sectionId)).grade_level} - ${departmentsCache.find(s => String(s.section_id) === String(sectionId)).section_name}`
+                : '';
+
+            sendStudentQrEmail({
+                studentId, firstName, middleName, lastName, suffix, birthDate, gender, sectionLabel, email,
+            }).then((emailResult) => {
+                if (emailResult.sent) {
+                    showEmailStatusToast(`QR code emailed to ${email} for ${firstName} ${lastName}.`, 'success');
+                } else {
+                    showEmailStatusToast(`Student saved, but QR email wasn't sent (${emailResult.message}).`, 'warning');
+                }
+            });
+        }
+
     } catch (err) {
         console.error('Single student registration failed:', err?.message || err, {
-            code: err?.code,
-            details: err?.details,
-            hint: err?.hint,
-            full: err
+            code: err?.code, details: err?.details, hint: err?.hint, full: err
         });
         showImportAlert(`Failed to save student: ${err?.message || 'Unknown error. Check console for details.'}`, 'danger');
     } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Save Student';
+        setSingleStudentLoading(false);
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
@@ -1141,7 +1777,7 @@ function renderDuplicateRowsTable() {
 
     const mergedRows = [
         ...duplicateRowsInFile.map(row => ({ ...row, reason: 'Duplicate in uploaded file' })),
-        ...duplicateRowsInDatabase.map(row => ({ ...row, reason: 'Student ID already exists in database' }))
+        ...duplicateRowsInDatabase.map(row => ({ ...row, reason: 'LRN already exists in database' }))
     ].sort((a, b) => (a.rowIndex || 0) - (b.rowIndex || 0));
 
     summaryText.textContent = `${mergedRows.length} row(s) were skipped during import validation.`;
@@ -1199,40 +1835,47 @@ function getStudentQrPayload(student) {
         .replace(/\s+/g, ' ')
         .trim();
 
-    const course = String(student.course || '').trim() || 'N/A';
-    const yearLevel = String(student.yearLevel ?? '').trim() || 'N/A';
-    const section = String(student.section || '').trim() || 'N/A';
+    const birthDate = String(student.birthDate || '').trim() || 'N/A';
+    const gender = String(student.gender || '').trim() || 'N/A';
+    const sectionLabel = String(student.sectionLabel || '').trim() || 'N/A';
 
     return [
         'PLP Laboratory Attendance QR',
         `Name: ${fullName || 'N/A'}`,
-        `Student ID: ${student.studentId}`,
-        `Course: ${course}`,
-        `Year: ${yearLevel}`,
-        `Section: ${section}`,
+        `LRN: ${student.studentId}`,
+        `Birth Date: ${birthDate}`,
+        `Gender: ${gender}`,
+        `Section: ${sectionLabel}`,
     ].join('\n');
 }
 
 async function sendStudentQrEmail(student) {
     const email = String(student.email || '').trim();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return { sent: false, message: 'invalid email address' };
+    if (!email) {
+        return { sent: false, message: 'no email provided' };
+    }
+    if (!EMAIL_LIKE_PATTERN.test(email)) {
+        return { sent: false, message: 'email format not deliverable' };
     }
 
-    const payload = {
+   const payload = {
         email,
-        studentId: String(student.studentId || '').trim(),
+        lrn: String(student.studentId || '').trim(),
         firstName: String(student.firstName || '').trim(),
         middleName: String(student.middleName || '').trim(),
         lastName: String(student.lastName || '').trim(),
-        course: String(student.course || '').trim(),
-        yearLevel: String(student.yearLevel ?? '').trim(),
-        section: String(student.section || '').trim(),
+        sectionInfo: String(student.sectionLabel || '').trim(),
+        birthDate: String(student.birthDate ?? '').trim(),
+        gender: String(student.gender || '').trim(),
         qrPayload: getStudentQrPayload(student),
     };
 
-    if (!payload.studentId) {
-        return { sent: false, message: 'missing student ID' };
+    if (!payload.lrn) {
+        return { sent: false, message: 'missing LRN' };
+    }
+
+  if (!payload.lrn) {
+        return { sent: false, message: 'missing LRN' };
     }
 
     try {
@@ -1280,30 +1923,33 @@ function escapeHtml(text) {
     const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
     return String(text).replace(/[&<>"']/g, m => map[m]);
 }
-
 function downloadStudentTemplate() {
     const headers = [
-        'Student ID',
+        'LRN',
         'Last Name',
         'First Name',
         'Middle Name',
         'Suffix',
-        'Course',
-        'Year Level',
-        'Section',
-        'Email'
+        'Birth Date',
+        'Gender',
+        'Email',
+        'School Year'
     ];
 
+    const schoolYearSample = (activeSchoolYear && activeSchoolYear.name)
+        ? activeSchoolYear.name
+        : '2024-2025';
+
     const sampleRow = [
-        '23-00221',
+        '123456789012',
         'Dela Cruz',
         'Juan',
         'Santos',
         '',
-        'BSCS',
-        '3',
-        'A',
-        'delacruz_juan@plpasig.edu.ph'
+        '2012-06-14',
+        'male',
+        'delacruz_juan@plpasig.edu.ph',
+        schoolYearSample
     ];
 
     if (window.XLSX) {
@@ -1314,7 +1960,6 @@ function downloadStudentTemplate() {
         return;
     }
 
-    // Fallback if SheetJS fails to load.
     const csv = [headers, sampleRow]
         .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
         .join('\r\n');
@@ -1359,7 +2004,7 @@ async function removeExistingStudentIdsFromParsedRows() {
     const queryableIds = [...new Set(
         parsedRows
             .map(row => String(row.studentId || '').trim())
-            .filter(id => /^\d{2}-\d{5}$/.test(id))
+            .filter(id => /^\d{12}$/.test(id))
     )];
 
     if (queryableIds.length === 0) {
@@ -1368,12 +2013,12 @@ async function removeExistingStudentIdsFromParsedRows() {
 
     const { data: existingStudents, error } = await supabaseClient
         .from('students')
-        .select('id_number')
-        .in('id_number', queryableIds);
+        .select('lrn')
+        .in('lrn', queryableIds);
 
     if (error) throw error;
 
-    const existingIds = new Set((existingStudents || []).map(row => row.id_number));
+    const existingIds = new Set((existingStudents || []).map(row => row.lrn));
     const originalLength = parsedRows.length;
     const removedRows = [];
     parsedRows = parsedRows.filter(row => {
