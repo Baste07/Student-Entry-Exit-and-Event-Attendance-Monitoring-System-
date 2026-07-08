@@ -308,6 +308,7 @@ async function loadAttendanceData() {
             };
         });
 
+        document.querySelectorAll('.stats-row .skeleton, #attendanceBody .skeleton, #rmTableBody .skeleton').forEach(el => el.classList.remove('skeleton'));
         scheduleEnrollmentCounts = {};
         const scheduleIds = [...new Set(allAttendance.map(a => a.schedule_id).filter(Boolean))];
         if (scheduleIds.length > 0) {

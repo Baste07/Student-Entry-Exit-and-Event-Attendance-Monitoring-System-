@@ -40,8 +40,8 @@
                     </div>
                     <div class="profile-mini">
                         <div class="profile-info">
-                            <h3 id="adminName">Loading...</h3>
-                            <p id="adminRole">Admin</p>
+                            <h3 id="adminName" class="skeleton skeleton-text" style="width: 11rem; height: 1.35rem;"></h3>
+                            <p id="adminRole" class="skeleton skeleton-text" style="width: 6rem; height: .95rem; margin-top: .45rem;"></p>
                         </div>
                         <div class="profile-actions-mini">
                             <div class="profile-view-more">
@@ -59,7 +59,7 @@
                             <i class="fa-solid fa-calendar-check card-icon"></i>
                             <h3>Active Schedules</h3>
                         </div>
-                        <p><strong id="totalSchedules">0</strong> Active Class/es</p>
+                        <p><strong id="totalSchedules" class="skeleton skeleton-text" style="width: 2rem; height: 1.1rem; margin-right: .35rem;"></strong><span class="skeleton skeleton-text" style="width: 8rem; height: .95rem;"></span></p>
                         <div class="view">
                             <a href="schedules.html">
                                 Click to view Schedules <i class="fa-solid fa-chevron-right"></i>
@@ -72,7 +72,7 @@
                             <i class="fa-solid fa-users card-icon"></i>
                             <h3>Registered Students</h3>
                         </div>
-                        <p><strong id="totalStudents">0</strong> Active Student/s</p>
+                        <p><strong id="totalStudents" class="skeleton skeleton-text" style="width: 2rem; height: 1.1rem; margin-right: .35rem;"></strong><span class="skeleton skeleton-text" style="width: 8.5rem; height: .95rem;"></span></p>
                         <div class="view">
                             <a href="attendeesList.html">
                                 Click to view Students <i class="fa-solid fa-chevron-right"></i>
@@ -85,7 +85,7 @@
                             <i class="fa-solid fa-user-tie card-icon"></i>
                             <h3>Professors</h3>
                         </div>
-                        <p><strong id="totalProfessors">0</strong> Active Prof/s</p>
+                        <p><strong id="totalProfessors" class="skeleton skeleton-text" style="width: 2rem; height: 1.1rem; margin-right: .35rem;"></strong><span class="skeleton skeleton-text" style="width: 8rem; height: .95rem;"></span></p>
                         <div class="view">
                             <a href="professorsManagement.html">
                                 Click to view Professors <i class="fa-solid fa-chevron-right"></i>
@@ -98,7 +98,7 @@
                             <i class="fa-solid fa-file-lines card-icon"></i>
                             <h3>Reports</h3>
                         </div>
-                        <p><strong id="totalReports">0</strong> Generated</p>
+                        <p><strong id="totalReports" class="skeleton skeleton-text" style="width: 2rem; height: 1.1rem; margin-right: .35rem;"></strong><span class="skeleton skeleton-text" style="width: 6rem; height: .95rem;"></span></p>
                         <div class="view">
                             <a href="reports.html">
                                 Click to view Reports <i class="fa-solid fa-chevron-right"></i>
@@ -114,9 +114,18 @@
                     Laboratory Status &amp; Schedules
                 </div>
                 <div class="lab-grid" id="labGrid">
-                    <p class="no-schedules">
-                        <i class="fa-solid fa-spinner fa-spin"></i> Loading laboratories...
-                    </p>
+                    <div class="lab-card skeleton-card" style="padding:1rem">
+                        <div class="skeleton skeleton-block" style="height:2.25rem; width:42%;"></div>
+                        <div class="skeleton skeleton-block" style="height:.95rem; width:78%; margin-top:.8rem;"></div>
+                        <div class="skeleton skeleton-block" style="height:.95rem; width:60%; margin-top:.55rem;"></div>
+                        <div class="skeleton skeleton-block" style="height:.95rem; width:90%; margin-top:.55rem;"></div>
+                    </div>
+                    <div class="lab-card skeleton-card" style="padding:1rem">
+                        <div class="skeleton skeleton-block" style="height:2.25rem; width:42%;"></div>
+                        <div class="skeleton skeleton-block" style="height:.95rem; width:78%; margin-top:.8rem;"></div>
+                        <div class="skeleton skeleton-block" style="height:.95rem; width:60%; margin-top:.55rem;"></div>
+                        <div class="skeleton skeleton-block" style="height:.95rem; width:90%; margin-top:.55rem;"></div>
+                    </div>
                 </div>
             </section>
 
