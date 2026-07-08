@@ -130,11 +130,11 @@ hr {
     gap: 8px;
     font-size: 13px;
     font-weight: 600;
-    font-family: 'Nunito Sans', sans-serif;
+    font-family: var(--font-body);
 }
-.stat-mini.in-session { border-color: var(--green-bright); background: #dcfce7; color: var(--green-dark); }
-.stat-mini.schedules { border-color: #93c5fd; background: #eff6ff; color: #1e3a8a; }
-.stat-mini.face-registered { border-color: var(--green-light); background: #f0fdf4; color: var(--green-mid); }
+.stat-mini.in-session { border-color: var(--green-bright); background: var(--surface-strong); color: var(--green-dark); }
+.stat-mini.schedules { border-color: var(--blue); background: var(--blue-bg); color: var(--blue); }
+.stat-mini.face-registered { border-color: var(--green-light); background: var(--surface); color: var(--green-mid); }
 .stat-mini i { font-size: 15px; }
 
 /* Header Buttons */
@@ -143,7 +143,7 @@ hr {
     border-radius: 8px;
     font-size: 13.5px;
     font-weight: 700;
-    font-family: 'Nunito Sans', sans-serif;
+    font-family: var(--font-body);
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -153,9 +153,9 @@ hr {
 
 .btn-report { 
     padding: 9px 18px; 
-    background: #dcfce7;          /* Soft light green background */
-    color: #166534;               /* Signature dark green text for contrast */
-    border: 1.5px solid #bbf7d0;  /* Slightly darker green border */
+    background: var(--surface-strong);
+    color: var(--green-dark);
+    border: 1.5px solid var(--border);
     border-radius: 8px; 
     font-size: 13.5px; 
     font-weight: 800; 
@@ -164,14 +164,14 @@ hr {
     align-items: center; 
     gap: 8px; 
     transition: all .2s ease; 
-    font-family: 'Nunito Sans', sans-serif; 
+    font-family: var(--font-body); 
     margin-left: auto;            /* Keeps it grouped with the Add button */
 }
 
 .btn-report:hover { 
-    background: #bbf7d0;          /* Slightly darker pastel green on hover */
+    background: var(--hover-bg);
     transform: translateY(-2px); 
-    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15); /* Soft green shadow */
+    box-shadow: var(--shadow-sm);
 }
 
 .btn-add-prof {

@@ -6,8 +6,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-    font-family: 'Nunito Sans', 'Segoe UI', sans-serif;
-    background: var(--white);
+    font-family: var(--font-body);
+    background: var(--body-bg);
     color: var(--text-body);
     line-height: 1.75;
     font-size: 15px;
@@ -40,10 +40,10 @@ body {
 
 /* 2. Formats the H1 */
 .page-header .header-titles h1 { 
-    font-family: 'Nunito', sans-serif; 
+    font-family: var(--font-heading); 
     font-size: 24px; 
     font-weight: 800; 
-    color: var(--green-dark, #1a4731); 
+    color: var(--green-dark); 
     margin: 0; 
     display: flex; 
     align-items: center; 
@@ -53,7 +53,7 @@ body {
 /* 3. Forces the icon to be bright green! */
 /* ── Force Icon Visibility and Color ── */
 .page-header .header-titles h1 i {
-    color: var(--green-bright, #40916c) !important; 
+    color: var(--green-bright) !important; 
     font-size: 22px !important;
     display: inline-block !important; /* Ensures the icon has dimensions */
     visibility: visible !important;
@@ -62,21 +62,21 @@ body {
 
 /* 4. Formats the gray subtitle */
 .page-header .header-titles p {
-    color: var(--text-muted, #5a7265); 
+    color: var(--text-muted); 
     font-size: 13.5px; 
     margin-top: 2px; 
     margin-bottom: 0;
     font-weight: 500; 
     font-family: 'Nunito Sans', sans-serif;
 }
-.header-titles h1 { font-family: 'Nunito', sans-serif; font-size: 24px; font-weight: 700; color: var(--green-dark); margin: 0; display: flex; align-items: center; gap: 10px; }
-.header-titles p { color: var(--text-muted); font-size: 14px; margin: 5px 0 0 0; font-family: 'Nunito Sans', sans-serif;}
+.header-titles h1 { font-family: var(--font-heading); font-size: 24px; font-weight: 700; color: var(--green-dark); margin: 0; display: flex; align-items: center; gap: 10px; }
+.header-titles p { color: var(--text-muted); font-size: 14px; margin: 5px 0 0 0; font-family: var(--font-body);}
 
 .btn-report { 
     padding: 9px 18px; 
-    background: #dcfce7;          /* Soft light green background */
-    color: #166534;               /* Signature dark green text for contrast */
-    border: 1.5px solid #bbf7d0;  /* Slightly darker green border */
+    background: var(--surface-strong);
+    color: var(--green-dark);
+    border: 1.5px solid var(--border);
     border-radius: 8px; 
     font-size: 13.5px; 
     font-weight: 800; 
@@ -85,14 +85,14 @@ body {
     align-items: center; 
     gap: 8px; 
     transition: all .2s ease; 
-    font-family: 'Nunito Sans', sans-serif; 
+    font-family: var(--font-body); 
     margin-left: auto;            /* Keeps it grouped with the Add button */
 }
 
 .btn-report:hover { 
-    background: #bbf7d0;          /* Slightly darker pastel green on hover */
+    background: var(--hover-bg);
     transform: translateY(-2px); 
-    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15); /* Soft green shadow */
+    box-shadow: var(--shadow-sm);
 }
 
 hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark), var(--green-bright), transparent); margin: 0 0 28px; border-radius: 2px; }
@@ -107,17 +107,17 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 .stat-icon.amber { background: var(--amber-bg); color: var(--amber); }
 .stat-icon.blue { background: var(--blue-bg); color: var(--blue); }
 .stat-icon.purple { background: var(--purple-bg); color: var(--purple); }
-.stat-icon.dark { background: #e2e8f0; color: #475569; }
-.stat-val { font-size: 28px; font-weight: 800; color: var(--green-dark); line-height: 1; font-family: 'Nunito', sans-serif;}
-.stat-lbl { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; font-weight: 700; font-family: 'Nunito Sans', sans-serif;}
+.stat-icon.dark { background: var(--surface-strong); color: var(--text-muted); }
+.stat-val { font-size: 28px; font-weight: 800; color: var(--green-dark); line-height: 1; font-family: var(--font-heading);}
+.stat-lbl { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; font-weight: 700; font-family: var(--font-body);}
 
 /* Filter Panel */
-.controls-card { background: var(--white); border-radius: var(--radius-lg); padding: 22px 26px; margin-bottom: 24px; box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); border-left: 5px solid var(--green-dark); transition: box-shadow 0.3s ease; }
+.controls-card { background: var(--panel); border-radius: var(--radius-lg); padding: 22px 26px; margin-bottom: 24px; box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); border-left: 5px solid var(--green-dark); transition: box-shadow 0.3s ease; }
 .controls-card:hover { box-shadow: var(--shadow-md); }
 .fg-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr 130px; gap: 12px; align-items: end; }
 .fb-grid { grid-template-columns: 2fr 1fr 1fr 1fr 190px; }
 .fg { display: flex; flex-direction: column; }
-.fg label { display: block; font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: 6px; font-family: 'Nunito Sans', sans-serif;}
+.fg label { display: block; font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: 6px; font-family: var(--font-body);}
 .fg input, .fg select { width: 100%; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13.5px; font-family: 'Nunito Sans', sans-serif; color: var(--text-dark); background: var(--white); transition: border-color .2s, box-shadow .2s; outline: none; height: 40px;}
 .fg input:focus, .fg select:focus { border-color: var(--green-bright); box-shadow: 0 0 0 3px rgba(64,145,108,.15); }
 .fa-row { display: flex; gap: 8px; align-items: center; }

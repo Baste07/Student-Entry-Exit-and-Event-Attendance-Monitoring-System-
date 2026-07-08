@@ -6,8 +6,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-    font-family: 'Nunito Sans', 'Segoe UI', sans-serif;
-    background: var(--white);
+    font-family: var(--font-body);
+    background: var(--body-bg);
     color: var(--text-body);
     line-height: 1.75;
     font-size: 15px;
@@ -22,7 +22,7 @@ body {
 .main-content.sidebar-open { margin-left: var(--sidebar-expanded, 240px); }
 
 .container { background: var(--white); padding: 32px 36px 48px; min-height: 100%; width: 100%; }
-.container h1 { font-family: 'Nunito', sans-serif; font-size: 24px; font-weight: 700; color: var(--green-dark); margin: 0; display: flex; align-items: center; gap: 10px; }
+.container h1 { font-family: var(--font-heading); font-size: 24px; font-weight: 700; color: var(--green-dark); margin: 0; display: flex; align-items: center; gap: 10px; }
 
 hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark), var(--green-bright), transparent); margin: 0 0 28px; border-radius: 2px; }
 
@@ -45,7 +45,7 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 /* 2. Formats the H1 */
 .page-header .header-titles h1 {
     margin: 0;
-    font-family: 'Nunito', sans-serif;
+    font-family: var(--font-heading);
     font-size: 24px;
     font-weight: 800;
     color: var(--green-dark);
@@ -67,14 +67,14 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
     margin-top: 2px;
     margin-bottom: 0;
     font-weight: 500;
-    font-family: 'Nunito Sans', sans-serif;
+    font-family: var(--font-body);
 }
 
 /* (Leave your existing .total-badge and .stats-mini classes right below this) */
-.total-badge { background: var(--green-dark); color: var(--white); padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; font-family: 'Nunito Sans', sans-serif; }
+.total-badge { background: var(--green-dark); color: var(--white); padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; font-family: var(--font-body); }
 .stats-mini { display: flex; gap: 10px; flex-wrap: wrap; margin-right: auto; }
-.stat-mini { background: var(--surface); padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; font-family: 'Nunito Sans', sans-serif; }
-.stat-mini.active-sched { border-color: var(--green-bright); background: #dcfce7; color: var(--green-dark); }
+.stat-mini { background: var(--surface); padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; font-family: var(--font-body); }
+.stat-mini.active-sched { border-color: var(--green-bright); background: var(--surface-strong); color: var(--green-dark); }
 .stat-mini.inactive-sched { border-color: #fca5a5; background: #fef2f2; color: var(--red); }
 .stat-mini i { font-size: 15px; }
 
@@ -87,12 +87,12 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 }
 
 /* Buttons */
-.btn-report, .btn-add-sched { padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 700; font-family: 'Nunito Sans', sans-serif; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; transition: transform .2s, box-shadow .2s, background .2s; }
+.btn-report, .btn-add-sched { padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 700; font-family: var(--font-body); display: inline-flex; align-items: center; gap: 8px; cursor: pointer; transition: transform .2s, box-shadow .2s, background .2s; }
 .btn-report { 
     padding: 9px 18px; 
-    background: #dcfce7;          /* Soft light green background */
-    color: #166534;               /* Signature dark green text for contrast */
-    border: 1.5px solid #bbf7d0;  /* Slightly darker green border */
+    background: var(--surface-strong);
+    color: var(--green-dark);
+    border: 1.5px solid var(--border);
     border-radius: 8px; 
     font-size: 13.5px; 
     font-weight: 800; 
@@ -101,49 +101,49 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
     align-items: center; 
     gap: 8px; 
     transition: all .2s ease; 
-    font-family: 'Nunito Sans', sans-serif; 
+    font-family: var(--font-body); 
     margin-left: 0;
 }
 
 .btn-report:hover { 
-    background: #bbf7d0;          /* Slightly darker pastel green on hover */
+    background: var(--hover-bg);
     transform: translateY(-2px); 
-    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15); /* Soft green shadow */
+    box-shadow: var(--shadow-sm);
 }
 .btn-add-sched { background: var(--green-dark); color: var(--white); border: none; }
 .btn-add-sched:hover { background: var(--green-mid); transform: translateY(-2px); box-shadow: var(--shadow-md); }
 
 /* Controls Card */
-.controls-card { background: var(--white); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); border-top: 3px solid var(--green-bright); transition: box-shadow 0.3s ease; }
+.controls-card { background: var(--panel); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); border-top: 3px solid var(--green-bright); transition: box-shadow 0.3s ease; }
 .controls-card:hover { box-shadow: var(--shadow-md); }
 .controls-header { display: flex; align-items: center; margin-bottom: 15px; }
-.controls-header h2 { font-family: 'Nunito', sans-serif; font-size: 16px; font-weight: 700; color: var(--green-dark); display: flex; align-items: center; gap: 8px; margin: 0; }
+.controls-header h2 { font-family: var(--font-heading); font-size: 16px; font-weight: 700; color: var(--green-dark); display: flex; align-items: center; gap: 8px; margin: 0; }
 .table-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .control-group { display: flex; flex-direction: column; gap: 5px; flex: 1 1 0; min-width: 160px; }
-.control-group label { font-family: 'Nunito Sans', sans-serif; font-size: 12.5px; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
-.search-container input, .filter-container select { width: 100%; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; outline: none; font-size: 13.5px; height: 40px; font-family: 'Nunito Sans', sans-serif; transition: border-color .3s, box-shadow .3s; background: var(--white); color: var(--text-dark); }
-.search-container input:focus, .filter-container select:focus { border-color: var(--green-bright); box-shadow: 0 0 0 3px rgba(64,145,108,.15); }
-.btn-clear { height: 40px; padding: 0 16px; border-radius: 8px; background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); font-family: 'Nunito Sans', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; transition: all .2s; }
+.control-group label { font-family: var(--font-body); font-size: 12.5px; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+.search-container input, .filter-container select { width: 100%; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; outline: none; font-size: 13.5px; height: 40px; font-family: var(--font-body); transition: border-color .3s, box-shadow .3s; background: var(--panel); color: var(--text-dark); }
+.search-container input:focus, .filter-container select:focus { border-color: var(--green-bright); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green-bright) 15%, transparent); }
+.btn-clear { height: 40px; padding: 0 16px; border-radius: 8px; background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); font-family: var(--font-body); font-weight: 600; font-size: 13px; cursor: pointer; transition: all .2s; }
 .btn-clear:hover { background: var(--hover-bg); color: var(--green-dark); }
 
 
 /* ── Tables Container ── */
 .table-container { margin-top: 10px; }
-.data-table, .enroll-table { width: 100%; border-collapse: collapse; background: var(--white); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); }
+.data-table, .enroll-table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); }
 
 /* ── Standardized Table Headers & Cells (Main Schedules & Enroll Tables) ── */
 .data-table thead th,
 .enroll-table thead th {
-    background: linear-gradient(90deg, #166534, #14532d); 
-    color: #ffffff;
+    background: linear-gradient(90deg, var(--green-dark), var(--green-hover)); 
+    color: var(--white);
     padding: 14px 18px; 
     text-align: left; 
     font-size: 12.5px; 
     font-weight: 800;
     text-transform: uppercase; 
     letter-spacing: 0.5px; 
-    font-family: 'Nunito', sans-serif;
-    border-right: 1px solid rgba(255, 255, 255, 0.2); 
+    font-family: var(--font-heading);
+    border-right: 1px solid color-mix(in srgb, var(--white) 20%, transparent); 
     white-space: nowrap;
     border-bottom: none;
 }
@@ -160,7 +160,7 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
     color: var(--text-body); 
     vertical-align: middle;
     line-height: 1.35;
-    font-family: 'Nunito Sans', sans-serif;
+    font-family: var(--font-body);
 }
 .data-table tbody tr:last-child td,
 .enroll-table tbody tr:last-child td { 
@@ -168,16 +168,16 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark
 }
 .data-table tbody tr:hover,
 .enroll-table tbody tr:hover { 
-    background: var(--surface); 
+    background: var(--surface-strong); 
 }
 
 
 /* Badges & Chips */
-.status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11.5px; font-weight: 700; font-family: 'Nunito Sans', sans-serif; text-transform: uppercase;}
-.status-badge.active   { background: #dcfce7; color: var(--green-dark); border: 1px solid #bbf7d0; }
-.status-badge.inactive { background: #fee2e2; color: var(--red); border: 1px solid #fecaca; }
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11.5px; font-weight: 700; font-family: var(--font-body); text-transform: uppercase;}
+.status-badge.active   { background: var(--surface-strong); color: var(--green-dark); border: 1px solid var(--border); }
+.status-badge.inactive { background: var(--red-bg); color: var(--red); border: 1px solid var(--border); }
 
-.day-badge { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; background: #e0f2fe; color: #0284c7; font-family: 'Nunito Sans', sans-serif; }
+.day-badge { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; background: var(--blue-bg); color: var(--blue); font-family: var(--font-body); }
 .professor-chip { display: inline-flex; flex-direction: column; }
 .professor-chip span { font-weight: 800; color: var(--text-dark); line-height: 1.35; text-transform: none; }
 .professor-chip small { font-size: 11px; color: var(--text-muted); font-weight: 700; display: block; margin-top: 2px; letter-spacing: 0.2px; }
