@@ -3,26 +3,6 @@
    Dependencies: global.css (for shared styles)
    ------------------------------------------- */
 
-:root {
-    font-size: 125%;
-    --green-dark:    #0d3b1e;
-    --green-mid:     #145a2e;
-    --green-sidebar: #0f4423;
-    --green-btn:     #1a6b36;
-    --green-hover:   #12522a;
-    --green-active:  #1e7a3e;
-    --sidebar-w:     235px;
-    --topbar-h:      70px;
-    --body-bg:       #f0f4f1;
-    --card-bg:       #ffffff;
-    --border:        #e2ebe4;
-    --text-main:     #1a2e1c;
-    --text-muted:    #6b7f6e;
-    --shadow-sm:     0 2px 8px rgba(0,0,0,0.07);
-    --shadow-md:     0 4px 20px rgba(0,0,0,0.10);
-    --radius:        0.85rem;
-}
-
 html {
     font-size: 125%;
 }
