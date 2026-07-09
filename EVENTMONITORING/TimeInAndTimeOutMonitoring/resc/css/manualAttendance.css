@@ -3,18 +3,6 @@
    TimeInAndTimeOutMonitoring / resc / css / manualAttendance.css
    ============================================================ */
 
-:root {
-    --gd:  #0b4e78; --gm: #176aa4; --gb: #2f8fce;
-    --yw:  #f6b23e; --ywl: #fff1c6;
-    --wh:  #ffffff; --ow: #f4f9fd; --sf: #edf7ff;
-    --td:  #14364c; --tb: #2c4860; --tm: #6a8092;
-    --br:  #dcebf5; --bf: #2f8fce;
-    --red: #dc2626; --rdb: #fef2f2;
-    --amb: #d97706; --amb-bg: #fff8e6;
-    --blu: #1d4ed8; --blu-bg: #eff6ff;
-    --r:   10px;    --rl: 16px;
-}
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 

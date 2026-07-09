@@ -3,29 +3,6 @@
    Aligned with Dashboard Design System
 ============================================================ */
 
-:root {
-    --green-dark:   #1a4731;
-    --green-mid:    #2d6a4f;
-    --green-bright: #3aa96a;
-    --green-light:  #7ccba2;
-    --yellow:       #e0a800;
-    --yellow-light: #fde68a;
-    --white:        #ffffff;
-    --off-white:    #f7faf8;
-    --surface:      #eef6f1;
-    --hover-bg:     #e4efe8;
-    --text-dark:    #10281d;
-    --text-body:    #2b3d34;
-    --text-muted:   #5a6f64;
-    --border:       #d2e4d7;
-    --red:          #dc2626;
-    --radius:       10px;
-    --radius-lg:    14px;
-    --shadow-sm:    0 2px 8px rgba(21,60,44,.07);
-    --shadow-md:    0 6px 18px rgba(21,60,44,.11);
-    --shadow-lg:    0 16px 40px rgba(21,60,44,.14);
-}
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {

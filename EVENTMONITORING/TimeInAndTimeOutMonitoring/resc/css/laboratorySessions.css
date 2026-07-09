@@ -4,26 +4,6 @@
    ============================================================ */
 
 /* ── Design Tokens ── */
-:root {
-    --green-dark:   #1a4731;
-    --green-mid:    #2d6a4f;
-    --green-bright: #40916c;
-    --green-light:  #74c69d;
-    --yellow:       #f4c430;
-    --white:        #ffffff;
-    --surface:      #edf4ef;
-    --hover-bg:     #e2ede7;
-    --text-dark:    #0f2419;
-    --text-body:    #2a3d32;
-    --text-muted:   #5a7265;
-    --border:       #d4e6d9;
-    --red:          #dc2626;
-    --radius:       10px;
-    --radius-lg:    14px;
-    --shadow-sm:    0 2px 8px rgba(26, 71, 49, .07);
-    --shadow-md:    0 4px 16px rgba(26, 71, 49, .10);
-}
-
 *, *::before, *::after {
     margin: 0;
     padding: 0;

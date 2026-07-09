@@ -4,29 +4,11 @@
    ═══════════════════════════════════════════════════════════ */
 
 /* ── Design tokens (mirrors dashboard.css) ── */
-:root {
-    --green-dark:   #1a4731;
-    --green-mid:    #2d6a4f;
-    --green-bright: #40916c;
-    --white:        #ffffff;
-    --off-white:    #f5f8f5;
-    --surface:      #edf4ef;
-    --hover-bg:     #e2ede7;
-    --text-dark:    #0f2419;
-    --text-body:    #2a3d32;
-    --text-muted:   #5a7265;
-    --border:       #d4e6d9;
-    --radius-lg:    14px;
-    --shadow-sm:    0 2px 8px rgba(26,71,49,.07);
-    --shadow-md:    0 4px 16px rgba(26,71,49,.10);
-    --shadow-lg:    0 8px 32px rgba(26,71,49,.13);
-}
-
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
-    font-family: 'Nunito Sans', 'Segoe UI', sans-serif;
-    background: var(--white);
+    font-family: var(--font-body);
+    background: var(--body-bg);
     color: var(--text-body);
     line-height: 1.75;
     font-size: 15px;
@@ -76,10 +58,10 @@ hr {
 /* 2. Your existing H1 styling, just pointing to the new wrapper */
 .page-header .header-titles h1 {
     margin: 0;
-    font-family: 'Nunito', sans-serif;
+    font-family: var(--font-heading);
     font-size: 22px;
     font-weight: 800;
-    color: #1a4731;
+    color: var(--green-dark);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -87,13 +69,13 @@ hr {
 
 /* 3. The magic rule that makes the icon bright green! */
 .page-header .header-titles h1 i {
-    color: #40916c; 
+    color: var(--green-bright); 
     font-size: 22px;
 }
 
 /* 4. Styles the gray subtitle text underneath */
 .page-header .header-titles p {
-    color: #5a7265;
+    color: var(--text-muted);
     font-size: 13.5px;
     margin-top: 2px;
     margin-bottom: 0;
@@ -118,21 +100,21 @@ hr {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'Nunito Sans', sans-serif;
+    font-family: var(--font-body);
 }
 
-.stat-badge.total     { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-.stat-badge.schedules { background: #dbeafe; color: #2563eb; border: 1px solid #bfdbfe; }
-.stat-badge.units     { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+.stat-badge.total     { background: var(--surface-strong); color: var(--green-dark); border: 1px solid var(--border); }
+.stat-badge.schedules { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--border); }
+.stat-badge.units     { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--border); }
 
 /* ── Action Buttons ── */
 
 /* ── Light Green "Generate Report" Button ── */
 .btn-report { 
     padding: 9px 18px; 
-    background: #dcfce7;          /* Soft light green background */
-    color: #166534;               /* Signature dark green text for contrast */
-    border: 1.5px solid #bbf7d0;  /* Slightly darker green border */
+    background: var(--surface-strong);
+    color: var(--green-dark);
+    border: 1.5px solid var(--border);
     border-radius: 8px; 
     font-size: 13.5px; 
     font-weight: 800; 
@@ -141,42 +123,42 @@ hr {
     align-items: center; 
     gap: 8px; 
     transition: all .2s ease; 
-    font-family: 'Nunito Sans', sans-serif; 
+    font-family: var(--font-body); 
     margin-left: auto;            /* Keeps it grouped with the Add button */
 }
 
 .btn-report:hover { 
-    background: #bbf7d0;          /* Slightly darker pastel green on hover */
+    background: var(--hover-bg);
     transform: translateY(-2px); 
-    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15); /* Soft green shadow */
+    box-shadow: var(--shadow-sm);
 }
 .btn-add {
-    background: #166534; color: white; padding: 8px 18px; border: none;
+    background: var(--green-dark); color: var(--white); padding: 8px 18px; border: none;
     border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
     display: inline-flex; align-items: center; gap: 8px; transition: all 0.22s;
-    font-family: 'Nunito Sans', sans-serif;
+    font-family: var(--font-body);
     /* margin-left: auto removed from here */
 }
-.btn-add:hover { background: #14532d; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(22, 101, 52, 0.3); }
+.btn-add:hover { background: var(--green-hover); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 
 /* ── Controls Card ── */
 .controls-card {
-    background: #ffffff;
+    background: var(--panel);
     border-radius: 12px;
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border-left: 5px solid #166534;
+    box-shadow: var(--shadow-sm);
+    border-left: 5px solid var(--green-dark);
     transition: box-shadow 0.3s ease;
 }
-.controls-card:hover { box-shadow: 0 0 20px rgba(34, 197, 94, 0.5); }
+.controls-card:hover { box-shadow: var(--shadow-md); }
 
 .controls-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-.controls-card h2 { font-size: 18px; font-weight: 600; color: #166534; display: flex; align-items: center; gap: 8px; margin: 0; font-family: 'Nunito', sans-serif; }
+.controls-card h2 { font-size: 18px; font-weight: 600; color: var(--green-dark); display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-heading); }
 
 .table-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .control-group  { display: flex; flex-direction: column; gap: 5px; flex: 1 1 0; min-width: 150px; }
-.control-group label { font-size: 12px; font-weight: 600; color: #2d6a4f; display: flex; align-items: center; gap: 6px; font-family: 'Nunito Sans', sans-serif; }
+.control-group label { font-size: 12px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 6px; font-family: var(--font-body); }
 
 .search-container { display: flex; gap: 10px; align-items: center; }
 .search-container input { flex: 1; }
@@ -186,28 +168,28 @@ hr {
 .sort-container select {
     width: 100%;
     padding: 8px 12px;
-    border: 1.5px solid #bbf7d0;
+    border: 1.5px solid var(--border);
     border-radius: 8px;
     outline: none;
     font-size: 13.5px;
     height: 40px;
     box-sizing: border-box;
-    font-family: 'Nunito Sans', sans-serif;
+    font-family: var(--font-body);
     transition: border-color 0.3s, box-shadow 0.3s, background 0.3s;
-    background: white;
+    background: var(--panel);
 }
 .search-container input:focus,
 .filter-container select:focus,
 .sort-container select:focus {
-    border-color: #166534;
-    box-shadow: 0 0 6px rgba(22, 101, 52, 0.3);
-    background: #f0fdf4;
+    border-color: var(--green-bright);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--green-bright) 18%, transparent);
+    background: var(--surface-strong);
 }
 
 .btn.btn-clear {
-    background: #f1f5f9;
-    color: #334155;
-    border: 1.5px solid #cbd5e1;
+    background: var(--surface);
+    color: var(--text-main);
+    border: 1.5px solid var(--border);
     border-radius: 7px;
     padding: 0 16px;
     height: 40px;
@@ -221,7 +203,7 @@ hr {
     transition: all 0.18s;
     font-family: 'Nunito Sans', sans-serif;
 }
-.btn.btn-clear:hover { background: #e2e8f0; }
+.btn.btn-clear:hover { background: var(--hover-bg); }
 
 /* ── Table Container ── */
 .table-container {
@@ -235,10 +217,10 @@ hr {
 .subjects-table {
     width: 100%;
     border-collapse: collapse;
-    background: white;
+    background: var(--panel);
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
 }
 
 /* ── Standardized Table Headers & Cells ── */

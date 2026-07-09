@@ -5,12 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Report Logs | Laboratory Attendance System</title>
 
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
+    <link rel="stylesheet" href="../shared/global.css">
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
     <link rel="stylesheet" href="../resc/css/reports.css">
@@ -34,23 +33,23 @@
             <div class="stats-row">
                 <div class="stat-card">
                     <div class="stat-icon blue"><i class="fa-solid fa-file-lines"></i></div>
-                    <div><div class="stat-val" id="statTotalAll">0</div><div class="stat-lbl">Total Exports</div></div>
+                    <div><div class="stat-val skeleton skeleton-text" id="statTotalAll" style="width: 2.8rem; height: 1.3rem;"></div><div class="stat-lbl skeleton skeleton-text" style="width: 6rem; height: .9rem; margin-top: .35rem;"></div></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon green"><i class="fa-solid fa-desktop"></i></div>
-                    <div><div class="stat-val" id="statSessions">0</div><div class="stat-lbl">Session Logs</div></div>
+                    <div><div class="stat-val skeleton skeleton-text" id="statSessions" style="width: 2.8rem; height: 1.3rem;"></div><div class="stat-lbl skeleton skeleton-text" style="width: 6rem; height: .9rem; margin-top: .35rem;"></div></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon dark"><i class="fa-solid fa-clipboard-user"></i></div>
-                    <div><div class="stat-val" id="statAttendance">0</div><div class="stat-lbl">Attendance Logs</div></div>
+                    <div><div class="stat-val skeleton skeleton-text" id="statAttendance" style="width: 2.8rem; height: 1.3rem;"></div><div class="stat-lbl skeleton skeleton-text" style="width: 6rem; height: .9rem; margin-top: .35rem;"></div></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon amber"><i class="fa-solid fa-chalkboard-teacher"></i></div>
-                    <div><div class="stat-val" id="statProfessor">0</div><div class="stat-lbl">Professor Logs</div></div>
+                    <div><div class="stat-val skeleton skeleton-text" id="statProfessor" style="width: 2.8rem; height: 1.3rem;"></div><div class="stat-lbl skeleton skeleton-text" style="width: 6rem; height: .9rem; margin-top: .35rem;"></div></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon purple"><i class="fa-solid fa-user-graduate"></i></div>
-                    <div><div class="stat-val" id="statStudent">0</div><div class="stat-lbl">Student Logs</div></div>
+                    <div><div class="stat-val skeleton skeleton-text" id="statStudent" style="width: 2.8rem; height: 1.3rem;"></div><div class="stat-lbl skeleton skeleton-text" style="width: 6rem; height: .9rem; margin-top: .35rem;"></div></div>
                 </div>
             </div>
 
@@ -104,7 +103,7 @@
                         </tr>
                     </thead>
                     <tbody id="reportsBody">
-                        <tr><td colspan="6" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading logs...</p></td></tr>
+                        <tr><td colspan="6" class="empty-state"><div class="skeleton skeleton-block" style="height:1rem;width:68%;margin:0 auto 0.6rem;"></div><div class="skeleton skeleton-block" style="height:1rem;width:54%;margin:0 auto 0.6rem;"></div><div class="skeleton skeleton-block" style="height:1rem;width:44%;margin:0 auto;"></div></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -124,12 +123,12 @@
             <button class="modal-close" onclick="closeDelAllModal()"><i class="fa-solid fa-xmark"></i></button>
             <h3><i class="fa-solid fa-trash-can" style="color:var(--red)"></i> Clear All Logs?</h3>
             <div class="conflict-warning" style="background:var(--red-bg); border-color:#fca5a5; color:#991b1b">
-                <h4 style="color:#991b1b; font-family:'Nunito Sans', sans-serif;"><i class="fa-solid fa-triangle-exclamation"></i> Warning: This cannot be undone.</h4>
+                <h4 style="color:#991b1b; font-family:var(--font-body);"><i class="fa-solid fa-triangle-exclamation"></i> Warning: This cannot be undone.</h4>
                 <p style="font-size: 13px;">The audit history of all exports will be wiped. Your raw system data will <strong>not</strong> be affected.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="pm-btn-cancel" onclick="closeDelAllModal()">Cancel</button>
-                <button type="button" class="btn-danger" style="padding:10px 24px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-family:'Nunito Sans', sans-serif;" onclick="executeDeleteAll()">
+                <button type="button" class="btn-danger" style="padding:10px 24px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-family:var(--font-body); background: var(--red); color: var(--white);" onclick="executeDeleteAll()">
                     <i class="fa-solid fa-trash-can"></i> Yes, Clear Logs
                 </button>
             </div>

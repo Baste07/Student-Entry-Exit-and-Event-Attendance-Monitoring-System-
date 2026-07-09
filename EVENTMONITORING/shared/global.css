@@ -1,21 +1,124 @@
 :root {
-    font-size: 125%;
+    font-size: 100%;
     --blue-dark:    #0b4f6c;
     --blue-mid:     #1976b8;
     --blue-sidebar: #083b53;
     --blue-btn:     #2382c8;
     --blue-hover:   #17679a;
     --blue-active:  #2b93db;
-    --sidebar-w:     235px;
-    --topbar-h:      70px;
+    --surface:       #ffffff;
+    --surface-soft:  #f5faff;
+    --surface-strong:#eaf4fb;
     --body-bg:       #f3f8fc;
-    --card-bg:       #ffffff;
     --border:        #dbeaf4;
     --text-main:     #15364d;
     --text-muted:    #5f7889;
     --shadow-sm:     0 2px 10px rgba(8, 44, 69, 0.08);
     --shadow-md:     0 12px 30px rgba(8, 44, 69, 0.12);
+    --shadow-lg:     0 18px 50px rgba(8, 44, 69, 0.16);
     --radius:        0.85rem;
+    --radius-lg:     1.35rem;
+
+    --font-body:     'Source Sans 3', sans-serif;
+    --font-heading:  'Merriweather', serif;
+    --font-mono:     'Source Sans 3', sans-serif;
+
+    --sidebar-w:     235px;
+    --topbar-h:      70px;
+    --sidebar-collapsed: 64px;
+    --sidebar-expanded:  240px;
+    --sidebar-bg:    var(--blue-sidebar);
+    --sidebar-hover-bg: rgba(255,255,255,.08);
+    --sidebar-active-bg: rgba(255,255,255,.15);
+    --sidebar-border: rgba(255,255,255,.08);
+    --sidebar-text: rgba(255,255,255,.80);
+    --sidebar-text-active: #ffffff;
+    --sidebar-icon: rgba(255,255,255,.65);
+    --sidebar-icon-active: #ffffff;
+    --accent-bar:   var(--yellow);
+
+    --green-dark:   var(--blue-dark);
+    --green-mid:    var(--blue-mid);
+    --green-sidebar: var(--blue-sidebar);
+    --green-btn:    var(--blue-btn);
+    --green-hover:  var(--blue-hover);
+    --green-active: var(--blue-active);
+    --green-bright: var(--blue-active);
+    --green-light:  var(--surface-strong);
+    --blue-bright:  var(--blue-active);
+    --blue-light:   var(--surface-strong);
+    --blue:         var(--blue-active);
+    --blue-bg:      var(--surface-strong);
+    --yellow:       #f6b23e;
+    --yellow-light: #fff1c6;
+    --yellow-pale:  var(--yellow-light);
+    --red:          #dc2626;
+    --red-bg:       #fee2e2;
+    --amber:        var(--yellow);
+    --amber-light:  #fff7e6;
+    --amber-bg:     #fffbeb;
+    --purple:       #7c3aed;
+    --purple-bg:    #f5f3ff;
+    --accent:       var(--blue-btn);
+    --accent-dark:  var(--blue-hover);
+    --accent-light: var(--surface-strong);
+    --accent-lighter:#d1edde;
+    --link-hover:   var(--blue-hover);
+    --text-light:   var(--text-main);
+    --text-dark:    var(--text-main);
+    --text-body:    var(--text-main);
+    --off-white:    var(--body-bg);
+    --card-bg:      var(--surface);
+    --panel:        var(--surface);
+    --hover-bg:     var(--surface-strong);
+    --border-focus: var(--blue-mid);
+    --card-shadow:  var(--shadow-md);
+    --shadow:       var(--shadow-md);
+    --r:            var(--radius);
+    --rl:           var(--radius-lg);
+}
+
+.skeleton {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+    min-height: 1rem;
+    border: 1px solid var(--border);
+    background-color: var(--card-bg);
+    background-image: linear-gradient(90deg, var(--surface-soft) 25%, var(--surface) 37%, var(--surface-soft) 63%);
+    background-size: 400px 100%;
+    border-radius: 999px;
+    color: transparent;
+    pointer-events: none;
+    animation: skeleton-shimmer 1.4s ease infinite;
+}
+
+.skeleton.skeleton-block,
+.skeleton.skeleton-card {
+    display: block;
+    border-radius: .75rem;
+}
+
+.skeleton.skeleton-pill {
+    border-radius: 999px;
+}
+
+.skeleton.skeleton-text {
+    min-height: .95rem;
+    border-radius: 999px;
+}
+
+.skeleton.skeleton-circle {
+    border-radius: 50%;
+}
+
+@keyframes skeleton-shimmer {
+    0% { background-position: -200px 0; }
+    100% { background-position: 200px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton { animation: none; }
 }
 
 html {
@@ -23,10 +126,36 @@ html {
 }
 
 body {
-    font-family: 'Source Sans 3', sans-serif;
+    font-family: var(--font-body) !important;
     background: var(--body-bg);
     color: var(--text-main);
     min-height: 100vh;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+    font-family: var(--font-body) !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.topbar-title,
+.page-header h1,
+.container h1,
+.header-titles h1,
+.settings-header h2,
+.toolbar-title,
+.stat-value,
+.stat-val,
+.preview-value {
+    font-family: var(--font-heading) !important;
 }
 
 .topbar {
@@ -72,7 +201,6 @@ body {
     font-size: 1rem;
     color: #fff;
     letter-spacing: .02em;
-    text-transform: uppercase;
 }
 
 .topbar-subtitle {
@@ -199,7 +327,7 @@ body {
 .nav-item.active {
     background: rgba(255,255,255,0.12);
     color: #fff;
-        border-left-color: #5ddc8a;
+    border-left-color: #2b93db;
     font-weight: 600;
 }
 

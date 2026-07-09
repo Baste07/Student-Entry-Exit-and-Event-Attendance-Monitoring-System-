@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Professors | Laboratory Attendance System</title>
 
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
+    <link rel="stylesheet" href="../shared/global.css">
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
     <link rel="stylesheet" href="../resc/css/professor.css">
@@ -166,17 +166,17 @@
                 <div class="pm-group">
                     <label for="profIdSearch">Enter Employee ID</label>
                     <input type="text" id="profIdSearch" placeholder="e.g., EMP2024001"
-                        style="width:100%;padding:12px;border:2px solid #dcfce7;border-radius:8px;font-size:14px;box-sizing:border-box">
+                        style="width:100%;padding:12px;border:2px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box">
                 </div>
                 <button type="button" id="profSearchBtn" onclick="searchProfessor()"
-                    style="width:100%;padding:12px;background:#166534;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px">
+                    style="width:100%;padding:12px;background:var(--green-dark);color:var(--white);border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px">
                     <i class="fa-solid fa-search"></i> Search Professor
                 </button>
                 <div id="profSearchResult" class="prof-search-result">
                     <div id="profFaceStatus" class="face-status"></div>
                     <div id="profStudentInfo" class="student-info"></div>
                     <button type="button" id="profRegisterFaceBtn" onclick="redirectToProfFaceReg()"
-                        style="display:none;width:100%;padding:12px;background:#166534;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;align-items:center;justify-content:center;gap:8px">
+                        style="display:none;width:100%;padding:12px;background:var(--green-dark);color:var(--white);border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;align-items:center;justify-content:center;gap:8px">
                         <i class="fa-solid fa-camera"></i> Register Face Now
                     </button>
                 </div>
@@ -216,7 +216,7 @@
                     </thead>
                     <tbody id="rmTableBody">
                         <tr>
-                            <td colspan="12" style="text-align:center;padding:40px;color:#9ca3af">
+                            <td colspan="12" style="text-align:center;padding:40px;color:var(--text-muted)">
                                 Loading report data...
                             </td>
                         </tr>
