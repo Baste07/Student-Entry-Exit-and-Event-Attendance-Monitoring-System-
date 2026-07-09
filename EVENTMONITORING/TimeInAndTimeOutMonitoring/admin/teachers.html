@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teachers Management | Laboratory Attendance System</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Shared component styles -->
+    <link rel="stylesheet" href="../shared/global.css">
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+
+    <!-- Page-specific styles -->
+    <link rel="stylesheet" href="../resc/css/teachers.css">
+</head>
+<body>
+
+    <!-- Shared header injected by sidebar.js -->
+    <div id="header-container"></div>
+
+    <!-- Shared sidebar injected by sidebar.js -->
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-chalkboard-user"></i> Teachers Management</h1>
+                    <p>Manage teacher records, employee IDs, and department assignments</p>
+                </div>
+
+                <div class="stats-badges">
+                    <span class="stat-badge total"><i class="fa-solid fa-chalkboard-user"></i> <span id="badgeTotal">0</span> Total</span>
+                    <span class="stat-badge active"><i class="fa-solid fa-circle-check"></i> <span id="badgeActive">0</span> Active</span>
+                    <span class="stat-badge inactive"><i class="fa-solid fa-circle-xmark"></i> <span id="badgeInactive">0</span> Inactive</span>
+                </div>
+
+                <button class="btn-add" onclick="openAddModal()">
+                    <i class="fa-solid fa-plus"></i> Add Teacher
+                </button>
+            </div>
+            <hr>
+
+            <!-- Filters -->
+            <div class="controls-card">
+                <div class="controls-header">
+                    <h2><i class="fa-solid fa-sliders-h"></i> Filters &amp; Search</h2>
+                </div>
+                <div class="table-controls">
+                    <div class="control-group">
+                        <label for="searchInput"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                        <input type="text" id="searchInput" placeholder="Search by employee ID or name" />
+                    </div>
+                    <div class="control-group">
+                        <label for="departmentFilter"><i class="fa-solid fa-building"></i> Filter by Department</label>
+                        <select id="departmentFilter">
+                            <option value="">All Departments</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="statusFilter"><i class="fa-solid fa-filter"></i> Filter by Status</label>
+                        <select id="statusFilter">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="control-group" style="display:flex; align-items:flex-end;">
+                        <button id="clearFilters" class="btn btn-clear">
+                            <i class="fa-solid fa-eraser"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Employee ID</th>
+                            <th>Last Name</th>
+                            <th>First Name</th>
+                            <th>Department</th>
+                            <th>Position</th>
+                            <th>Contact No.</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teachersTableBody">
+                        <tr id="loadingRow">
+                            <td colspan="9" class="loading-cell">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading teachers...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ══ ADD / EDIT MODAL ══ -->
+    <div id="teacherModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"><i class="fa-solid fa-plus"></i> Add Teacher</h2>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="teacherForm">
+                <input type="hidden" id="teacherId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Employee ID <span class="required">*</span></label>
+                        <input type="text" id="employeeId" required placeholder="e.g., EMP-2026-001">
+                    </div>
+                    <div class="form-group">
+                        <label>Status <span class="required">*</span></label>
+                        <select id="status" required>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name <span class="required">*</span></label>
+                        <input type="text" id="firstName" required placeholder="e.g., Juan">
+                    </div>
+                    <div class="form-group">
+                        <label>Middle Name</label>
+                        <input type="text" id="middleName" placeholder="Optional">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Last Name <span class="required">*</span></label>
+                    <input type="text" id="lastName" required placeholder="e.g., Dela Cruz">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Department</label>
+                        <input type="text" id="department" placeholder="e.g., Mathematics">
+                    </div>
+                    <div class="form-group">
+                        <label>Position</label>
+                        <input type="text" id="position" placeholder="e.g., Subject Teacher">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email" placeholder="e.g., juan.delacruz@school.edu">
+                    </div>
+                    <div class="form-group">
+                        <label>Contact Number</label>
+                        <input type="text" id="contactNumber" placeholder="e.g., 09171234567">
+                    </div>
+                </div>
+                <button type="submit" class="btn-submit" style="width:100%">
+                    <i class="fa-solid fa-save"></i> <span id="submitBtnText">Add Teacher</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+
+    <!-- Shared header + sidebar loader -->
+    <script src="../includes/sidebar.js"></script>
+
+    <!-- Page logic -->
+    <script src="../resc/js/teachers.js"></script>
+
+    <script>
+        loadHeader();
+        loadSidebar('teachers');
+    </script>
+</body>
+</html>

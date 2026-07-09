@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Attendance | Laboratory Attendance System</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Shared component styles -->
+    <link rel="stylesheet" href="../shared/global.css">
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+
+    <!-- Page-specific styles -->
+    <link rel="stylesheet" href="../resc/css/eventAttendance.css">
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-calendar-check"></i> Event Attendance</h1>
+                    <p>Track student and teacher attendance for school events</p>
+                </div>
+
+                <div class="stats-badges">
+                    <span class="stat-badge total"><i class="fa-solid fa-check"></i> <span id="badgePresent">0</span> Present</span>
+                    <span class="stat-badge active"><i class="fa-solid fa-clock"></i> <span id="badgeLate">0</span> Late</span>
+                    <span class="stat-badge inactive"><i class="fa-solid fa-xmark"></i> <span id="badgeAbsent">0</span> Absent</span>
+                </div>
+
+                <button class="btn-add" onclick="openAddModal()" id="btnAddAttendance" disabled>
+                    <i class="fa-solid fa-plus"></i> Record Attendance
+                </button>
+            </div>
+            <hr>
+
+            <!-- Event Selector + Filters -->
+            <div class="controls-card">
+                <div class="controls-header">
+                    <h2><i class="fa-solid fa-sliders-h"></i> Select Event &amp; Filter</h2>
+                </div>
+                <div class="table-controls">
+                    <div class="control-group" style="flex:2 1 0; min-width:240px;">
+                        <label for="eventSelect"><i class="fa-solid fa-calendar-day"></i> Event</label>
+                        <select id="eventSelect">
+                            <option value="">-- Select an Event --</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="searchInput"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                        <input type="text" id="searchInput" placeholder="Search by name or ID" />
+                    </div>
+                    <div class="control-group">
+                        <label for="roleFilter"><i class="fa-solid fa-user-tag"></i> Filter by Role</label>
+                        <select id="roleFilter">
+                            <option value="">All</option>
+                            <option value="student">Students</option>
+                            <option value="teacher">Teachers</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="statusFilter"><i class="fa-solid fa-filter"></i> Filter by Status</label>
+                        <select id="statusFilter">
+                            <option value="">All Status</option>
+                            <option value="present">Present</option>
+                            <option value="late">Late</option>
+                            <option value="absent">Absent</option>
+                            <option value="excused">Excused</option>
+                        </select>
+                    </div>
+                    <div class="control-group" style="display:flex; align-items:flex-end;">
+                        <button id="clearFilters" class="btn btn-clear">
+                            <i class="fa-solid fa-eraser"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>ID</th>
+                            <th>Status</th>
+                            <th>Time In</th>
+                            <th>Time Out</th>
+                            <th>Remarks</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceTableBody">
+                        <tr id="loadingRow">
+                            <td colspan="8" class="loading-cell">
+                                <i class="fa-solid fa-calendar-day" style="font-size:20px;"></i>
+                                Select an event above to view its attendance.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ══ ADD / EDIT MODAL ══ -->
+    <div id="attendanceModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"><i class="fa-solid fa-plus"></i> Record Attendance</h2>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="attendanceForm">
+                <input type="hidden" id="attendanceId">
+                <div class="form-group">
+                    <label>Role <span class="required">*</span></label>
+                    <select id="personRole" required>
+                        <option value="student">Student</option>
+                        <option value="teacher">Teacher</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Person <span class="required">*</span></label>
+                    <select id="personId" required>
+                        <option value="" disabled selected>-- Select --</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Status <span class="required">*</span></label>
+                        <select id="status" required>
+                            <option value="present">Present</option>
+                            <option value="late">Late</option>
+                            <option value="absent">Absent</option>
+                            <option value="excused">Excused</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Time In</label>
+                        <input type="time" id="timeIn">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Time Out</label>
+                    <input type="time" id="timeOut">
+                </div>
+                <div class="form-group">
+                    <label>Remarks</label>
+                    <textarea id="remarks" placeholder="Optional"></textarea>
+                </div>
+                <button type="submit" class="btn-submit" style="width:100%">
+                    <i class="fa-solid fa-save"></i> <span id="submitBtnText">Save Record</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+
+    <!-- Shared header + sidebar loader -->
+    <script src="../includes/sidebar.js"></script>
+
+    <!-- Page logic -->
+    <script src="../resc/js/eventAttendance.js"></script>
+
+    <script>
+        loadHeader();
+        loadSidebar('event-attendance');
+    </script>
+</body>
+</html>
