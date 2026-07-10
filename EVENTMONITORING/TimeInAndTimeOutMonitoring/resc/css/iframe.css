@@ -6,6 +6,22 @@
  */
 
 /* ===== CSS VARIABLES ===== */
+:root {
+    --green-dark:   #1a4731;
+    --green-mid:    #2d6a4f;
+    --green-bright: #40916c;
+    --yellow:       #f4c430;
+    --yellow-light: #fde68a;
+    --white:        #ffffff;
+    --accent: #1a7a4a;
+    --accent-dark: #145f38;
+    --accent-light: #e8f5ee;
+    --accent-lighter: #d1edde;
+    --border: #e2e8f0;
+    --text-light: #1e293b;
+    --link-hover: #15803d;
+}
+
 /* ===== RESET ===== */
 * {
     margin: 0;

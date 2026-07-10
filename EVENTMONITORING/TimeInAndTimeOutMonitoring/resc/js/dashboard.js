@@ -45,12 +45,6 @@ function getCurrentTime() {
     }).substring(0, 8);
 }
 
-function revealDashboardSkeletons() {
-    document.querySelectorAll('#profileCard .skeleton, .summary-section .skeleton, #labGrid .skeleton').forEach(el => {
-        el.classList.remove('skeleton');
-    });
-}
-
 // ────────────────────────────────────────────
 // LOAD ALL DASHBOARD DATA
 // ────────────────────────────────────────────
@@ -68,7 +62,6 @@ async function loadDashboardData() {
             loadLaboratories()
         ]);
 
-        revealDashboardSkeletons();
         console.log('✅ Dashboard loaded');
 
     } catch (error) {

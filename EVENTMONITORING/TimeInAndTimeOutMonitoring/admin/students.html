@@ -6,13 +6,12 @@
     <title>Students List | Laboratory Attendance System</title>
 
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
     <!-- Shared component styles -->
-    <link rel="stylesheet" href="../shared/global.css">
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
 
@@ -136,9 +135,7 @@
                     <tbody id="studentsTableBody">
                         <tr id="loadingRow">
                             <td colspan="9" style="text-align:center;padding:40px;color:#5a7265">
-                                <div class="skeleton skeleton-block" style="height:1rem;width:58%;margin:0 auto 0.7rem;"></div>
-                                <div class="skeleton skeleton-block" style="height:1rem;width:42%;margin:0 auto 0.7rem;"></div>
-                                <div class="skeleton skeleton-block" style="height:1rem;width:50%;margin:0 auto;"></div>
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading students...
                             </td>
                         </tr>
                     </tbody>
@@ -205,7 +202,7 @@
                         </tr>
                     </thead>
                     <tbody id="rmTableBody">
-                        <tr><td colspan="14" style="text-align:center;padding:40px;color:var(--text-muted)">
+                        <tr><td colspan="14" style="text-align:center;padding:40px;color:#9ca3af">
                             <i class="fa-solid fa-spinner fa-spin"></i> Loading report data...
                         </td></tr>
                     </tbody>
