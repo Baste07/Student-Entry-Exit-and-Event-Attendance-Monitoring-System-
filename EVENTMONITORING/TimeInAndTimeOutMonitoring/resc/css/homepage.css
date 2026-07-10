@@ -4,6 +4,29 @@
    ============================================================ */
 
 /* ── Tokens ── */
+:root {
+    --blue-dark:   #0b4e78;
+    --blue-mid:    #176aa4;
+    --blue-bright: #2f8fce;
+    --blue-light:  #80c7f5;
+    --yellow:       #f6b23e;
+    --yellow-light: #fff1c6;
+    --yellow-pale:  #fff8e6;
+    --white:        #ffffff;
+    --off-white:    #f4f9fd;
+    --surface:      #edf7ff;
+    --hover-bg:     #e5f4ff;
+    --text-dark:    #14364c;
+    --text-body:    #2c4860;
+    --text-muted:   #6a8092;
+    --border:       #dcebf5;
+    --red:          #dc2626;
+    --radius:       10px;
+    --radius-lg:    14px;
+    --shadow-sm:    0 16px 40px rgba(11,78,120,.10);
+    --shadow-md:    0 24px 60px rgba(11,78,120,.14);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 

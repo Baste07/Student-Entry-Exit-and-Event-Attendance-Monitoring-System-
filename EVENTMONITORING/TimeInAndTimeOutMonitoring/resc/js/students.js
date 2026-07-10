@@ -152,7 +152,6 @@ async function loadStudents() {
         document.getElementById('statRegistered').textContent = registered;
         document.getElementById('statPending').textContent    = pending;
 
-        document.querySelectorAll('.stats-badges .skeleton, #studentsTableBody .skeleton').forEach(el => el.classList.remove('skeleton'));
         renderTable(allStudents);
         await buildReportRows();
 

@@ -4,6 +4,20 @@
    Replaces the old css_nav.css.
 ============================================================ */
 
+:root {
+    --sidebar-collapsed:    64px;
+    --sidebar-expanded:     240px;
+    --sidebar-bg:           #1a4731;
+    --sidebar-hover-bg:     rgba(255,255,255,.08);
+    --sidebar-active-bg:    rgba(255,255,255,.15);
+    --sidebar-border:       rgba(255,255,255,.08);
+    --sidebar-text:         rgba(255,255,255,.80);
+    --sidebar-text-active:  #ffffff;
+    --sidebar-icon:         rgba(255,255,255,.65);
+    --sidebar-icon-active:  #ffffff;
+    --accent-bar:           #f4c430;
+}
+
 /* ===== SIDEBAR ===== */
 .sidebar {
     position: fixed;

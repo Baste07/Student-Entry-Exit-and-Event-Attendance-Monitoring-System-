@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Attendance | Laboratory Attendance System</title>
 
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-    <link rel="stylesheet" href="../shared/global.css">
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
 
@@ -66,7 +67,7 @@
                     <div><div class="stat-val" id="statSessions">0</div><div class="stat-lbl">Active Sessions</div></div>
                 </div>
                 <div class="stat-card" id="statAbsentCard" style="display:none">
-                    <div class="stat-icon" style="background:var(--red-bg);color:var(--red)"><i class="fa-solid fa-circle-minus"></i></div>
+                    <div class="stat-icon" style="background:#fee2e2;color:#991b1b"><i class="fa-solid fa-circle-minus"></i></div>
                     <div><div class="stat-val" id="statAbsent">0</div><div class="stat-lbl">Not Timed In</div></div>
                 </div>
             </div>
@@ -137,7 +138,7 @@
                             </tr>
                         </thead>
                         <tbody id="attendanceBody">
-                            <tr><td colspan="12" class="empty-state"><div class="skeleton skeleton-block" style="height:1rem;width:62%;margin:0 auto 0.65rem;"></div><div class="skeleton skeleton-block" style="height:1rem;width:48%;margin:0 auto 0.65rem;"></div><div class="skeleton skeleton-block" style="height:1rem;width:56%;margin:0 auto;"></div></td></tr>
+                            <tr><td colspan="12" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading attendance data...</p></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -189,7 +190,7 @@
                         </tr>
                     </thead>
                     <tbody id="rmTableBody">
-                        <tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)"><div class="skeleton skeleton-block" style="height:1rem;width:56%;margin:0 auto 0.65rem;"></div><div class="skeleton skeleton-block" style="height:1rem;width:38%;margin:0 auto;"></div></td></tr>
+                        <tr><td colspan="15" style="text-align:center;padding:40px;color:var(--text-muted)">Loading report data...</td></tr>
                     </tbody>
                 </table>
             </div>

@@ -4,6 +4,15 @@
    Replaces the old css_header.css.
 ============================================================ */
 
+:root {
+    --blue-dark:   #0b4e78;
+    --blue-mid:    #176aa4;
+    --blue-bright: #2f8fce;
+    --yellow:       #f6b23e;
+    --yellow-light: #fff1c6;
+    --white:        #ffffff;
+}
+
 /* ====== HEADER ====== */
 header {
     position: fixed;

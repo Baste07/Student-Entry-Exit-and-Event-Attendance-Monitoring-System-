@@ -143,7 +143,7 @@ body {
     font-size: clamp(1.7rem, 2.1vw, .8rem);
     line-height: 1.18;
     letter-spacing: -0.01em;
-    color: var(--blue-mid);
+    color: var(--green-mid);
     text-align: center;
     margin-bottom: .55rem;
 }
