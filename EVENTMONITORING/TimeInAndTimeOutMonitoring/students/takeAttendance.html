@@ -16,8 +16,8 @@
     gap: 8px;
     padding: 10px 20px;
     background: transparent;
-    color: #0b4e78;
-    border: 2px solid #0b4e78;
+    color: #c0392b;
+    border: 2px solid #c0392b;
     border-radius: 8px;
     font-family: 'DM Sans', sans-serif;
     font-size: 14px;
@@ -29,7 +29,7 @@
     justify-content: center;
 }
 .btn-manual:hover {
-    background: #0b4e78;
+    background: #c0392b;
     color: #fff;
     transform: translateY(-1px);
     box-shadow: 0 4px 14px rgba(192,57,43,.35);
@@ -64,14 +64,21 @@
     to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+.cred-bar {
+    height: 4px;
+    background: linear-gradient(90deg, #1a4731, #40916c, #f4c430);
+    margin: -36px -32px 28px;
+    border-radius: 18px 18px 0 0;
+}
+
 .cred-icon {
     width: 52px; height: 52px;
-    background: #edf7ff;
-    border: 1.5px solid #0b4e78;
+    background: #fef2f2;
+    border: 1.5px solid #fecaca;
     border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
     font-size: 22px; margin-bottom: 14px;
-    color: #0b4e78;
+    color: #c0392b;
 }
 
 .cred-box h3 {
@@ -81,7 +88,7 @@
 }
 
 .cred-box p {
-    font-size: 13.5px; color: #0b4e78;
+    font-size: 13.5px; color: #5a7265;
     margin-bottom: 22px; line-height: 1.5;
 }
 
@@ -90,7 +97,7 @@
 .cred-fg label {
     display: block;
     font-size: 12.5px; font-weight: 700;
-    color: #0b4e78; margin-bottom: 6px;
+    color: #1a4731; margin-bottom: 6px;
     text-transform: uppercase; letter-spacing: .7px;
     font-family: 'DM Sans', sans-serif;
 }
@@ -110,7 +117,7 @@
 }
 
 .cred-fg input:focus {
-    border-color: #80c7f5;
+    border-color: #40916c;
     background: #fff;
     box-shadow: 0 0 0 3px rgba(64,145,108,.12);
 }
@@ -120,8 +127,8 @@
     align-items: center;
     gap: 8px;
     background: #fef2f2;
-    border: 1px solid #80c7f5;
-    color: #0b4e78;
+    border: 1px solid #fecaca;
+    color: #991b1b;
     padding: 10px 13px;
     border-radius: 8px;
     font-size: 13px;
@@ -140,7 +147,7 @@
 .cred-btn-submit {
     flex: 1;
     padding: 12px;
-    background: #0b4e78;
+    background: #1a4731;
     color: #fff;
     border: none;
     border-radius: 10px;
@@ -152,7 +159,7 @@
     box-shadow: 0 4px 12px rgba(26,71,49,.22);
 }
 .cred-btn-submit:hover:not(:disabled) {
-    background: #0b4e78;
+    background: #2d6a4f;
     transform: translateY(-1px);
 }
 .cred-btn-submit:disabled { opacity: .55; cursor: not-allowed; }
@@ -160,8 +167,8 @@
 .cred-btn-cancel {
     padding: 12px 18px;
     background: transparent;
-    color: #80c7f5;
-    border: 1.5px solid #80c7f5;
+    color: #5a7265;
+    border: 1.5px solid #d4e6d9;
     border-radius: 10px;
     font-family: 'DM Sans', sans-serif;
     font-size: 14px; font-weight: 600;
@@ -169,8 +176,8 @@
     transition: all .15s;
 }
 .cred-btn-cancel:hover {
-    border-color: #2f8fce;
-    color: #2f8fce;
+    border-color: #40916c;
+    color: #1a4731;
     background: #f5f8f5;
 }
 
@@ -187,7 +194,7 @@
     font-family: 'DM Sans', sans-serif;
 }
 
-.cred-note i { color: #0b4e78; margin-right: 4px; }
+.cred-note i { color: #40916c; margin-right: 4px; }
 
 /* ── Greeting Overlay ── */
 .greet-overlay {
@@ -280,7 +287,7 @@
 </div>
         <div class="brand-text">
             <span class="sys-label">Monitoring System</span>
-            <h1>Entry-Exit Attendance</h1>
+            <h1>Entry Exit Attendance</h1>
         </div>
     </a>
 
@@ -416,12 +423,12 @@
         </div>
 
         <div class="cred-fg">
-            <label><i class="fa-solid fa-envelope" style="color:#0b4e78;margin-right:5px"></i> Email Address</label>
+            <label><i class="fa-solid fa-envelope" style="color:#40916c;margin-right:5px"></i> Email Address</label>
             <input type="email" id="credEmail" placeholder="Enter your email" autocomplete="off">
         </div>
 
         <div class="cred-fg">
-            <label><i class="fa-solid fa-lock" style="color:#0b4e78;margin-right:5px"></i> Password</label>
+            <label><i class="fa-solid fa-lock" style="color:#40916c;margin-right:5px"></i> Password</label>
             <input type="password" id="credPassword" placeholder="Enter your password"
                    onkeydown="if(event.key==='Enter')submitCredentials()">
         </div>

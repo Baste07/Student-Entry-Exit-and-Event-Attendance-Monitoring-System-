@@ -5,11 +5,11 @@
 ============================================================ */
 
 :root {
-    --blue-dark:   #0b4e78;
-    --blue-mid:    #176aa4;
-    --blue-bright: #2f8fce;
-    --yellow:       #f6b23e;
-    --yellow-light: #fff1c6;
+    --green-dark:   #1a4731;
+    --green-mid:    #2d6a4f;
+    --green-bright: #40916c;
+    --yellow:       #f4c430;
+    --yellow-light: #fde68a;
     --white:        #ffffff;
 }
 
@@ -23,7 +23,7 @@ header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue-mid) 100%);
+    background: var(--green-dark);
     padding: 0 28px 0 20px;
     box-shadow: 0 2px 16px rgba(0,0,0,.22);
     z-index: 200;          /* above sidebar (z-index: 100) */
@@ -166,9 +166,9 @@ header {
 .header-home-btn i { font-size: 13px; }
 
 .header-home-btn:hover {
-    background: var(--blue-bright);
+    background: var(--green-bright);
     color: var(--white);
-    border-color: var(--blue-bright);
+    border-color: var(--green-bright);
     box-shadow: 0 4px 16px rgba(64,145,108,.35); /* Soft green glow */
 }
 
@@ -224,7 +224,7 @@ header {
 
 .header-attendance-btn:hover {
     background: var(--yellow); /* Bright yellow/amber hover */
-    color: var(--blue-dark);  /* Dark text for contrast */
+    color: var(--green-dark);  /* Dark text for contrast */
     border-color: var(--yellow);
     box-shadow: 0 4px 16px rgba(244, 196, 48, 0.35); /* Yellow glow */
 }
