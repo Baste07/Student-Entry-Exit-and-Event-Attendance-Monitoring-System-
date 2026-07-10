@@ -3,212 +3,205 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>ADMIN REGISTRATION</title>
+    <title>Admin Registration</title>
+    <link rel="icon" type="image/png" href="assets/ElTresEresCenciaEscuelaLogo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="register.css">
 </head>
 <body>
 
-<div class="register-card">
-
-    <div class="logos">
-        <img src="assets/El Tres Eres Cencia Escuela.jpg" alt="PLP Logo" class="plp-logo"/>
-    </div>
-
-    <h1 class="card-title">ADMIN REGISTRATION</h1>
-    <p class="card-subtitle">Create your account to access the requirement submission system</p>
-
-    <!-- Step Indicator -->
-    <div class="step-indicator">
-        <div class="step active" data-step="1">
-            <span class="step-number">1</span>
-            <span class="step-label">Personal Info</span>
-        </div>
-        <div class="step-divider"></div>
-        <div class="step" data-step="2">
-            <span class="step-number">2</span>
-            <span class="step-label">Account Details</span>
-        </div>
-    </div>
-
-    <form id="registrationForm" novalidate>
-
-        <!-- Step 1: Personal Info -->
-        <div class="form-step active" data-step="1">
-            
-            <div class="mb-field" id="employeeIdField">
-                <label class="form-label" for="employeeId"><span id="employeeIdLabel">Employee ID</span> <span class="required" id="employeeIdRequired">*</span></label>
-                <input
-                    type="text"
-                    id="employeeId"
-                    name="employeeId"
-                    class="form-control"
-                    placeholder="Enter your employee ID"
-                    required
-                />
+<div class="auth-shell">
+    <section class="auth-panel">
+        <div class="register-card">
+            <div class="logos">
+                <img src="assets/ElTresEresCenciaEscuelaLogo.png" alt="El Tres Eres Ciencia Escuela logo" class="logo"/>
             </div>
 
-            <div class="row" id="nameFields">
-                <div class="col-md-4 mb-field">
-                    <label class="form-label" for="firstName"><span id="firstNameLabel">First Name</span> <span class="required">*</span></label>
-                    <input
-                        type="text"
-                        id="firstName"
-                        name="firstName"
-                        class="form-control"
-                        placeholder="First name"
-                        required
-                    />
+            <h1 class="card-title">Admin Registration</h1>
+            <p class="card-subtitle">Create your account to access the attendance monitoring system</p>
+
+            <div class="step-indicator">
+                <div class="step active" data-step="1">
+                    <span class="step-number">1</span>
+                    <span class="step-label">Personal Info</span>
                 </div>
-                <div class="col-md-4 mb-field" id="middleNameField">
-                    <label class="form-label" for="middleName">Middle Name</label>
-                    <input
-                        type="text"
-                        id="middleName"
-                        name="middleName"
-                        class="form-control"
-                        placeholder="Middle name"
-                    />
-                </div>
-                <div class="col-md-4 mb-field" id="lastNameField">
-                    <label class="form-label" for="lastName">Last Name <span class="required" id="lastNameRequired">*</span></label>
-                    <input
-                        type="text"
-                        id="lastName"
-                        name="lastName"
-                        class="form-control"
-                        placeholder="Last name"
-                        required
-                    />
+                <div class="step-divider"></div>
+                <div class="step" data-step="2">
+                    <span class="step-number">2</span>
+                    <span class="step-label">Account Details</span>
                 </div>
             </div>
 
-            <div class="mb-field" id="suffixField">
-                <label class="form-label" for="suffix">Suffix</label>
-                <input
-                    type="text"
-                    id="suffix"
-                    name="suffix"
-                    class="form-control"
-                    placeholder="e.g., Jr., Sr., III"
-                />
-                <small class="field-hint">Optional: Enter suffix if applicable (e.g., Jr., Sr., III)</small>
-            </div>
+            <form id="registrationForm" novalidate>
+                <div class="form-step active" data-step="1">
+                    <div class="mb-field" id="employeeIdField">
+                        <label class="form-label" for="employeeId"><span id="employeeIdLabel">Employee ID</span> <span class="required" id="employeeIdRequired">*</span></label>
+                        <input
+                            type="text"
+                            id="employeeId"
+                            name="employeeId"
+                            class="form-control"
+                            placeholder="Enter your employee ID"
+                            required
+                        />
+                    </div>
 
-            <div class="mb-field" id="roleField">
-                <label class="form-label" for="role">Role</label>
-                <select id="role" name="role" class="form-select">
-                    <option value="full_time" selected>Full-time Professor</option>
-                    <option value="part_time">Part-time Professor</option>
-                </select>
-            </div>
+                    <div class="row" id="nameFields">
+                        <div class="col-md-4 mb-field">
+                            <label class="form-label" for="firstName"><span id="firstNameLabel">First Name</span> <span class="required">*</span></label>
+                            <input
+                                type="text"
+                                id="firstName"
+                                name="firstName"
+                                class="form-control"
+                                placeholder="First name"
+                                required
+                            />
+                        </div>
+                        <div class="col-md-4 mb-field" id="middleNameField">
+                            <label class="form-label" for="middleName">Middle Name</label>
+                            <input
+                                type="text"
+                                id="middleName"
+                                name="middleName"
+                                class="form-control"
+                                placeholder="Middle name"
+                            />
+                        </div>
+                        <div class="col-md-4 mb-field" id="lastNameField">
+                            <label class="form-label" for="lastName">Last Name <span class="required" id="lastNameRequired">*</span></label>
+                            <input
+                                type="text"
+                                id="lastName"
+                                name="lastName"
+                                class="form-control"
+                                placeholder="Last name"
+                                required
+                            />
+                        </div>
+                    </div>
 
-            <div class="mb-field" id="departmentField">
-                <label class="form-label" for="department">Department <span class="required">*</span></label>
-                <select id="department" name="department" class="form-select" required>
-                    <option value="">Select your department...</option>
-                </select>
-                <small class="field-hint">Select the department you belong to</small>
-            </div>
+                    <div class="mb-field" id="suffixField">
+                        <label class="form-label" for="suffix">Suffix</label>
+                        <input
+                            type="text"
+                            id="suffix"
+                            name="suffix"
+                            class="form-control"
+                            placeholder="e.g., Jr., Sr., III"
+                        />
+                        <small class="field-hint">Optional: Enter suffix if applicable (e.g., Jr., Sr., III)</small>
+                    </div>
 
-            <input type="hidden" id="userType" name="userType" value="professor">
+                    <div class="mb-field" id="roleField">
+                        <label class="form-label" for="role">Role</label>
+                        <select id="role" name="role" class="form-select">
+                            <option value="full_time" selected>Full-time Professor</option>
+                            <option value="part_time">Part-time Professor</option>
+                        </select>
+                    </div>
 
-        </div>
+                    <div class="mb-field" id="departmentField">
+                        <label class="form-label" for="department">Department <span class="required">*</span></label>
+                        <select id="department" name="department" class="form-select" required>
+                            <option value="">Select your department...</option>
+                        </select>
+                        <small class="field-hint">Select the department you belong to</small>
+                    </div>
 
-        <!-- Step 2: Account Details -->
-        <div class="form-step" data-step="2">
-            
-            <div class="mb-field">
-                <label class="form-label" for="email">Email Address <span class="required">*</span></label>
-                <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    class="form-control"
-                    placeholder="your.email@plpasig.edu.ph"
-                    required
-                />
-                <small class="field-hint">Use your institutional email address</small>
-            </div>
-
-            <div class="mb-field">
-                <label class="form-label" for="password">Password <span class="required">*</span></label>
-                <div class="input-wrapper">
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        class="form-control"
-                        placeholder="Minimum 8 characters"
-                        autocomplete="new-password"
-                        minlength="8"
-                        required
-                    />
-                    <svg class="input-icon toggle-password" data-target="password" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                    </svg>
+                    <input type="hidden" id="userType" name="userType" value="professor">
                 </div>
-                <small class="field-hint">Must be at least 8 characters long</small>
-            </div>
 
-            <div class="mb-field">
-                <label class="form-label" for="confirmPassword">Confirm Password <span class="required">*</span></label>
-                <div class="input-wrapper">
-                    <input
-                        type="password"
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        class="form-control"
-                        placeholder="Re-enter your password"
-                        autocomplete="new-password"
-                        minlength="8"
-                        required
-                    />
-                    <svg class="input-icon toggle-password" data-target="confirmPassword" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                    </svg>
+                <div class="form-step" data-step="2">
+                    <div class="mb-field">
+                        <label class="form-label" for="email">Email Address <span class="required">*</span></label>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            class="form-control"
+                            placeholder="your.email@plpasig.edu.ph"
+                            required
+                        />
+                        <small class="field-hint">Use your institutional email address</small>
+                    </div>
+
+                    <div class="mb-field">
+                        <label class="form-label" for="password">Password <span class="required">*</span></label>
+                        <div class="input-wrapper">
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                class="form-control"
+                                placeholder="Minimum 8 characters"
+                                autocomplete="new-password"
+                                minlength="8"
+                                required
+                            />
+                            <svg class="input-icon toggle-password" data-target="password" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </div>
+                        <small class="field-hint">Must be at least 8 characters long</small>
+                    </div>
+
+                    <div class="mb-field">
+                        <label class="form-label" for="confirmPassword">Confirm Password <span class="required">*</span></label>
+                        <div class="input-wrapper">
+                            <input
+                                type="password"
+                                id="confirmPassword"
+                                name="confirmPassword"
+                                class="form-control"
+                                placeholder="Re-enter your password"
+                                autocomplete="new-password"
+                                minlength="8"
+                                required
+                            />
+                            <svg class="input-icon toggle-password" data-target="confirmPassword" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div class="info-note">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 16v-4M12 8h.01"/>
+                        </svg>
+                        <span><strong>Note:</strong> Your account will be subject to admin approval before you can access the system.</span>
+                    </div>
                 </div>
-            </div>
 
-            <div class="info-note">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M12 16v-4M12 8h.01"/>
-                </svg>
-                <span><strong>Note:</strong> Your account will be subject to admin approval before you can access the system.</span>
-            </div>
+                <div class="form-navigation">
+                    <button type="button" class="btn-secondary" id="backBtn">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                        Back to Login
+                    </button>
+                    <button type="button" class="btn-primary" id="nextBtn">
+                        Next Step
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                    <button type="button" class="btn-secondary" id="prevBtn" style="display: none;">
+                        Previous
+                    </button>
+                    <button type="submit" class="btn-primary" id="submitBtn" style="display: none;">
+                        Complete Registration
+                    </button>
+                </div>
+            </form>
 
+            <p class="signin-link">Already have an account? <a href="login.html">Sign in here</a></p>
         </div>
-
-        <!-- Navigation Buttons -->
-        <div class="form-navigation">
-            <button type="button" class="btn-secondary" id="backBtn">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path d="M19 12H5M12 19l-7-7 7-7"/>
-                </svg>
-                Back to Login
-            </button>
-            <button type="button" class="btn-primary" id="nextBtn">
-                Next Step
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-            </button>
-            <button type="button" class="btn-secondary" id="prevBtn" style="display: none;">
-                Previous
-            </button>
-            <button type="submit" class="btn-primary" id="submitBtn" style="display: none;">
-                Complete Registration
-            </button>
-        </div>
-
-    </form>
-
-    <p class="signin-link">Already have an account? <a href="login.html">Sign in here</a></p>
-
+    </section>
 </div>
 
 <button class="help-btn" title="Help">?</button>
