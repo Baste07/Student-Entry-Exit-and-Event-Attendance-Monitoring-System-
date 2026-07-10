@@ -21,8 +21,9 @@
     <!-- Page Header -->
     <div class="page-header anim anim-1" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
         <div>
-            <h1>Student Import</h1>
-            <p>Bulk import student accounts via Excel or CSV file</p>
+ <!-- TO THIS -->
+<h1>Student Import</h1>
+<p>Bulk import student accounts via Excel or CSV file</p>
         </div>
         <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
             <button type="button" class="btn-download-template" id="addSingleStudentBtn">
@@ -43,17 +44,30 @@
         <p class="step-desc">Choose the section these students belong to, then upload your filled Excel or CSV template.</p>
 
         <div class="row g-4 mt-1">
-          <div class="col-md-5">
+                    <div class="col-md-5">
+    <div class="mb-3">
+        <label for="gradeLevelSelect" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg> 
+            Grade Level <span class="text-danger ms-1">*</span>
+        </label>
+        <select class="form-select" id="gradeLevelSelect">
+            <option value="" disabled selected>Loading grade levels...</option>
+        </select>
+    </div>
+
     <div class="mb-3">
         <label for="departmentSelect" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                 <polyline points="9 22 9 12 15 12 15 22"></polyline>
             </svg> 
-            Grade Level / Section <span class="text-danger ms-1">*</span>
+            Section <span class="text-danger ms-1">*</span>
         </label>
-        <select class="form-select" id="departmentSelect">
-            <option value="" disabled selected>Loading...</option>
+        <select class="form-select" id="departmentSelect" disabled>
+            <option value="" disabled selected>Select grade level first...</option>
         </select>
     </div>
 
@@ -137,7 +151,7 @@
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>LRN</th>
+                        <th>Student ID</th>
                         <th>Last Name</th>
                         <th>First Name</th>
                         <th>Middle Name</th>
@@ -201,7 +215,7 @@
             <div class="info-col">
                 <h4>Required Columns</h4>
                 <ul>
-                    <li><strong>LRN</strong> — Learner Reference Number (12 digits)</li>
+                    <li><strong>Student ID</strong> — Format: K-0001, 1-0001, 10-0001 (Grade-Serial)</li>
                     <li><strong>First Name</strong> — Student's first name</li>
                     <li><strong>Last Name</strong> — Student's last name</li>
                 </ul>
@@ -218,9 +232,9 @@
             </div>
             <div class="info-col">
                 <h4>Notes</h4>
-                <ul>
+                <ul><label for="singleStudentId" class="form-label">Student ID <span class="text-danger">*
                     <li>Section is taken from Step 1 selection for all imported rows</li>
-                    <li>LRNs that already exist in the database are <strong>skipped</strong> from preview and import</li>
+                   <li>Student IDs that already exist in the database are <strong>skipped</strong></li>
                     <li>Do not delete the header row</li>
                     <li>Remove sample data before importing</li>
                 </ul>
@@ -240,7 +254,7 @@
         <div class="students-filters">
             <div class="students-filter-item students-filter-search">
                 <label for="studentSearchInput" class="form-label">Search</label>
-                <input type="text" id="studentSearchInput" class="form-control" placeholder="Name or LRN">
+                <input type="text" id="studentSearchInput" class="form-control" placeholder="Name or Student ID">
             </div>
             <div class="students-filter-item">
                 <label for="studentDeptFilter" class="form-label">Grade Level</label>
@@ -277,7 +291,7 @@
             <table class="students-table">
     <thead>
         <tr>
-            <th>LRN</th>
+            <th>Student ID</th>
             <th>Name</th>
             <th>Grade Level</th>
             <th>Section</th>
@@ -307,13 +321,13 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted mb-3" id="duplicateRowsSummaryText">Rows skipped due to duplicate LRNs.</p>
+                <p class="text-muted mb-3" id="duplicateRowsSummaryText">Rows skipped due to duplicate Student IDs.</p>
                 <div class="table-responsive duplicate-rows-table-wrap">
                     <table class="table table-sm align-middle mb-0 duplicate-rows-table">
                         <thead>
                             <tr>
                                 <th>Source Row</th>
-                                <th>LRN</th>
+                                <th>Student ID</th>
                                 <th>Name</th>
                                 <th>Email</th>
                                 <th>Reason</th>
@@ -360,17 +374,24 @@
 
                         <!-- Student Information -->
                         <h6 class="fw-semibold mb-3" style="color:var(--text-main);">Student Information</h6>
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label for="singleDepartment" class="form-label">Section <span class="text-danger">*</span></label>
-                                <select id="singleDepartment" class="form-select" required>
-                                    <option value="">Select section...</option>
+                                            <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="singleGradeLevel" class="form-label">Grade Level <span class="text-danger">*</span></label>
+                                <select id="singleGradeLevel" class="form-select" required>
+                                    <option value="" disabled selected>Select grade level...</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
-                                <label for="singleStudentId" class="form-label">LRN <span class="text-danger">*</span></label>
-                                <input type="text" id="singleStudentId" class="form-control" placeholder="12-digit LRN" maxlength="12" required>
+                            <div class="col-md-4">
+                                <label for="singleDepartment" class="form-label">Section <span class="text-danger">*</span></label>
+                                <select id="singleDepartment" class="form-select" required disabled>
+                                    <option value="" disabled selected>Select grade level first...</option>
+                                </select>
                             </div>
+                            <div class="col-md-4">
+                                <label for="singleStudentId" class="form-label">Student ID <span class="text-danger">*</span></label>
+                                <input type="text" id="singleStudentId" class="form-control" placeholder="e.g. 1-0001, K-0001" maxlength="10" required>
+                            </div>
+                                
                             <div class="col-md-4">
                                 <label for="singleFirstName" class="form-label">First Name <span class="text-danger">*</span></label>
                                 <input type="text" id="singleFirstName" class="form-control" required>
@@ -589,7 +610,7 @@
                     <input type="hidden" id="editStudentUid">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label for="editStudentId" class="form-label">LRN</label>
+                            <label for="editStudentId" class="form-label">Student ID</label>
                             <input type="text" id="editStudentId" class="form-control" readonly>
                         </div>
                         <div class="col-md-6">
@@ -653,7 +674,7 @@
             </div>
             <div class="modal-body">
                 <div style="margin-bottom: 1.5rem;">
-                    <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Student: <strong id="viewGuardiansStudentName">—</strong> (LRN: <span id="viewGuardiansStudentLRN">—</span>)</p>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Student: <strong id="viewGuardiansStudentName">—</strong> (Student ID: <span id="viewGuardiansStudentId">—</span>)</p>
                 </div>
                 <div id="guardiansListContent" style="display: flex; flex-direction: column; gap: 1rem;">
                     <!-- Guardians will be populated here -->
