@@ -607,3 +607,58 @@ hr {
     color: var(--green-bright); /* Or #40916c if you prefer hex */
     font-size: 22px; 
 }
+
+/* ===============================
+   VIEW PROFILE MODAL
+================================ */
+.modal {
+    display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(15, 36, 25, 0.55); z-index: 9000; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.22s; backdrop-filter: blur(4px); pointer-events: none;
+}
+.modal.active { opacity: 1; pointer-events: auto; }
+.modal-content {
+    background: var(--white); border-radius: 14px; padding: 28px; max-width: 460px; width: 90%;
+    max-height: 90vh; overflow-y: auto; transform: scale(0.9);
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); border: 1.5px solid #d4e6d9;
+    box-shadow: 0 20px 60px rgba(26, 71, 49, 0.2);
+}
+.modal.active .modal-content { transform: scale(1); }
+.modal-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;
+    padding-bottom: 14px; border-bottom: 1.5px solid #d4e6d9;
+}
+.modal-header h2 {
+    font-family: 'Nunito Sans', sans-serif; color: var(--green-dark); font-size: 19px; font-weight: 800;
+    display: flex; align-items: center; gap: 9px; margin: 0;
+}
+.close-modal {
+    background: var(--off-white); border: 1px solid #d4e6d9; font-size: 16px; cursor: pointer;
+    color: #5a7265; width: 32px; height: 32px; border-radius: 7px; display: flex;
+    align-items: center; justify-content: center; transition: background 0.18s;
+}
+.close-modal:hover { background: #e2ede7; color: var(--green-dark); }
+
+.profile-modal-body { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.profile-modal-picture img {
+    width: 84px; height: 84px; border-radius: 50%; object-fit: cover;
+    border: 3px solid var(--green-light); margin-bottom: 12px;
+}
+#profileModalName {
+    font-family: 'Nunito Sans', sans-serif; color: var(--green-dark); font-size: 18px;
+    font-weight: 800; margin: 0 0 6px;
+}
+.profile-modal-badge {
+    display: inline-block; background: var(--green-light); color: var(--green-dark);
+    font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px; margin: 0 0 20px;
+}
+.profile-modal-details { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+.profile-detail-row {
+    display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 4px;
+    border-bottom: 1px solid #eef3ef;
+}
+.profile-detail-row:last-child { border-bottom: none; }
+.profile-detail-row i { color: var(--green-bright); font-size: 15px; width: 18px; text-align: center; }
+.profile-detail-row div { display: flex; flex-direction: column; gap: 2px; }
+.profile-detail-row span { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .3px; }
+.profile-detail-row strong { font-size: 14px; color: var(--text-body); font-weight: 600; }

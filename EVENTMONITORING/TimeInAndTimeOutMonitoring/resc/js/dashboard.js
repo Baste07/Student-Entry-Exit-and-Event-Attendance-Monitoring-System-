@@ -15,6 +15,7 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadDashboardData();
+    initProfileModal();
 });
 
 // ────────────────────────────────────────────
@@ -82,11 +83,15 @@ async function loadAdminProfile() {
 
         const displayName = userData.firstName
             ? `${userData.firstName} ${userData.lastName}`
-            : userData.email;
+            : (userData.lastName || userData.email);
 
         document.getElementById('adminName').textContent = displayName;
         document.getElementById('adminRole').textContent =
             userData.adminLevel === 'super_admin' ? 'Super Admin' : 'Admin';
+
+        if (userData.departmentLogo) {
+            document.getElementById('profilePic').src = userData.departmentLogo;
+        }
 
         console.log('✅ Profile loaded:', displayName);
 
@@ -94,6 +99,71 @@ async function loadAdminProfile() {
         console.error('Profile error:', error);
     }
 }
+
+// ────────────────────────────────────────────
+// VIEW PROFILE MODAL
+// ────────────────────────────────────────────
+
+function initProfileModal() {
+    const trigger = document.getElementById('viewProfileBtn');
+    const modal   = document.getElementById('profileModal');
+    if (!trigger || !modal) return;
+
+    trigger.addEventListener('click', openProfileModal);
+
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeProfileModal();
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('active')) closeProfileModal();
+    });
+}
+
+function openProfileModal() {
+    try {
+        const userDataStr = sessionStorage.getItem('user');
+        if (!userDataStr) return;
+        const userData = JSON.parse(userDataStr);
+
+        const displayName = userData.firstName
+            ? `${userData.firstName} ${userData.lastName}`
+            : (userData.lastName || userData.email);
+
+        document.getElementById('profileModalName').textContent  = displayName || '—';
+        document.getElementById('profileModalRole').textContent  =
+            userData.adminLevel === 'super_admin' ? 'Super Admin' : 'Admin';
+        document.getElementById('profileModalEmpId').textContent = userData.employeeId || '—';
+        document.getElementById('profileModalEmail').textContent = userData.email || '—';
+        document.getElementById('profileModalDept').textContent  = userData.department || '—';
+        document.getElementById('profileModalLevel').textContent =
+            userData.adminLevel === 'super_admin' ? 'Super Admin (full access)' : 'Admin';
+
+        const loginTime = userData.loginTime ? new Date(userData.loginTime) : null;
+        document.getElementById('profileModalLoginTime').textContent = loginTime
+            ? loginTime.toLocaleString('en-US', {
+                dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila'
+              })
+            : '—';
+
+        if (userData.departmentLogo) {
+            document.getElementById('profileModalPic').src = userData.departmentLogo;
+        }
+
+        document.getElementById('profileModal').classList.add('active');
+    } catch (err) {
+        console.error('Failed to open profile modal:', err);
+    }
+}
+
+function closeProfileModal() {
+    document.getElementById('profileModal').classList.remove('active');
+}
+
+// expose to inline onclick handler
+window.closeProfileModal = closeProfileModal;
 
 // ────────────────────────────────────────────
 // LOAD STATISTICS
