@@ -69,7 +69,7 @@ function renderTable(rows) {
     const tbody = document.getElementById('eventsTableBody');
     if (!rows || rows.length === 0) {
         tbody.innerHTML = `
-            <tr><td colspan="7" class="empty-cell">
+            <tr><td colspan="8" class="empty-cell">
                 <i class="fa-solid fa-calendar-day" style="font-size:36px;display:block;margin-bottom:10px;color:#dcfce7"></i>
                 No events found.
             </td></tr>`;
@@ -95,6 +95,7 @@ function renderTable(rows) {
             <td>${timeLabel}</td>
             <td><span class="badge" style="background:${typeColor}20;color:${typeColor}">${escHtml(ev.event_type || '—')}</span></td>
             <td><span class="secondary-cell">${escHtml(ev.location || '—')}</span></td>
+            <td><span class="badge info">${escHtml(ev.target_grade_level || 'All')}${ev.target_section ? ' – ' + escHtml(ev.target_section) : ''}</span></td>
             <td><span class="badge" style="background:${sc.bg};color:${sc.text}">${escHtml(status)}</span></td>
             <td>
                 <div style="display:flex;gap:8px">
@@ -134,12 +135,15 @@ document.getElementById('eventForm').addEventListener('submit', async function (
     const location    = document.getElementById('location').value.trim();
     const status      = document.getElementById('status').value;
     const description = document.getElementById('description').value.trim();
+    const targetGradeLevel = document.getElementById('targetGradeLevel').value;
+    const targetSection    = document.getElementById('targetSection').value.trim();
     const isEdit       = eventId !== '';
 
     if (!eventName) return showValidationError('Event name is required.');
     if (!eventDate) return showValidationError('Event date is required.');
     if (!eventType) return showValidationError('Please select an event type.');
     if (timeStart && timeEnd && timeEnd <= timeStart) return showValidationError('End time must be after start time.');
+    if (!targetGradeLevel) return showValidationError('Please select a target grade level.');
 
     const btn  = this.querySelector('.btn-submit');
     const orig = btn.innerHTML;
@@ -156,6 +160,8 @@ document.getElementById('eventForm').addEventListener('submit', async function (
             location:    location || null,
             status:      status,
             description: description || null,
+            target_grade_level: targetGradeLevel,
+            target_section:     targetSection || null,
         };
 
         let saveErr;
@@ -205,6 +211,8 @@ function openAddModal() {
     document.getElementById('eventForm').reset();
     document.getElementById('eventId').value = '';
     document.getElementById('status').value = 'upcoming';
+    document.getElementById('targetGradeLevel').value = '';
+    document.getElementById('targetSection').value = '';
     document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-plus"></i> Add Event';
     document.getElementById('submitBtnText').textContent = 'Add Event';
     clearAllValidation();
@@ -224,6 +232,8 @@ function editEvent(id) {
     document.getElementById('location').value    = ev.location || '';
     document.getElementById('status').value      = ev.status || 'upcoming';
     document.getElementById('description').value = ev.description || '';
+    document.getElementById('targetGradeLevel').value = ev.target_grade_level || '';
+    document.getElementById('targetSection').value    = ev.target_section || '';
 
     document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-edit"></i> Edit Event';
     document.getElementById('submitBtnText').textContent = 'Update Event';
@@ -287,12 +297,12 @@ function bindEvents() {
 
 function setTableLoading(on) {
     const tbody = document.getElementById('eventsTableBody');
-    if (on) tbody.innerHTML = `<tr id="loadingRow"><td colspan="7" class="loading-cell"><i class="fa-solid fa-spinner fa-spin"></i> Loading events…</td></tr>`;
+    if (on) tbody.innerHTML = `<tr id="loadingRow"><td colspan="8" class="loading-cell"><i class="fa-solid fa-spinner fa-spin"></i> Loading events…</td></tr>`;
 }
 
 function showTableError(msg) {
     document.getElementById('eventsTableBody').innerHTML = `
-        <tr><td colspan="7" class="empty-cell" style="color:#dc2626">
+        <tr><td colspan="8" class="empty-cell" style="color:#dc2626">
             <i class="fa-solid fa-triangle-exclamation" style="font-size:36px;display:block;margin-bottom:10px"></i>
             ${escHtml(msg)}
         </td></tr>`;

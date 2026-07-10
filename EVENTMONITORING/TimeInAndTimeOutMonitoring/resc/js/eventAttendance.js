@@ -9,6 +9,7 @@ let allEventsList   = [];
 let allStudentsList  = [];
 let allTeachersList  = [];
 let currentEventId   = '';
+let currentEvent     = null;
 let currentRecords   = [];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -27,8 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
 async function init() {
     try {
         const [eventsRes, studentsRes, teachersRes] = await Promise.all([
-            supabaseClient.from('events').select('event_id, event_name, event_date').order('event_date', { ascending: false }),
-            supabaseClient.from('students').select('student_id, first_name, last_name, lrn').order('last_name', { ascending: true }),
+            supabaseClient.from('events').select('event_id, event_name, event_date, target_grade_level, target_section').order('event_date', { ascending: false }),
+            supabaseClient.from('students').select('student_id, first_name, last_name, lrn, year_level, section').order('last_name', { ascending: true }),
             supabaseClient.from('teachers').select('teacher_id, first_name, last_name, employee_id').order('last_name', { ascending: true }),
         ]);
 
@@ -60,7 +61,15 @@ function formatDate(d) {
 
 async function loadAttendanceForEvent(eventId) {
     currentEventId = eventId;
+    currentEvent = allEventsList.find(ev => ev.event_id === eventId) || null;
     document.getElementById('btnAddAttendance').disabled = !eventId;
+
+    const hint = document.getElementById('eventTargetHint');
+    if (hint) {
+        hint.textContent = currentEvent && currentEvent.target_grade_level
+            ? `Needed for this event: ${currentEvent.target_grade_level}${currentEvent.target_section ? ' – ' + currentEvent.target_section : ' (all sections)'}`
+            : '';
+    }
 
     if (!eventId) {
         currentRecords = [];
@@ -170,16 +179,49 @@ function formatTime(t) {
 // PERSON DROPDOWN (role-dependent)
 // ══════════════════════════════════════════════════════════
 
+// A student is "needed" for the event if their grade level matches the
+// event's target grade level, and (when the event specifies a section)
+// their section matches too. No target grade level on the event = open to all.
+function isStudentEligibleForEvent(student, event) {
+    if (!event || !event.target_grade_level) return true;
+    if ((student.year_level || '').trim() !== event.target_grade_level.trim()) return false;
+    if (event.target_section && (student.section || '').trim() !== event.target_section.trim()) return false;
+    return true;
+}
+
 function populatePersonDropdown(role, selectedId) {
     const select = document.getElementById('personId');
-    const list = role === 'teacher' ? allTeachersList : allStudentsList;
+
+    if (role === 'teacher') {
+        select.innerHTML = '<option value="" disabled selected>-- Select --</option>' +
+            allTeachersList.map(p =>
+                `<option value="${p.teacher_id}">${escHtml(p.last_name)}, ${escHtml(p.first_name)}${p.employee_id ? ' — ' + escHtml(p.employee_id) : ''}</option>`
+            ).join('');
+        if (selectedId) select.value = selectedId;
+        return;
+    }
+
+    let eligible = currentEvent
+        ? allStudentsList.filter(s => isStudentEligibleForEvent(s, currentEvent))
+        : allStudentsList;
+
+    // If editing a record for a student outside the current target group
+    // (e.g. added before the event's target was set), keep them selectable
+    // so the existing record can still be edited.
+    if (selectedId && !eligible.some(s => s.student_id === selectedId)) {
+        const existing = allStudentsList.find(s => s.student_id === selectedId);
+        if (existing) eligible = [existing, ...eligible];
+    }
+
+    if (currentEvent && currentEvent.target_grade_level && eligible.length === 0) {
+        select.innerHTML = '<option value="" disabled selected>-- No students match this event\'s target grade/section --</option>';
+        return;
+    }
 
     select.innerHTML = '<option value="" disabled selected>-- Select --</option>' +
-        list.map(p => {
-            const idLabel = role === 'teacher' ? p.employee_id : p.lrn;
-            const pid = role === 'teacher' ? p.teacher_id : p.student_id;
-            return `<option value="${pid}">${escHtml(p.last_name)}, ${escHtml(p.first_name)}${idLabel ? ' — ' + escHtml(idLabel) : ''}</option>`;
-        }).join('');
+        eligible.map(p =>
+            `<option value="${p.student_id}">${escHtml(p.last_name)}, ${escHtml(p.first_name)}${p.lrn ? ' — ' + escHtml(p.lrn) : ''}</option>`
+        ).join('');
 
     if (selectedId) select.value = selectedId;
 }
@@ -204,6 +246,14 @@ document.getElementById('attendanceForm').addEventListener('submit', async funct
 
     if (!personId) return showValidationError('Please select a person.');
     if (timeIn && timeOut && timeOut <= timeIn) return showValidationError('Time out must be after time in.');
+
+    if (personRole === 'student' && currentEvent && currentEvent.target_grade_level) {
+        const student = allStudentsList.find(s => s.student_id === personId);
+        if (!student || !isStudentEligibleForEvent(student, currentEvent)) {
+            const target = currentEvent.target_grade_level + (currentEvent.target_section ? ' – ' + currentEvent.target_section : '');
+            return showValidationError(`This student is not part of the event's target group (${target}).`);
+        }
+    }
 
     const btn  = this.querySelector('.btn-submit');
     const orig = btn.innerHTML;

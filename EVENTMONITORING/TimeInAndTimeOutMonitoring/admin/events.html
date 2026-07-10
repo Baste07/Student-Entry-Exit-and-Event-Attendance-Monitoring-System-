@@ -96,13 +96,14 @@
                             <th>Time</th>
                             <th>Type</th>
                             <th>Location</th>
+                            <th>Target</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="eventsTableBody">
                         <tr id="loadingRow">
-                            <td colspan="7" class="loading-cell">
+                            <td colspan="8" class="loading-cell">
                                 <i class="fa-solid fa-spinner fa-spin"></i> Loading events...
                             </td>
                         </tr>
@@ -168,6 +169,20 @@
                             <option value="completed">Completed</option>
                             <option value="cancelled">Cancelled</option>
                         </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Target Grade Level <span class="required">*</span></label>
+                        <select id="targetGradeLevel" required>
+                            <option value="" disabled selected>-- Select --</option>
+                            <option value="Grade 11">Grade 11</option>
+                            <option value="Grade 12">Grade 12</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Target Section <span style="font-weight:400;color:#888">(optional)</span></label>
+                        <input type="text" id="targetSection" placeholder="e.g., ASSH — leave blank for whole grade level">
                     </div>
                 </div>
                 <div class="form-group">
