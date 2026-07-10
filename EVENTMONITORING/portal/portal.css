@@ -1,9 +1,9 @@
 :root {
-    font-size: 125%;
-    --green-dark:  #0d3b1e;
-    --green-mid:   #145a2e;
-    --green-btn:   #1a6b36;
-    --green-hover: #12522a;
+    --blue-dark:  #1a3a5c;
+    --blue-mid:   #2c5282;
+    --blue-btn:   #3182ce;
+    --blue-hover: #2b6cb0;
+    --blue-light: #ebf8ff;
 }
 
 html { font-size: 125%; }
@@ -17,19 +17,21 @@ body {
     position: relative;
 }
 
+/* ── Background with school logo watermark ── */
 .bg-image {
     position: fixed;
-    top: 70px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, rgba(13, 59, 30, 0.88) 0%, rgba(8, 28, 14, 0.88) 100%),
-                url('../auth/assets/plpbackground.png');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    background-repeat: no-repeat;
+    inset: 0;
+    background: linear-gradient(135deg, #1a3a5c 0%, #2c5282 100%);
     z-index: 0;
+}
+
+.bg-image::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('../auth/assets/ElTresEresCenciaEscuelaLogo.png') center/900px no-repeat;
+    opacity: 0.12;
+    filter: brightness(0) invert(1);
 }
 
 .page-wrap {
@@ -46,7 +48,7 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 1rem 2.5rem;
-    background: linear-gradient(135deg, rgba(13, 59, 30, 0.97) 0%, rgba(8, 28, 14, 0.97) 100%);
+    background: linear-gradient(135deg, rgba(26, 58, 92, 0.98) 0%, rgba(44, 82, 130, 0.98) 100%);
     border-bottom: 1px solid rgba(255,255,255,0.08);
     backdrop-filter: blur(10px);
     animation: fadeDown .5s ease both;
@@ -66,22 +68,19 @@ body {
 }
 
 .topbar-logo {
-    height: 42px;
-    width: 42px;
+    height: 48px;
+    width: 48px;
     object-fit: contain;
-}
-
-.topbar-divider {
-    width: 1px;
-    height: 32px;
-    background: rgba(255,255,255,0.25);
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    padding: 4px;
 }
 
 .topbar-title {
     font-family: 'Merriweather', serif;
-    font-size: .95rem;
+    font-size: 1rem;
     font-weight: 700;
-    color: #e8f5ec;
+    color: #ffffff;
     line-height: 1.3;
     margin-left: .6rem;
 }
@@ -90,8 +89,8 @@ body {
     display: block;
     font-family: 'Source Sans 3', sans-serif;
     font-weight: 400;
-    font-size: .75rem;
-    color: rgba(255,255,255,0.55);
+    font-size: .78rem;
+    color: rgba(255,255,255,0.6);
     letter-spacing: .04em;
 }
 
@@ -106,7 +105,7 @@ body {
 .user-name {
     font-size: .875rem;
     font-weight: 600;
-    color: #e8f5ec;
+    color: #ffffff;
     line-height: 1.3;
 }
 
@@ -121,7 +120,7 @@ body {
     width: 38px;
     height: 38px;
     border-radius: 50%;
-    background: var(--green-btn);
+    background: var(--blue-btn);
     border: 2px solid rgba(255,255,255,0.2);
     display: flex;
     align-items: center;
@@ -205,30 +204,25 @@ body {
     position: relative;
     overflow: hidden;
     animation: fadeUp .55s cubic-bezier(.22,.68,0,1.2) both;
-
     height: 320px;
-
-    background-size: cover;
-    background-position: right center;
-    background-repeat: no-repeat;
-
-    border: 1.5px solid rgba(255,255,255,0.22);
-
+    background: linear-gradient(135deg, rgba(49, 130, 206, 0.5) 0%, rgba(26, 58, 92, 0.75) 100%);
+    border: 1.5px solid rgba(255,255,255,0.15);
     box-shadow:
         0 10px 40px rgba(0,0,0,0.50),
         0 2px 8px  rgba(0,0,0,0.30);
-
     transition:
         transform .32s cubic-bezier(.22,.68,0,1.2),
         box-shadow .32s ease,
         border-color .25s ease;
 }
 
-.system-card:nth-child(1) { background-image: url('../auth/assets/portalthesisbg.png'); animation-delay: .15s; }
-.system-card:nth-child(2) { background-image: url('../auth/assets/portalfacultybg.png'); animation-delay: .25s; }
-.system-card:nth-child(3) { background-image: url('../auth/assets/portalviolationbg.png'); animation-delay: .35s; }
-.system-card:nth-child(4) { background-image: url('../auth/assets/portaltimeinoutbg.png'); animation-delay: .45s; }
-
+.system-card:nth-child(1) { animation-delay: .15s; }
+.system-card:nth-child(2) { animation-delay: .25s; }
+.system-card:nth-child(3) { animation-delay: .35s; }
+.system-card:nth-child(4) { animation-delay: .45s; }
+.system-card:nth-child(5) { animation-delay: .15s; }
+.system-card:nth-child(6) { animation-delay: .25s; }
+.system-card:nth-child(7) { animation-delay: .35s; }
 
 .system-card::after {
     content: '';
@@ -236,10 +230,10 @@ body {
     inset: 0;
     background: linear-gradient(
         to bottom,
-        rgba(0,0,0,0.00)  0%,
-        rgba(0,0,0,0.00) 50%,
-        rgba(0,0,0,0.3) 75%,
-        rgba(0,0,0,0.55) 100%
+        rgba(26, 58, 92, 0.00)  0%,
+        rgba(26, 58, 92, 0.00) 50%,
+        rgba(26, 58, 92, 0.4) 75%,
+        rgba(26, 58, 92, 0.7) 100%
     );
     border-radius: inherit;
     z-index: 1;
@@ -249,10 +243,10 @@ body {
 .system-card:hover::after {
     background: linear-gradient(
         to bottom,
-        rgba(0,0,0,0.00)  0%,
-        rgba(0,0,0,0.00) 50%,
-        rgba(0,0,0,0.25) 75%,
-        rgba(0,0,0,0.45) 100%
+        rgba(26, 58, 92, 0.00)  0%,
+        rgba(26, 58, 92, 0.00) 50%,
+        rgba(26, 58, 92, 0.35) 75%,
+        rgba(26, 58, 92, 0.6) 100%
     );
 }
 
@@ -261,10 +255,9 @@ body {
     box-shadow:
         0 28px 70px rgba(0,0,0,0.60),
         0 6px 20px  rgba(0,0,0,0.35);
-    border-color: rgba(255,255,255,0.42);
+    border-color: rgba(255,255,255,0.35);
 }
 
-/* ── Card Number — dark tint so it reads on light backgrounds ── */
 .card-number {
     display: none;
 }
@@ -280,10 +273,12 @@ body {
     overflow: hidden;
     box-shadow: 0 4px 16px rgba(0,0,0,0.20);
     z-index: 2;
-    border: 2px solid rgba(255,255,255,0.55);
+    border: 2px solid rgba(255,255,255,0.6);
     transition: transform .3s cubic-bezier(.22,.68,0,1.2), box-shadow .3s;
-    background: rgba(255,255,255,0.35);
-    backdrop-filter: blur(4px);
+    background: rgba(255,255,255,0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .system-card:hover .card-icon-wrap {
@@ -292,9 +287,9 @@ body {
 }
 
 .card-icon-wrap img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    width: 90%;
+    height: 90%;
+    object-fit: contain;
 }
 
 /* ── Bottom content ── */
@@ -411,7 +406,7 @@ body {
         max-width: 860px;
         gap: 1.5rem;
     }
-    .system-card { height: 340px; }
+    .system-card { flex: 0 1 calc(50% - 1.5rem); height: 340px; }
 }
 
 @media (max-width: 768px) {
@@ -421,10 +416,11 @@ body {
         gap: 1.25rem;
     }
     .topbar { padding: .75rem 1.25rem; }
-    .topbar-title { display: none; }
+    .topbar-title { font-size: .85rem; }
+    .topbar-title span { font-size: .7rem; }
     .portal-heading h2 { font-size: 1.25rem; }
     .portal-heading { margin-bottom: 1.75rem; }
-    .system-card { height: 260px; }
+    .system-card { flex: 0 1 100%; height: 260px; }
 }
 
 @media (max-width: 640px) {

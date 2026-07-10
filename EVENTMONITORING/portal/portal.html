@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Smart Academic Management System — Portal</title>
+    <title>Attendance Monitoring System — Portal</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="portal.css"/>
@@ -16,12 +16,10 @@
 
     <header class="topbar">
         <div class="topbar-logos">
-            <img src="../auth/assets/plplogo.png" alt="PLP Logo" class="topbar-logo"/>
-            <div class="topbar-divider"></div>
-            <img id="deptLogoPortal" src="../auth/assets/ccslogo.png" alt="Department Logo" class="topbar-logo"/>
+            <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo" class="topbar-logo"/>
             <div class="topbar-title">
-                Smart Academic Management System
-                <span id="deptNamePortal">Pamantasan ng Lungsod ng Pasig — CCS</span>
+                ATTENDANCE MONITORING SYSTEM
+                <span>El Tres Eres Ciencia Escuela</span>
             </div>
         </div>
 
@@ -48,7 +46,7 @@
             <a href="../ThesisAndCapstoneArchiving/pages/admin/dashboard.html" class="system-card">
                 <span class="card-number">01</span>
                 <div class="card-icon-wrap">
-                    <img src="../auth/assets/portalthesisicon.jpg" alt="Thesis & Capstone icon"/>
+                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
                 </div>
                 <div class="card-bottom">
                     <div class="card-label">Archive</div>
@@ -64,7 +62,7 @@
             <a href="../FacultyRequirementSubmissionSystem/pages/dashboard.html" class="system-card">
                 <span class="card-number">02</span>
                 <div class="card-icon-wrap">
-                    <img src="../auth/assets/portalfacultyicon.jpg" alt="Faculty Requirement icon"/>
+                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
                 </div>
                 <div class="card-bottom">
                     <div class="card-label">Submission</div>
@@ -80,7 +78,7 @@
             <a href="../StudentViolationManagementSystem/pages/admin/dashboard.html" class="system-card">
                 <span class="card-number">03</span>
                 <div class="card-icon-wrap">
-                    <img src="../auth/assets/portalviolationicon.jpg" alt="Student Violation icon"/>
+                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
                 </div>
                 <div class="card-bottom">
                     <div class="card-label">Discipline</div>
@@ -96,7 +94,7 @@
             <a href="../TimeInAndTimeOutMonitoring/students/homepage.html" class="system-card">
                 <span class="card-number">04</span>
                 <div class="card-icon-wrap">
-                    <img src="../auth/assets/portaltimeinouticon.jpg" alt="Time In/Out icon"/>
+                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
                 </div>
                 <div class="card-bottom">
                     <div class="card-label">Monitoring</div>
@@ -108,11 +106,59 @@
                 </div>
             </a>
 
+            <!-- Card 5: Event Attendance (Admin/Superadmin only) -->
+            <a href="http://localhost/CAPSTONEFINAL/EVENTMONITORING/TimeinAndTimeOutMonitoring/admin/dashboard.html" class="system-card event-attendance-card">
+                <span class="card-number">05</span>
+                <div class="card-icon-wrap">
+                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
+                </div>
+                <div class="card-bottom">
+                    <div class="card-label">Monitoring</div>
+                    <div class="card-title-text">Event Attendance</div>
+                    <div class="card-desc">Track and manage event-based attendance records for students and faculty.</div>
+                    <div class="card-arrow">
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Card 6: Entry & Exit Attendance (Admin/Superadmin only) -->
+            <a href="#" class="system-card entry-exit-card" onclick="event.preventDefault();" title="Coming soon">
+                <span class="card-number">06</span>
+                <div class="card-icon-wrap">
+                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
+                </div>
+                <div class="card-bottom">
+                    <div class="card-label">Monitoring</div>
+                    <div class="card-title-text">Entry & Exit Attendance</div>
+                    <div class="card-desc">Monitor daily entry and exit attendance records. (Coming soon)</div>
+                    <div class="card-arrow">
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Card 7: SUPERADMIN Panel (Superadmin only) -->
+            <a href="http://localhost/CAPSTONEFINAL/EVENTMONITORING/admin/usermanagement.html" class="system-card superadmin-panel-card">
+                <span class="card-number">07</span>
+                <div class="card-icon-wrap">
+                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
+                </div>
+                <div class="card-bottom">
+                    <div class="card-label">Administration</div>
+                    <div class="card-title-text">SUPERADMIN</div>
+                    <div class="card-desc">Manage users, system settings, and administrative configurations.</div>
+                    <div class="card-arrow">
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </div>
+                </div>
+            </a>
+
         </div>
     </main>
 
     <footer class="footer">
-        © 2025 Pamantasan ng Lungsod ng Pasig — College of Computer Studies
+        © 2025 El Tres Eres Ciencia Escuela
     </footer>
 </div>
 
