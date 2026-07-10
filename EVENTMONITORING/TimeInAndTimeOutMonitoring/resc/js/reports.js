@@ -55,7 +55,6 @@ async function loadReportsData() {
         if (error) throw error;
         allReports = data;
         executeClientFilter();
-        document.querySelectorAll('.stats-row .skeleton, #reportsBody .skeleton').forEach(el => el.classList.remove('skeleton'));
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:var(--red)"><i class="fa-solid fa-triangle-exclamation"></i><p>Error loading export logs.</p></td></tr>`;
     }

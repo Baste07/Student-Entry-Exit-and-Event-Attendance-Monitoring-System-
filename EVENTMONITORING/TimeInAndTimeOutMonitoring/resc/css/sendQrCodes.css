@@ -1,3 +1,19 @@
+:root {
+    --green-dark: #1a4731;
+    --green-mid: #2d6a4f;
+    --green-bright: #40916c;
+    --green-light: #dff4e8;
+    --amber-light: #fff7e6;
+    --blue-light: #e8f1ff;
+    --surface: #f6faf7;
+    --text-dark: #10261a;
+    --text-body: #294034;
+    --text-muted: #6a7f73;
+    --border: #d6e5db;
+    --shadow: 0 10px 30px rgba(26, 71, 49, 0.10);
+    --radius: 14px;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 body {

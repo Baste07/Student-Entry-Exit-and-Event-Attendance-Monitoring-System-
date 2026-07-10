@@ -76,7 +76,7 @@ function loadHeader() {
     headerContainer.innerHTML = `
         <header class="topbar">
             <div class="topbar-left">
-                <img src="../auth/assets/El Tres Eres Cencia Escuela.jpg" alt="School Logo" class="topbar-logo"/>
+                <img src="../auth/assets/Schoollogo.jpg" alt="School Logo" class="topbar-logo"/>
                 <div class="topbar-info">
                     <div class="topbar-title">${siteName}</div>
                     <div class="topbar-subtitle" id="topbarSubtitle">${subtitle}</div>

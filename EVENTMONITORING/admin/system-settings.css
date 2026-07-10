@@ -22,6 +22,7 @@
 }
 
 .settings-header {
+    margin-bottom: 2rem;
     padding-bottom: 1.5rem;
     border-bottom: 2px solid var(--border);
 }
@@ -72,8 +73,10 @@
 /* ── Calendar tabs ── */
 .calendar-tabs {
     display: flex;
-    gap: 1rem;
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--border);
     padding-bottom: 0;
+    margin-bottom: 0.25rem;
 }
 
 .cal-tab {
@@ -98,7 +101,7 @@
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
-    border-top: 2px solid var(--border);
+    padding-top: 1.25rem;
 }
 
 /* ── Semester preview strip ── */
