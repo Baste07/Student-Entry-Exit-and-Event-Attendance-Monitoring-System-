@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Reports | Laboratory Attendance System</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+    <link rel="stylesheet" href="../resc/css/attendanceReports.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-file-lines"></i> Attendance Reports</h1>
+                    <p>View, filter, and export lab/class and event attendance records.</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn-report excel" id="btnExportExcel"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
+                    <button class="btn-report pdf" id="btnExportPdf"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
+                </div>
+            </div>
+            <hr>
+
+            <div class="report-tabs">
+                <button class="report-tab active" data-tab="lab"><i class="fa-solid fa-flask"></i> Lab / Class Attendance</button>
+                <button class="report-tab" data-tab="event"><i class="fa-solid fa-calendar-check"></i> Event Attendance</button>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="fa-solid fa-file-lines"></i></div>
+                    <div><div class="stat-val" id="statTotal">0</div><div class="stat-lbl">Total Records</div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+                    <div><div class="stat-val" id="statPresent">0</div><div class="stat-lbl">Present</div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon amber"><i class="fa-solid fa-clock"></i></div>
+                    <div><div class="stat-val" id="statLate">0</div><div class="stat-lbl">Late</div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red"><i class="fa-solid fa-circle-xmark"></i></div>
+                    <div><div class="stat-val" id="statAbsent">0</div><div class="stat-lbl">Absent / Excused</div></div>
+                </div>
+            </div>
+
+            <div class="charts-row">
+                <div class="chart-card">
+                    <h3><i class="fa-solid fa-chart-pie"></i> Status Breakdown</h3>
+                    <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h3><i class="fa-solid fa-chart-column"></i> Top Records by <span id="breakdownLabel">Subject</span></h3>
+                    <div class="chart-wrap"><canvas id="breakdownChart"></canvas></div>
+                </div>
+            </div>
+
+            <div class="controls-card">
+                <div class="fg-grid">
+                    <div class="fg">
+                        <label><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                        <input type="text" id="filterSearch" placeholder="Name or ID number...">
+                    </div>
+                    <div class="fg" id="labFilterOnly">
+                        <label><i class="fa-solid fa-book"></i> Course</label>
+                        <input type="text" id="filterCourse" placeholder="e.g. BSCS">
+                    </div>
+                    <div class="fg" id="eventFilterOnly" style="display:none;">
+                        <label><i class="fa-solid fa-calendar-day"></i> Event</label>
+                        <input type="text" id="filterEvent" placeholder="Event name...">
+                    </div>
+                    <div class="fg">
+                        <label><i class="fa-solid fa-tag"></i> Status</label>
+                        <select id="filterStatus">
+                            <option value="">All Statuses</option>
+                            <option value="present">Present</option>
+                            <option value="late">Late</option>
+                            <option value="absent">Absent</option>
+                            <option value="excused">Excused</option>
+                        </select>
+                    </div>
+                    <div class="fg">
+                        <label><i class="fa-solid fa-calendar"></i> From</label>
+                        <input type="date" id="filterFrom">
+                    </div>
+                    <div class="fg">
+                        <label><i class="fa-solid fa-calendar"></i> To</label>
+                        <input type="date" id="filterTo">
+                    </div>
+                    <div class="fg">
+                        <label>&nbsp;</label>
+                        <button class="btn btn-reset" id="btnResetFilters"><i class="fa-solid fa-eraser"></i> Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="reports-table" id="reportsTable">
+                    <thead id="tableHead"></thead>
+                    <tbody id="tableBody">
+                        <tr><td colspan="9" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading attendance data...</p></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bottom-bar">
+                <div class="rb-count"><strong id="recordCountDisplay">0</strong> record(s) found</div>
+            </div>
+
+        </div>
+    </main>
+
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+    <script src="../resc/js/attendanceReports.js"></script>
+
+    <script>
+        loadHeader();
+        loadSidebar('attendance-reports');
+    </script>
+</body>
+</html>

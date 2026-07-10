@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sections Management | Laboratory Attendance System</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Shared component styles -->
+    <link rel="stylesheet" href="../shared/global.css">
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+
+    <!-- Page-specific styles -->
+    <link rel="stylesheet" href="../resc/css/sections.css">
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-school"></i> Sections Management</h1>
+                    <p>Manage grade level sections, advisers, and school year assignments</p>
+                </div>
+
+                <div class="stats-badges">
+                    <span class="stat-badge total"><i class="fa-solid fa-school"></i> <span id="badgeTotal">0</span> Sections</span>
+                    <span class="stat-badge active"><i class="fa-solid fa-users"></i> <span id="badgeStudents">0</span> Students Enrolled</span>
+                </div>
+
+                <button class="btn-add" onclick="openAddModal()">
+                    <i class="fa-solid fa-plus"></i> Add Section
+                </button>
+            </div>
+            <hr>
+
+            <!-- Filters -->
+            <div class="controls-card">
+                <div class="controls-header">
+                    <h2><i class="fa-solid fa-sliders-h"></i> Filters &amp; Search</h2>
+                </div>
+                <div class="table-controls">
+                    <div class="control-group">
+                        <label for="searchInput"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                        <input type="text" id="searchInput" placeholder="Search by section or adviser name" />
+                    </div>
+                    <div class="control-group">
+                        <label for="gradeLevelFilter"><i class="fa-solid fa-layer-group"></i> Filter by Grade Level</label>
+                        <select id="gradeLevelFilter">
+                            <option value="">All Grade Levels</option>
+                        </select>
+                    </div>
+                    <div class="control-group" style="display:flex; align-items:flex-end;">
+                        <button id="clearFilters" class="btn btn-clear">
+                            <i class="fa-solid fa-eraser"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Section Name</th>
+                            <th>Grade Level</th>
+                            <th>Adviser</th>
+                            <th>School Year</th>
+                            <th>Room</th>
+                            <th>Students</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sectionsTableBody">
+                        <tr id="loadingRow">
+                            <td colspan="7" class="loading-cell">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading sections...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ══ ADD / EDIT MODAL ══ -->
+    <div id="sectionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"><i class="fa-solid fa-plus"></i> Add Section</h2>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="sectionForm">
+                <input type="hidden" id="sectionId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Section Name <span class="required">*</span></label>
+                        <input type="text" id="sectionName" required placeholder="e.g., Sampaguita">
+                    </div>
+                    <div class="form-group">
+                        <label>Grade Level <span class="required">*</span></label>
+                        <input type="text" id="gradeLevel" required placeholder="e.g., Grade 10">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Adviser</label>
+                    <select id="adviserId">
+                        <option value="">-- No Adviser Assigned --</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>School Year</label>
+                        <input type="text" id="schoolYear" placeholder="e.g., 2026-2027">
+                    </div>
+                    <div class="form-group">
+                        <label>Room</label>
+                        <input type="text" id="room" placeholder="e.g., Room 204">
+                    </div>
+                </div>
+                <button type="submit" class="btn-submit" style="width:100%">
+                    <i class="fa-solid fa-save"></i> <span id="submitBtnText">Add Section</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+
+    <!-- Shared header + sidebar loader -->
+    <script src="../includes/sidebar.js"></script>
+
+    <!-- Page logic -->
+    <script src="../resc/js/sections.js"></script>
+
+    <script>
+        loadHeader();
+        loadSidebar('sections');
+    </script>
+</body>
+</html>

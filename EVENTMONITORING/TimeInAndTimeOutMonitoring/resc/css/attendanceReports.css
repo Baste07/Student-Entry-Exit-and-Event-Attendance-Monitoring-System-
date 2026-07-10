@@ -1,0 +1,144 @@
+/* ============================================================
+   resc/css/attendanceReports.css
+   Aligned with Dashboard Design System
+============================================================ */
+
+:root {
+    --green-dark:   #1a4731;
+    --green-mid:    #2d6a4f;
+    --green-bright: #40916c;
+    --green-light:  #74c69d;
+    --white:        #ffffff;
+    --off-white:    #f5f8f5;
+    --surface:      #edf4ef;
+    --hover-bg:     #e2ede7;
+    --text-dark:    #0f2419;
+    --text-body:    #2a3d32;
+    --text-muted:   #5a7265;
+    --border:       #d4e6d9;
+    --red:          #dc2626;
+    --red-bg:       #fee2e2;
+    --amber:        #d97706;
+    --amber-bg:     #fffbeb;
+    --blue:         #2563eb;
+    --blue-bg:      #dbeafe;
+    --purple:       #7c3aed;
+    --purple-bg:    #f5f3ff;
+    --radius-lg:    14px;
+    --shadow-sm:    0 2px 8px rgba(26,71,49,.07);
+    --shadow-md:    0 4px 16px rgba(26,71,49,.10);
+    --shadow-lg:    0 8px 32px rgba(26,71,49,.13);
+    --mono:         'DM Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Nunito Sans', 'Segoe UI', sans-serif;
+    background: var(--white);
+    color: var(--text-body);
+    line-height: 1.75;
+    font-size: 15px;
+}
+
+.main-content {
+    margin-left: var(--sidebar-collapsed, 64px);
+    margin-top: 68px;
+    min-height: calc(100vh - 68px);
+    transition: margin-left 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.main-content.sidebar-open { margin-left: var(--sidebar-expanded, 240px); }
+
+.container { background: var(--white); padding: 32px 36px 48px; min-height: 100%; width: 100%; }
+
+/* ── Page Header ── */
+.page-header { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+.page-header .header-titles { display: flex; flex-direction: column; }
+.page-header .header-titles h1 { font-family: 'Nunito', sans-serif; font-size: 24px; font-weight: 800; color: var(--green-dark); margin: 0; display: flex; align-items: center; gap: 10px; }
+.page-header .header-titles h1 i { color: var(--green-bright) !important; font-size: 22px !important; display: inline-block !important; visibility: visible !important; margin-right: 10px; }
+.page-header .header-titles p { color: var(--text-muted); font-size: 13.5px; margin-top: 2px; margin-bottom: 0; font-weight: 500; font-family: 'Nunito Sans', sans-serif; }
+
+.page-actions { display: flex; gap: 10px; margin-left: auto; }
+
+.btn-report { padding: 9px 18px; background: #dcfce7; color: #166534; border: 1.5px solid #bbf7d0; border-radius: 8px; font-size: 13.5px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all .2s ease; font-family: 'Nunito Sans', sans-serif; }
+.btn-report:hover { background: #bbf7d0; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15); }
+.btn-report.pdf { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.btn-report.pdf:hover { background: #fee2e2; }
+.btn-report.excel { background: var(--surface); color: var(--green-dark); border-color: var(--border); }
+.btn-report.excel:hover { background: var(--hover-bg); }
+
+hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--green-dark), var(--green-bright), transparent); margin: 0 0 24px; border-radius: 2px; }
+
+/* ── Tabs ── */
+.report-tabs { display: flex; gap: 8px; margin-bottom: 24px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 6px; width: fit-content; }
+.report-tab { padding: 10px 22px; border-radius: 8px; border: none; background: transparent; color: var(--text-muted); font-weight: 800; font-size: 13.5px; font-family: 'Nunito Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all .2s ease; }
+.report-tab:hover { color: var(--green-dark); }
+.report-tab.active { background: var(--green-dark); color: var(--white); box-shadow: var(--shadow-sm); }
+
+/* Stat Cards */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 16px; transition: transform .2s, box-shadow .2s; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.stat-icon.green { background: var(--surface); color: var(--green-bright); }
+.stat-icon.amber { background: var(--amber-bg); color: var(--amber); }
+.stat-icon.blue { background: var(--blue-bg); color: var(--blue); }
+.stat-icon.red { background: var(--red-bg); color: var(--red); }
+.stat-val { font-size: 28px; font-weight: 800; color: var(--green-dark); line-height: 1; font-family: 'Nunito', sans-serif; }
+.stat-lbl { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; font-weight: 700; font-family: 'Nunito Sans', sans-serif; }
+
+/* Charts */
+.charts-row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; margin-bottom: 24px; }
+.chart-card { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius-lg); padding: 20px 22px; box-shadow: var(--shadow-sm); }
+.chart-card h3 { font-size: 14px; font-weight: 800; color: var(--green-dark); margin-bottom: 14px; font-family: 'Nunito', sans-serif; display: flex; align-items: center; gap: 8px; }
+.chart-card h3 i { color: var(--green-bright); }
+.chart-wrap { position: relative; height: 240px; }
+
+/* Filter Panel */
+.controls-card { background: var(--white); border-radius: var(--radius-lg); padding: 22px 26px; margin-bottom: 24px; box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); border-left: 5px solid var(--green-dark); transition: box-shadow 0.3s ease; }
+.controls-card:hover { box-shadow: var(--shadow-md); }
+.fg-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 130px; gap: 12px; align-items: end; }
+.fg { display: flex; flex-direction: column; }
+.fg label { display: block; font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-bottom: 6px; font-family: 'Nunito Sans', sans-serif; }
+.fg input, .fg select { width: 100%; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13.5px; font-family: 'Nunito Sans', sans-serif; color: var(--text-dark); background: var(--white); transition: border-color .2s, box-shadow .2s; outline: none; height: 40px; }
+.fg input:focus, .fg select:focus { border-color: var(--green-bright); box-shadow: 0 0 0 3px rgba(64,145,108,.15); }
+.btn { height: 40px; padding: 0 16px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: .2s; font-family: 'Nunito Sans', sans-serif; }
+.btn-reset { background: var(--surface); color: var(--text-body); border: 1.5px solid var(--border); font-weight: 600; width: 100%; }
+.btn-reset:hover { background: var(--hover-bg); border-color: var(--green-bright); color: var(--green-dark); }
+
+/* Table Section */
+.table-container { background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1.5px solid var(--border); overflow: auto; margin-bottom: 20px; }
+.reports-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.reports-table thead { background: linear-gradient(90deg, #166534, #14532d); }
+.reports-table thead th { background: transparent; color: #ffffff; font-size: 12.5px; font-weight: 700; font-family: 'Nunito', sans-serif; text-transform: uppercase; letter-spacing: .5px; padding: 14px 16px; text-align: left; white-space: nowrap; border-bottom: 2px solid rgba(255,255,255,.18); border-right: 1px solid rgba(255,255,255,.2); }
+.reports-table tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+.reports-table tbody tr:nth-child(even) { background: var(--off-white); }
+.reports-table tbody tr:last-child { border-bottom: none; }
+.reports-table tbody tr:hover { background: var(--hover-bg); }
+.reports-table td { padding: 14px 16px; vertical-align: middle; white-space: nowrap; }
+
+.status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+.status-present { background: #dcfce7; color: #166534; }
+.status-late { background: #fef3c7; color: #92400e; }
+.status-absent { background: #fee2e2; color: #b91c1c; }
+.status-excused { background: #e0f2fe; color: #0369a1; }
+
+.mono { font-family: var(--mono); font-size: 12.5px; }
+
+.empty-state { text-align: center; padding: 60px 20px !important; color: var(--text-muted); font-family: 'Nunito Sans', sans-serif; }
+.empty-state i { font-size: 40px; margin-bottom: 16px; color: var(--green-light); display: block; }
+.empty-state p { font-size: 14px; font-weight: 600; }
+
+.bottom-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 0 5px; }
+.rb-count { font-size: 13.5px; color: var(--text-muted); font-family: 'Nunito Sans', sans-serif; }
+.rb-count strong { color: var(--text-dark); font-weight: 800; }
+
+/* Toast */
+.toast { position: fixed; bottom: 30px; right: 30px; padding: 14px 24px; background: var(--green-dark); color: var(--white); border-radius: 12px; font-size: 14px; font-weight: 700; display: none; align-items: center; gap: 10px; z-index: 99999; box-shadow: var(--shadow-md); font-family: 'Nunito Sans', sans-serif; }
+.toast.on { display: flex; animation: slideUp 0.3s ease-out; }
+.toast.error { background: var(--red); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+@media(max-width:1100px){ .charts-row{grid-template-columns:1fr;} .stats-row{grid-template-columns:repeat(2,1fr);} }
+@media(max-width:900px){ .fg-grid{grid-template-columns:1fr 1fr;} }
+@media(max-width:600px){ .stats-row{grid-template-columns:1fr 1fr;} .fg-grid{grid-template-columns:1fr;} .page-actions{width:100%;} }

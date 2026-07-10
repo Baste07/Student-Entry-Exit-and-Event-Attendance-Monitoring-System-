@@ -43,13 +43,53 @@
                             <p id="adminRole">Admin</p>
                         </div>
                         <div class="profile-actions-mini">
-                            <div class="profile-view-more">
+                            <div class="profile-view-more" id="viewProfileBtn">
                                 View Profile <i class="fa-solid fa-chevron-right"></i>
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
+
+            <!-- ══ VIEW PROFILE MODAL ══ -->
+            <div id="profileModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2><i class="fa-solid fa-id-badge"></i> My Profile</h2>
+                        <button class="close-modal" onclick="closeProfileModal()">&times;</button>
+                    </div>
+                    <div class="profile-modal-body">
+                        <div class="profile-modal-picture">
+                            <img src="../resc/assets/pfp.png" alt="profile picture" id="profileModalPic">
+                        </div>
+                        <h3 id="profileModalName">—</h3>
+                        <p id="profileModalRole" class="profile-modal-badge">Admin</p>
+
+                        <div class="profile-modal-details">
+                            <div class="profile-detail-row">
+                                <i class="fa-solid fa-id-card"></i>
+                                <div><span>Employee ID</span><strong id="profileModalEmpId">—</strong></div>
+                            </div>
+                            <div class="profile-detail-row">
+                                <i class="fa-solid fa-envelope"></i>
+                                <div><span>Email</span><strong id="profileModalEmail">—</strong></div>
+                            </div>
+                            <div class="profile-detail-row">
+                                <i class="fa-solid fa-building-columns"></i>
+                                <div><span>Department</span><strong id="profileModalDept">—</strong></div>
+                            </div>
+                            <div class="profile-detail-row">
+                                <i class="fa-solid fa-user-shield"></i>
+                                <div><span>Access Level</span><strong id="profileModalLevel">—</strong></div>
+                            </div>
+                            <div class="profile-detail-row">
+                                <i class="fa-solid fa-clock"></i>
+                                <div><span>Signed in since</span><strong id="profileModalLoginTime">—</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <section class="summary-section">
                 <div class="cards">
