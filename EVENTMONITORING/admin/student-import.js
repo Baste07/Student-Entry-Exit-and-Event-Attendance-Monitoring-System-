@@ -6,6 +6,7 @@ let singleStudentModal = null;
 let duplicateRowsModal = null;
 let editStudentModal = null;
 let viewGuardiansModal = null;
+let addGuardianModal = null;
 let duplicateRowsInFileCount = 0;
 let duplicateRowsInDatabaseCount = 0;
 let duplicateRowsInFile = [];
@@ -15,43 +16,46 @@ let activeSchoolYear = null;
 const QR_EMAIL_ENDPOINT = 'send-student-qr-email.php';
 const EMAIL_LIKE_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// STUDENT ID format: K-#### or 1-#### through 10-####
+const STUD_ID_PATTERN = /^([Kk]|[1-9]|10)-\d{1,4}$/;
 
 document.addEventListener('DOMContentLoaded', async () => {
     checkSupabaseConnection();
     await loadDepartments();
     setupEventListeners();
     await loadAllStudentsTable();
-    
-    // Prevent browser default behavior for drag & drop on the entire document
+
     document.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
     });
-    
+
     document.addEventListener('drop', (e) => {
         e.preventDefault();
     });
 });
+
 async function loadDepartments() {
     try {
         if (!supabaseClient) return;
 
-        // Fetch and assign directly to the global variable
         const { data: fetchedSY, error: schoolYearError } = await supabaseClient
             .from('school_years')
             .select('id, name')
             .eq('is_active', true)
             .maybeSingle();
 
-        activeSchoolYear = fetchedSY; // Save it globally
+        activeSchoolYear = fetchedSY;
         const syDisplay = document.getElementById('activeSchoolYearDisplay');
 
         if (schoolYearError || !activeSchoolYear) {
             console.warn('No active school year found:', schoolYearError);
             showAlert('No active school year set. Please set one in System Settings before importing.', 'warning');
-            
+
             if (syDisplay) syDisplay.value = 'No Active School Year';
-            document.getElementById('departmentSelect').innerHTML = '<option value="" disabled selected>No Active School Year</option>';
+                      document.getElementById('departmentSelect').innerHTML = '<option value="" disabled selected>No Active School Year</option>';
+            const gradeSelect = document.getElementById('gradeLevelSelect');
+            if (gradeSelect) gradeSelect.innerHTML = '<option value="" disabled selected>No Active School Year</option>';
             return;
         }
 
@@ -69,18 +73,21 @@ async function loadDepartments() {
         if (error) throw error;
         departmentsCache = depts || [];
 
-        const select = document.getElementById('departmentSelect');
-        select.innerHTML = '<option value="" disabled selected>Select grade level and section...</option>';
-        
-        departmentsCache.forEach(dept => {
-            const opt = document.createElement('option');
-            opt.value = dept.section_id;
-            opt.textContent = `${dept.grade_level} - ${dept.section_name}`;
-            select.appendChild(opt);
-        });
+               populateGradeLevelSelects();
 
-        // RESTORED: This populates the dropdown inside the Single Student Modal!
-        populateSingleStudentDepartments();
+        // Keep section dropdowns disabled until a grade level is chosen
+        const deptSelect = document.getElementById('departmentSelect');
+        if (deptSelect) {
+            deptSelect.innerHTML = '<option value="" disabled selected>Select grade level first...</option>';
+            deptSelect.disabled = true;
+        }
+
+        const singleDeptSelect = document.getElementById('singleDepartment');
+        if (singleDeptSelect) {
+            singleDeptSelect.innerHTML = '<option value="" disabled selected>Select grade level first...</option>';
+            singleDeptSelect.disabled = true;
+        }
+
         checkReadyToParse();
 
     } catch (error) {
@@ -89,28 +96,49 @@ async function loadDepartments() {
     }
 }
 
-function setupEventListeners() {
+// ========== AUTO-GENERATE STUDENT ID ==========
+async function generateNextStudId(gradeLevel) {
+    const prefix = gradeLevel === 'Kinder' ? 'K' : gradeLevel.replace('Grade ', '');
 
+    const { data, error } = await supabaseClient
+        .from('students')
+        .select('stud_id')
+        .ilike('stud_id', `${prefix}-%`)
+        .order('stud_id', { ascending: false })
+        .limit(1);
 
-    // Inside setupEventListeners(), alongside the other modal inits:
-const addGuardianModalElement = document.getElementById('addGuardianModal');
-if (addGuardianModalElement && window.bootstrap) {
-    addGuardianModal = new bootstrap.Modal(addGuardianModalElement);
+    if (error) throw error;
+
+    let nextNum = 1;
+    if (data && data.length > 0) {
+        const lastId = data[0].stud_id;
+        const lastNum = parseInt(lastId.split('-')[1], 10);
+        if (!isNaN(lastNum)) nextNum = lastNum + 1;
+    }
+
+    return `${prefix}-${String(nextNum).padStart(4, '0')}`;
 }
 
-document.getElementById('addGuardianForm')?.addEventListener('submit', submitAddGuardianForm);
-document.getElementById('modalGuardianPhone')?.addEventListener('blur', handleModalGuardianPhoneLookup);
-    // Add inside setupEventListeners(), alongside the other single-student listeners:
-const guardianPhoneInput = document.getElementById('singleGuardianPhone');
-guardianPhoneInput?.addEventListener('blur', handleGuardianPhoneLookup);
-    const dropZone    = document.getElementById('fileDropZone');
-    const fileInput   = document.getElementById('fileInput');
-    const removeBtn   = document.getElementById('fileRemoveBtn');
-    const parseBtn    = document.getElementById('parseFileBtn');
-    const backUpload  = document.getElementById('backToUploadBtn');
-    const proceedBtn  = document.getElementById('proceedImportBtn');
-    const anotherBtn  = document.getElementById('importAnotherBtn');
-    const deptSelect  = document.getElementById('departmentSelect');
+function setupEventListeners() {
+    const addGuardianModalElement = document.getElementById('addGuardianModal');
+    if (addGuardianModalElement && window.bootstrap) {
+        addGuardianModal = new bootstrap.Modal(addGuardianModalElement);
+    }
+
+    document.getElementById('addGuardianForm')?.addEventListener('submit', submitAddGuardianForm);
+    document.getElementById('modalGuardianPhone')?.addEventListener('blur', handleModalGuardianPhoneLookup);
+
+    const guardianPhoneInput = document.getElementById('singleGuardianPhone');
+    guardianPhoneInput?.addEventListener('blur', handleGuardianPhoneLookup);
+
+    const dropZone = document.getElementById('fileDropZone');
+    const fileInput = document.getElementById('fileInput');
+    const removeBtn = document.getElementById('fileRemoveBtn');
+    const parseBtn = document.getElementById('parseFileBtn');
+    const backUpload = document.getElementById('backToUploadBtn');
+    const proceedBtn = document.getElementById('proceedImportBtn');
+    const anotherBtn = document.getElementById('importAnotherBtn');
+    const deptSelect = document.getElementById('departmentSelect');
     const downloadBtn = document.getElementById('downloadTemplateBtn');
     const addSingleBtn = document.getElementById('addSingleStudentBtn');
     const singleStudentForm = document.getElementById('singleStudentForm');
@@ -126,49 +154,51 @@ guardianPhoneInput?.addEventListener('blur', handleGuardianPhoneLookup);
 
     if (window.bootstrap) {
         const modalElement = document.getElementById('singleStudentModal');
-        if (modalElement) {
-            singleStudentModal = new bootstrap.Modal(modalElement);
-        }
+        if (modalElement) singleStudentModal = new bootstrap.Modal(modalElement);
 
         const duplicateModalElement = document.getElementById('duplicateRowsModal');
-        if (duplicateModalElement) {
-            duplicateRowsModal = new bootstrap.Modal(duplicateModalElement);
-        }
+        if (duplicateModalElement) duplicateRowsModal = new bootstrap.Modal(duplicateModalElement);
 
         const editModalElement = document.getElementById('editStudentModal');
-        if (editModalElement) {
-            editStudentModal = new bootstrap.Modal(editModalElement);
-        }
+        if (editModalElement) editStudentModal = new bootstrap.Modal(editModalElement);
 
         const viewGuardiansModalElement = document.getElementById('viewGuardiansModal');
-        if (viewGuardiansModalElement) {
-            viewGuardiansModal = new bootstrap.Modal(viewGuardiansModalElement);
-        }
+        if (viewGuardiansModalElement) viewGuardiansModal = new bootstrap.Modal(viewGuardiansModalElement);
     }
 
-    // Generate template on demand so download still works even without a static file.
     downloadBtn?.addEventListener('click', (e) => {
         e.preventDefault();
         downloadStudentTemplate();
     });
 
-    // Department select
-    deptSelect.addEventListener('change', () => {
-        const opt = deptSelect.options[deptSelect.selectedIndex];
-        selectedDepartmentId   = deptSelect.value || null;
-        selectedDepartmentName = opt?.dataset?.name || '';
+       const gradeLevelSelect = document.getElementById('gradeLevelSelect');
+    gradeLevelSelect?.addEventListener('change', () => {
+        const gradeLevel = gradeLevelSelect.value;
+        filterSectionsByGradeLevel(gradeLevel, 'departmentSelect');
+        // Clear section selection when grade changes
+        selectedDepartmentId = null;
+        selectedDepartmentName = '';
         checkReadyToParse();
     });
 
-    // Drop zone click — open file picker
+       const singleGradeLevel = document.getElementById('singleGradeLevel');
+    singleGradeLevel?.addEventListener('change', () => {
+        const gradeLevel = singleGradeLevel.value;
+
+        // 1. Cascade sections
+        filterSectionsByGradeLevel(gradeLevel, 'singleDepartment');
+
+        // 2. Auto-generate Student ID (K-####, 1-####, 10-####, etc.)
+        updateSingleStudentId();
+    }); 
+
     dropZone.addEventListener('click', (e) => {
         if (e.target.closest('.file-remove')) return;
         fileInput.click();
     });
 
-    // Drag & drop with counter to handle nested elements
     let dragCounter = 0;
-    
+
     dropZone.addEventListener('dragenter', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -176,14 +206,14 @@ guardianPhoneInput?.addEventListener('blur', handleGuardianPhoneLookup);
         dragCounter++;
         dropZone.classList.add('drag-over');
     });
-    
+
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect = 'copy';
         dropZone.classList.add('drag-over');
     });
-    
+
     dropZone.addEventListener('dragleave', (e) => {
         e.stopPropagation();
         dragCounter--;
@@ -191,21 +221,18 @@ guardianPhoneInput?.addEventListener('blur', handleGuardianPhoneLookup);
             dropZone.classList.remove('drag-over');
         }
     });
-    
+
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         e.stopPropagation();
         dragCounter = 0;
         dropZone.classList.remove('drag-over');
-        
-        // Handle files from external sources (File Explorer, etc.)
+
         try {
             const files = e.dataTransfer.files;
             if (files && files.length > 0) {
-                const file = files[0];
-                // Add a small delay to ensure DOM is ready
                 setTimeout(() => {
-                    handleFileSelected(file);
+                    handleFileSelected(files[0]);
                 }, 10);
             }
         } catch (err) {
@@ -245,57 +272,46 @@ guardianPhoneInput?.addEventListener('blur', handleGuardianPhoneLookup);
         }
     });
 
-    // Add guardian button in single student modal
     const addGuardian2Btn = document.getElementById('addGuardian2Btn');
     addGuardian2Btn?.addEventListener('click', showGuardian2Form);
 
-    // Form step navigation
     const nextToGuardianBtn = document.getElementById('nextToGuardianBtn');
     const backToStudentBtn = document.getElementById('backToStudentBtn');
     nextToGuardianBtn?.addEventListener('click', proceedToGuardianStep);
     backToStudentBtn?.addEventListener('click', goBackToStudentStep);
 
-    // LRN: allow digits only (up to 12).
-const singleIdInput = document.getElementById('singleStudentId');
-singleIdInput?.addEventListener('input', (e) => {
-    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 12);
-});
+    const singleIdInput = document.getElementById('singleStudentId');
+    // Student ID is now auto-generated, no manual input needed
+    // But keep this for any custom overrides if needed later
 
+    const singleGenderInput = document.getElementById('singleSection');
+    singleGenderInput?.addEventListener('change', (e) => {
+        e.target.value = String(e.target.value || '').trim().toLowerCase();
+    });
 
+    const singleSuffixInput = document.getElementById('singleSuffix');
+    singleSuffixInput?.addEventListener('input', (e) => {
+        let value = e.target.value.replace(/[^A-Za-z]/g, '');
+        if (value.length > 0) {
+            value = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+        }
+        e.target.value = value;
+    });
 
-// Normalize gender values.
-const singleGenderInput = document.getElementById('singleSection');
-singleGenderInput?.addEventListener('change', (e) => {
-    e.target.value = String(e.target.value || '').trim().toLowerCase();
-});
+    const editSuffixInput = document.getElementById('editSuffix');
+    editSuffixInput?.addEventListener('input', (e) => {
+        let value = e.target.value.replace(/[^A-Za-z]/g, '');
+        if (value.length > 0) {
+            value = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+        }
+        e.target.value = value;
+    });
 
-// ── Suffix: auto-format with first letter uppercase (e.g. Sr, Jr, III) ──
-const singleSuffixInput = document.getElementById('singleSuffix');
-singleSuffixInput?.addEventListener('input', (e) => {
-    let value = e.target.value.replace(/[^A-Za-z]/g, '');
-    if (value.length > 0) {
-        value = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-    }
-    e.target.value = value;
-});
-
-const editSuffixInput = document.getElementById('editSuffix');
-editSuffixInput?.addEventListener('input', (e) => {
-    let value = e.target.value.replace(/[^A-Za-z]/g, '');
-    if (value.length > 0) {
-        value = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-    }
-    e.target.value = value;
-});
-
-const editGenderInput = document.getElementById('editSection');
-editGenderInput?.addEventListener('change', (e) => {
-    e.target.value = String(e.target.value || '').trim().toLowerCase();
-});
+    const editGenderInput = document.getElementById('editSection');
+    editGenderInput?.addEventListener('change', (e) => {
+        e.target.value = String(e.target.value || '').trim().toLowerCase();
+    });
 }
-
-// Add near the other module-level lets:
-let addGuardianModal = null;
 
 async function handleGuardianPhoneLookup(e) {
     const phone = String(e.target.value || '').trim();
@@ -383,9 +399,7 @@ async function upsertAndLinkGuardian(studentId, guardianData, isPrimary = true) 
     return guardianId;
 }
 
-
 let selectedFile = null;
-
 
 function handleFileSelected(file) {
     if (!file) {
@@ -437,7 +451,6 @@ function checkReadyToParse() {
     console.log('Parse button status updated - Ready:', isReady, 'File:', !!selectedFile, 'Dept:', !!selectedDepartmentId);
 }
 
-
 async function parseFile() {
     if (!selectedFile) return;
 
@@ -464,31 +477,29 @@ async function parseFile() {
                 showImportAlert('The file appears to be empty or has no data rows.', 'warning');
                 return;
             }
-           rows = raw.slice(1).map(r => ({
-    studentId:   String(r[0] || '').trim(),
-    lastName:    String(r[1] || '').trim(),
-    firstName:   String(r[2] || '').trim(),
-    middleName:  String(r[3] || '').trim(),
-    suffix:      String(r[4] || '').trim(),
-    birthDate:   String(r[5] || '').trim(),
-    gender:      String(r[6] || '').trim(),
-    email:       String(r[7] || '').trim(),
-}));
+            rows = raw.slice(1).map(r => ({
+                studId: String(r[0] || '').trim().toUpperCase(),
+                lastName: String(r[1] || '').trim(),
+                firstName: String(r[2] || '').trim(),
+                middleName: String(r[3] || '').trim(),
+                suffix: String(r[4] || '').trim(),
+                birthDate: String(r[5] || '').trim(),
+                gender: String(r[6] || '').trim(),
+                email: String(r[7] || '').trim(),
+            }));
         }
 
-        rows = rows.filter(r => r.studentId || r.firstName || r.lastName);
+        rows = rows.filter(r => r.studId || r.firstName || r.lastName);
 
         if (rows.length === 0) {
             showImportAlert('No data rows found. Make sure you have data below the header row.', 'warning');
             return;
         }
 
-        // Validate rows
         parsedRows = rows.map((r, i) => validateRow(r, i));
 
-        duplicateRowsInFileCount = removeDuplicateStudentIdsFromParsedRows();
-
-        duplicateRowsInDatabaseCount = await removeExistingStudentIdsFromParsedRows();
+        duplicateRowsInFileCount = removeDuplicateStudIdsFromParsedRows();
+        duplicateRowsInDatabaseCount = await removeExistingStudIdsFromParsedRows();
 
         renderPreview();
         showStep('preview');
@@ -498,6 +509,7 @@ async function parseFile() {
         showImportAlert('Failed to parse file: ' + err.message, 'danger');
     }
 }
+
 function parseCSV(text) {
     const lines = text.split(/\r?\n/).filter(l => l.trim());
     if (lines.length < 2) return [];
@@ -505,32 +517,31 @@ function parseCSV(text) {
     return lines.slice(1).map(line => {
         const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
         return {
-            studentId:  cols[0] || '',
-            lastName:   cols[1] || '',
-            firstName:  cols[2] || '',
+            studId: (cols[0] || '').toUpperCase(),
+            lastName: cols[1] || '',
+            firstName: cols[2] || '',
             middleName: cols[3] || '',
-            suffix:     cols[4] || '',
-            birthDate:  cols[5] || '',
-            gender:     cols[6] || '',
-            email:      cols[7] || '',
+            suffix: cols[4] || '',
+            birthDate: cols[5] || '',
+            gender: cols[6] || '',
+            email: cols[7] || '',
         };
     });
 }
 
-
 function validateRow(row, index) {
-    const errors   = [];
+    const errors = [];
     const warnings = [];
-    const normalizedId = String(row.studentId || '').replace(/\D/g, '').trim();
+    const rawId = String(row.studId || '').trim().toUpperCase();
 
-    if (!normalizedId) {
-        errors.push('LRN is required');
-    } else if (!/^\d{12}$/.test(normalizedId)) {
-        errors.push('LRN must be exactly 12 digits');
+    if (!rawId) {
+        errors.push('Student ID is required');
+    } else if (!STUD_ID_PATTERN.test(rawId)) {
+        errors.push('Student ID format: K-####, 1-####, ..., 10-####');
     }
 
-    if (!row.firstName)  errors.push('First Name is required');
-    if (!row.lastName)   errors.push('Last Name is required');
+    if (!row.firstName) errors.push('First Name is required');
+    if (!row.lastName) errors.push('Last Name is required');
 
     if (row.birthDate && Number.isNaN(Date.parse(row.birthDate))) {
         errors.push('Birth Date must be valid (YYYY-MM-DD)');
@@ -547,12 +558,12 @@ function validateRow(row, index) {
     }
 
     const status = errors.length > 0 ? 'error'
-                 : warnings.length > 0 ? 'warning'
-                 : 'ok';
+        : warnings.length > 0 ? 'warning'
+            : 'ok';
 
     return {
         ...row,
-        studentId: normalizedId,
+        studId: rawId,
         birthDate: String(row.birthDate || '').trim(),
         gender: normalizedGender,
         section: selectedDepartmentName || String(row.section || '').trim(),
@@ -566,12 +577,12 @@ function validateRow(row, index) {
 
 function renderPreview() {
     const tbody = document.getElementById('previewTableBody');
-    const valid    = parsedRows.filter(r => r.status !== 'error').length;
+    const valid = parsedRows.filter(r => r.status !== 'error').length;
     const warnings = parsedRows.filter(r => r.status === 'warning').length;
-    const errors   = parsedRows.filter(r => r.status === 'error').length;
+    const errors = parsedRows.filter(r => r.status === 'error').length;
     const duplicated = duplicateRowsInFileCount + duplicateRowsInDatabaseCount;
 
-    document.getElementById('validCount').textContent   = valid;
+    document.getElementById('validCount').textContent = valid;
     const duplicatedCountEl = document.getElementById('duplicatedCount');
     if (duplicatedCountEl) {
         duplicatedCountEl.textContent = duplicated;
@@ -586,8 +597,8 @@ function renderPreview() {
     }
 
     document.getElementById('warningCount').textContent = warnings;
-    document.getElementById('errorCount').textContent   = errors;
-    document.getElementById('totalCount').textContent   = parsedRows.length;
+    document.getElementById('errorCount').textContent = errors;
+    document.getElementById('totalCount').textContent = parsedRows.length;
     const proceedBtn = document.getElementById('proceedImportBtn');
     if (parsedRows.length === 0) {
         proceedBtn.disabled = true;
@@ -613,23 +624,23 @@ function renderPreview() {
 
     tbody.innerHTML = parsedRows.map((row, i) => {
         const rowClass = row.status === 'error' ? 'row-error'
-                       : row.status === 'warning' ? 'row-warning' : '';
+            : row.status === 'warning' ? 'row-warning' : '';
 
         const statusBadge = row.status === 'ok'
             ? `<span class="row-status status-ok"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Ready</span>`
             : row.status === 'warning'
-            ? `<span class="row-status status-warning" title="${row.warnings.join('; ')}">
+                ? `<span class="row-status status-warning" title="${row.warnings.join('; ')}">
                 <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                 Warning
                </span>`
-            : `<span class="row-status status-error" title="${row.errors.join('; ')}">
+                : `<span class="row-status status-error" title="${row.errors.join('; ')}">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                 Error
                </span>`;
 
         const errorNote = row.errors.length > 0
             ? `<div class="error-tooltip">${row.errors.join(', ')}</div>` : '';
-        const warnNote  = row.warnings.length > 0
+        const warnNote = row.warnings.length > 0
             ? `<div style="font-size:0.75rem;color:#92400e;margin-top:0.15rem;">${row.warnings.join(', ')}</div>` : '';
 
         const cell = (val) => val
@@ -639,7 +650,7 @@ function renderPreview() {
         return `
             <tr class="${rowClass}">
                 <td style="color:var(--text-muted);font-size:0.8rem;">${row.rowIndex}</td>
-                <td><strong>${escapeHtml(row.studentId)}</strong>${errorNote}</td>
+                <td><strong>${escapeHtml(row.studId)}</strong>${errorNote}</td>
                 ${cell(row.lastName)}
                 ${cell(row.firstName)}
                 ${cell(row.middleName)}
@@ -662,49 +673,47 @@ async function startImport() {
         return;
     }
 
-    // Safety check: Ensure active school year exists before bulk importing
     if (!activeSchoolYear || !activeSchoolYear.id) {
         showImportAlert('No active school year found. Please set one in System Settings first.', 'danger');
         return;
     }
 
     showStep('import');
-    const log   = document.getElementById('importLog');
-    const fill  = document.getElementById('progressBarFill');
-    const text  = document.getElementById('progressText');
-    const pct   = document.getElementById('progressPct');
+    const log = document.getElementById('importLog');
+    const fill = document.getElementById('progressBarFill');
+    const text = document.getElementById('progressText');
+    const pct = document.getElementById('progressPct');
     log.innerHTML = '';
 
     let success = 0;
-    let failed  = 0;
+    let failed = 0;
     const total = validRows.length;
 
     addLog(log, 'info', `Starting import of ${total} student(s) into ${selectedDepartmentName}...`);
-    const studentIds = validRows.map(r => r.studentId);
+    const studIds = validRows.map(r => r.studId);
     const { data: existing } = await supabaseClient
         .from('students')
-        .select('lrn')
-        .in('lrn', studentIds);
-    const existingIds = new Set((existing || []).map(e => e.lrn));
+        .select('stud_id')
+        .in('stud_id', studIds);
+    const existingIds = new Set((existing || []).map(e => e.stud_id));
 
     for (let i = 0; i < validRows.length; i++) {
         const row = validRows[i];
-
-        const isUpdate = existingIds.has(row.studentId);
+        const isUpdate = existingIds.has(row.studId);
 
         try {
             const studentData = {
-                lrn:          row.studentId,
-                first_name:   row.firstName,
-                middle_name:  row.middleName || null,
-                last_name:    row.lastName,
-                suffix:       row.suffix || null,
-                birth_date:   row.birthDate || null,
-                gender:       row.gender || null,
-                section_id:   selectedDepartmentId,
-                school_year_id: activeSchoolYear.id, // <-- ADDED THIS LINE
-                status:       'active',
-                updated_at:   new Date().toISOString(),
+                stud_id: row.studId,
+                first_name: row.firstName,
+                middle_name: row.middleName || null,
+                last_name: row.lastName,
+                suffix: row.suffix || null,
+                birth_date: row.birthDate || null,
+                gender: row.gender || null,
+                section_id: selectedDepartmentId,
+                school_year_id: activeSchoolYear.id,
+                status: 'active',
+                updated_at: new Date().toISOString(),
             };
 
             let error;
@@ -713,10 +722,9 @@ async function startImport() {
                 const res = await supabaseClient
                     .from('students')
                     .update(studentData)
-                    .eq('lrn', row.studentId);
+                    .eq('stud_id', row.studId);
                 error = res.error;
             } else {
-                // Insert new record
                 studentData.student_id = crypto.randomUUID();
                 studentData.created_at = new Date().toISOString();
                 const res = await supabaseClient
@@ -729,10 +737,10 @@ async function startImport() {
 
             success++;
             const label = isUpdate ? 'Updated' : 'Imported';
-            addLog(log, 'ok', `[Row ${row.rowIndex}] ${label}: ${row.firstName} ${row.lastName} (${row.studentId})`);
+            addLog(log, 'ok', `[Row ${row.rowIndex}] ${label}: ${row.firstName} ${row.lastName} (${row.studId})`);
 
             const emailResult = await sendStudentQrEmail({
-                studentId: row.studentId,
+                studId: row.studId,
                 firstName: row.firstName,
                 middleName: row.middleName,
                 lastName: row.lastName,
@@ -755,7 +763,7 @@ async function startImport() {
         const progress = Math.round(((i + 1) / total) * 100);
         fill.style.width = progress + '%';
         text.textContent = `${i + 1} of ${total} students processed`;
-        pct.textContent  = progress + '%';
+        pct.textContent = progress + '%';
         await sleep(60);
     }
 
@@ -785,7 +793,7 @@ async function loadAllStudentsTable() {
         const { data, error } = await supabaseClient
             .from('students')
             .select(`
-                student_id, lrn, first_name, middle_name, last_name, suffix, birth_date, gender, section_id, status,
+                student_id, stud_id, first_name, middle_name, last_name, suffix, birth_date, gender, section_id, status,
                 sections:section_id(grade_level, section_name),
                 student_guardians(is_primary_contact, guardians:guardian_id(first_name, last_name, relationship, phone_number, email, address))
             `)
@@ -807,6 +815,7 @@ async function loadAllStudentsTable() {
         countEl.textContent = '0';
     }
 }
+
 function renderAllStudentsTable() {
     const tbody = document.getElementById('allStudentsTableBody');
     const countEl = document.getElementById('allStudentsCount');
@@ -822,7 +831,7 @@ function renderAllStudentsTable() {
         const fullName = student.last_name ? (student.last_name + ', ' + nameParts.join(' ')).toLowerCase() : nameParts.join(' ').toLowerCase();
         const matchesSearch = !search
             || fullName.includes(search)
-            || String(student.lrn || '').toLowerCase().includes(search);
+            || String(student.stud_id || '').toLowerCase().includes(search);
         const gradeLevel = String(student.sections?.grade_level || '').trim();
         const sectionName = String(student.sections?.section_name || '').trim();
         const gender = String(student.gender || '').trim().toLowerCase();
@@ -853,19 +862,19 @@ function renderAllStudentsTable() {
         const guardianLinks = student.student_guardians || [];
         let guardianCell = '';
         if (guardianLinks.length === 0) {
-            guardianCell = `<button type="button" class="status-badge warning" style="border:none;cursor:pointer;" data-action="addGuardian" data-id="${escapeHtml(student.lrn || '')}">
+            guardianCell = `<button type="button" class="status-badge warning" style="border:none;cursor:pointer;" data-action="addGuardian" data-id="${escapeHtml(student.stud_id || '')}">
                  Not Added — Add
                </button>`;
         } else if (guardianLinks.length === 1) {
             const guardian = guardianLinks[0].guardians;
-            guardianCell = `<button type="button" class="status-badge valid" style="border:none;cursor:pointer;" data-action="viewGuardians" data-student-id="${escapeHtml(student.student_id || '')}" data-student-name="${escapeHtml((student.first_name || '') + ' ' + (student.last_name || ''))}" data-student-lrn="${escapeHtml(student.lrn || '')}" title="${escapeHtml(guardian.relationship || '')}">
+            guardianCell = `<button type="button" class="status-badge valid" style="border:none;cursor:pointer;" data-action="viewGuardians" data-student-id="${escapeHtml(student.student_id || '')}" data-student-name="${escapeHtml((student.first_name || '') + ' ' + (student.last_name || ''))}" data-student-stud-id="${escapeHtml(student.stud_id || '')}" title="${escapeHtml(guardian.relationship || '')}">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:0.3rem;vertical-align:middle;">
                     <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
                 </svg>
                 ${escapeHtml(guardian.first_name + ' ' + guardian.last_name)}
                </button>`;
         } else {
-            guardianCell = `<button type="button" class="status-badge valid" style="border:none;cursor:pointer;" data-action="viewGuardians" data-student-id="${escapeHtml(student.student_id || '')}" data-student-name="${escapeHtml((student.first_name || '') + ' ' + (student.last_name || ''))}" data-student-lrn="${escapeHtml(student.lrn || '')}">
+            guardianCell = `<button type="button" class="status-badge valid" style="border:none;cursor:pointer;" data-action="viewGuardians" data-student-id="${escapeHtml(student.student_id || '')}" data-student-name="${escapeHtml((student.first_name || '') + ' ' + (student.last_name || ''))}" data-student-stud-id="${escapeHtml(student.stud_id || '')}">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:0.3rem;vertical-align:middle;">
                     <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
                 </svg>
@@ -875,7 +884,7 @@ function renderAllStudentsTable() {
 
         return `
             <tr>
-                <td><strong>${escapeHtml(student.lrn || 'N/A')}</strong></td>
+                <td><strong>${escapeHtml(student.stud_id || 'N/A')}</strong></td>
                 <td>${escapeHtml(fullName || 'N/A')}</td>
                 <td>${escapeHtml(gradeLevel)}</td>
                 <td>${escapeHtml(sectionName)}</td>
@@ -885,10 +894,10 @@ function renderAllStudentsTable() {
                 <td>${escapeHtml(status)}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn-icon" title="Edit" data-action="edit" data-id="${escapeHtml(student.lrn || '')}">
+                        <button class="btn-icon" title="Edit" data-action="edit" data-id="${escapeHtml(student.stud_id || '')}">
                             <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
-                        <button class="btn-icon danger" title="Delete" data-action="delete" data-id="${escapeHtml(student.lrn || '')}">
+                        <button class="btn-icon danger" title="Delete" data-action="delete" data-id="${escapeHtml(student.stud_id || '')}">
                             <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
                     </div>
@@ -954,51 +963,50 @@ function clearStudentsFilters() {
     if (yearFilter) yearFilter.value = '';
     renderAllStudentsTable();
 }
+
 function handleStudentsTableActions(event) {
     const actionBtn = event.target.closest('[data-action]');
     if (!actionBtn) return;
 
     const action = actionBtn.dataset.action;
-    
-    // Handle viewGuardians action (doesn't need studentId from data-id)
+
     if (action === 'viewGuardians') {
         const studentUuid = actionBtn.dataset.studentId;
         const studentName = actionBtn.dataset.studentName;
-        const studentLrn = actionBtn.dataset.studentLrn;
-        openViewGuardiansModal(studentUuid, studentName, studentLrn);
+        const studentStudId = actionBtn.dataset.studentStudId;
+        openViewGuardiansModal(studentUuid, studentName, studentStudId);
         return;
     }
-    
-    const studentId = actionBtn.dataset.id;
-    if (!studentId) return;
+
+    const studId = actionBtn.dataset.id;
+    if (!studId) return;
 
     if (action === 'edit') {
-        openEditStudentModal(studentId);
+        openEditStudentModal(studId);
         return;
     }
     if (action === 'delete') {
-        deleteStudentRow(studentId);
+        deleteStudentRow(studId);
         return;
     }
     if (action === 'addGuardian') {
-        const student = allStudents.find(s => String(s.lrn) === String(studentId));
+        const student = allStudents.find(s => String(s.stud_id) === String(studId));
         const displayName = student
             ? [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ')
-            : studentId;
-        openAddGuardianModal(student?.student_id, displayName, studentId);
+            : studId;
+        openAddGuardianModal(student?.student_id, displayName, studId);
     }
 }
 
-function openViewGuardiansModal(studentUuid, studentName, studentLrn) {
+function openViewGuardiansModal(studentUuid, studentName, studentStudId) {
     if (!viewGuardiansModal) {
         showImportAlert('View Guardians modal is not available right now.', 'danger');
         return;
     }
 
     document.getElementById('viewGuardiansStudentName').textContent = studentName || '—';
-    document.getElementById('viewGuardiansStudentLRN').textContent = studentLrn || '—';
+    document.getElementById('viewGuardiansStudentId').textContent = studentStudId || '—';
 
-    // Find student and populate guardians
     const student = allStudents.find(s => String(s.student_id) === String(studentUuid));
     if (!student || !student.student_guardians || student.student_guardians.length === 0) {
         document.getElementById('guardiansListContent').innerHTML = `
@@ -1046,19 +1054,18 @@ function openViewGuardiansModal(studentUuid, studentName, studentLrn) {
         document.getElementById('guardiansListContent').innerHTML = guardiansHtml;
     }
 
-    // Update the "Add Guardian" button to trigger the add modal
     const addGuardianBtn = document.getElementById('addGuardianFromViewBtn');
     if (addGuardianBtn) {
         addGuardianBtn.onclick = () => {
             viewGuardiansModal.hide();
-            openAddGuardianModal(studentUuid, studentName, studentLrn);
+            openAddGuardianModal(studentUuid, studentName, studentStudId);
         };
     }
 
     viewGuardiansModal.show();
 }
 
-function openAddGuardianModal(studentUuid, displayName, lrn) {
+function openAddGuardianModal(studentUuid, displayName, studId) {
     if (!addGuardianModal) {
         showImportAlert('Add Guardian form is not available right now.', 'danger');
         return;
@@ -1068,8 +1075,8 @@ function openAddGuardianModal(studentUuid, displayName, lrn) {
     if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
 
     document.getElementById('guardianModalStudentId').value = studentUuid || '';
-    document.getElementById('guardianModalStudentId').dataset.lrn = lrn || '';
-    document.getElementById('guardianModalStudentName').textContent = displayName || lrn;
+    document.getElementById('guardianModalStudentId').dataset.studId = studId || '';
+    document.getElementById('guardianModalStudentName').textContent = displayName || studId;
 
     addGuardianModal.show();
 }
@@ -1122,7 +1129,7 @@ async function submitAddGuardianForm(event) {
     const submitBtn = document.getElementById('addGuardianSubmitBtn');
     const overlay = document.getElementById('addGuardianLoadingOverlay');
     const studentUuid = document.getElementById('guardianModalStudentId')?.value || '';
-    const lrn = document.getElementById('guardianModalStudentId')?.dataset.lrn || '';
+    const studId = document.getElementById('guardianModalStudentId')?.dataset.studId || '';
 
     const firstName = String(document.getElementById('modalGuardianFirstName')?.value || '').trim();
     const middleName = String(document.getElementById('modalGuardianMiddleName')?.value || '').trim();
@@ -1161,7 +1168,7 @@ async function submitAddGuardianForm(event) {
             address,
         }, true);
 
-        showImportAlert(`Guardian linked successfully for ${lrn}.`, 'success');
+        showImportAlert(`Guardian linked successfully for ${studId}.`, 'success');
         addGuardianModal?.hide();
         await loadAllStudentsTable();
     } catch (error) {
@@ -1173,8 +1180,8 @@ async function submitAddGuardianForm(event) {
     }
 }
 
-function openEditStudentModal(idNumber) {
-    const student = allStudents.find(s => String(s.lrn) === String(idNumber));
+function openEditStudentModal(studId) {
+    const student = allStudents.find(s => String(s.stud_id) === String(studId));
     if (!student || !editStudentModal) return;
 
     const editDepartment = document.getElementById('editDepartment');
@@ -1189,7 +1196,7 @@ function openEditStudentModal(idNumber) {
     }
 
     document.getElementById('editStudentUid').value = student.student_id || '';
-    document.getElementById('editStudentId').value = student.lrn || '';
+    document.getElementById('editStudentId').value = student.stud_id || '';
     document.getElementById('editDepartment').value = String(student.section_id || '');
     document.getElementById('editFirstName').value = student.first_name || '';
     document.getElementById('editMiddleName').value = student.middle_name || '';
@@ -1207,7 +1214,7 @@ async function submitEditStudentForm(event) {
 
     const saveBtn = document.getElementById('saveStudentEditBtn');
     const studentUid = String(document.getElementById('editStudentUid')?.value || '').trim();
-    const idNumber = String(document.getElementById('editStudentId')?.value || '').trim();
+    const studId = String(document.getElementById('editStudentId')?.value || '').trim();
     const sectionId = String(document.getElementById('editDepartment')?.value || '').trim();
     const firstName = String(document.getElementById('editFirstName')?.value || '').trim();
     const middleName = String(document.getElementById('editMiddleName')?.value || '').trim();
@@ -1254,13 +1261,13 @@ async function submitEditStudentForm(event) {
         if (studentUid) {
             query = query.eq('student_id', studentUid);
         } else {
-            query = query.eq('lrn', idNumber);
+            query = query.eq('stud_id', studId);
         }
 
         const { error } = await query;
         if (error) throw error;
 
-        showImportAlert(`Student ${idNumber} updated successfully.`, 'success');
+        showImportAlert(`Student ${studId} updated successfully.`, 'success');
         editStudentModal?.hide();
         await loadAllStudentsTable();
     } catch (error) {
@@ -1274,14 +1281,13 @@ async function submitEditStudentForm(event) {
     }
 }
 
-async function deleteStudentRow(idNumber) {
-    const student = allStudents.find(s => String(s.lrn) === String(idNumber));
-    // Format: lastName, firstName middleName suffix
+async function deleteStudentRow(studId) {
+    const student = allStudents.find(s => String(s.stud_id) === String(studId));
     const displayName = student
         ? (student.last_name ? (student.last_name + ', ' + [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' ')) : [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' '))
-        : idNumber;
+        : studId;
 
-    if (!confirm(`Delete student ${displayName} (${idNumber})? This action cannot be undone.`)) {
+    if (!confirm(`Delete student ${displayName} (${studId})? This action cannot be undone.`)) {
         return;
     }
 
@@ -1290,13 +1296,13 @@ async function deleteStudentRow(idNumber) {
         if (student?.student_id) {
             query = query.eq('student_id', student.student_id);
         } else {
-            query = query.eq('lrn', idNumber);
+            query = query.eq('stud_id', studId);
         }
 
         const { error } = await query;
         if (error) throw error;
 
-        showImportAlert(`Student ${idNumber} deleted successfully.`, 'success');
+        showImportAlert(`Student ${studId} deleted successfully.`, 'success');
         await loadAllStudentsTable();
     } catch (error) {
         console.error('Error deleting student:', error);
@@ -1304,11 +1310,10 @@ async function deleteStudentRow(idNumber) {
     }
 }
 
-
 function showStep(step) {
-    document.getElementById('stepUpload').style.display  = step === 'upload'  ? '' : 'none';
+    document.getElementById('stepUpload').style.display = step === 'upload' ? '' : 'none';
     document.getElementById('stepPreview').style.display = step === 'preview' ? '' : 'none';
-    document.getElementById('stepImport').style.display  = step === 'import'  ? '' : 'none';
+    document.getElementById('stepImport').style.display = step === 'import' ? '' : 'none';
 }
 
 function goBackToUpload() {
@@ -1333,35 +1338,80 @@ function resetAll() {
     checkReadyToParse();
 }
 
-function populateSingleStudentDepartments() {
-    const select = document.getElementById('singleDepartment');
-    if (!select) return;
+function populateGradeLevelSelects() {
+    const gradeSelect = document.getElementById('gradeLevelSelect');
+    const singleGradeSelect = document.getElementById('singleGradeLevel');
 
-    select.innerHTML = '<option value="">Select section...</option>';
-    departmentsCache.forEach(dept => {
-        const option = document.createElement('option');
-        option.value = dept.section_id;
-        option.textContent = `${dept.grade_level} - ${dept.section_name}`;
-        select.appendChild(option);
-    });
+    if (!gradeSelect || !singleGradeSelect) return;
+
+    const uniqueGrades = [...new Set(departmentsCache.map(d => d.grade_level).filter(Boolean))];
+
+    // Logical order: Kinder → Grade 1 → Grade 10
+    const gradeOrder = ['Kinder', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'];
+    const sortedGrades = uniqueGrades.sort((a, b) => gradeOrder.indexOf(a) - gradeOrder.indexOf(b));
+
+    const optionsHtml = sortedGrades.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
+
+    gradeSelect.innerHTML = '<option value="" disabled selected>Select grade level...</option>' + optionsHtml;
+    singleGradeSelect.innerHTML = '<option value="" disabled selected>Select grade level...</option>' + optionsHtml;
 }
-function openSingleStudentModal() {
+
+function filterSectionsByGradeLevel(gradeLevel, sectionSelectId) {
+    const sectionSelect = document.getElementById(sectionSelectId);
+    if (!sectionSelect) return;
+
+    if (!gradeLevel) {
+        sectionSelect.innerHTML = '<option value="" disabled selected>Select grade level first...</option>';
+        sectionSelect.disabled = true;
+        return;
+    }
+
+    const filteredSections = departmentsCache.filter(d => d.grade_level === gradeLevel);
+    const optionsHtml = filteredSections.map(d =>
+        `<option value="${escapeHtml(d.section_id)}">${escapeHtml(d.grade_level)} - ${escapeHtml(d.section_name)}</option>`
+    ).join('');
+
+    sectionSelect.innerHTML = '<option value="" disabled selected>Select section...</option>' + optionsHtml;
+    sectionSelect.disabled = false;
+}
+
+async function openSingleStudentModal() {
     if (!singleStudentModal) {
         showImportAlert('Single student form is not available right now.', 'danger');
         return;
     }
-    setSingleStudentLoading(false); // ensure a clean state
+    setSingleStudentLoading(false);
+
     const syDisplay = document.getElementById('singleActiveSchoolYear');
     if (syDisplay) {
         syDisplay.value = activeSchoolYear && activeSchoolYear.name ? activeSchoolYear.name : 'No Active School Year';
     }
-    const deptSelect = document.getElementById('singleDepartment');
-    if (deptSelect && selectedDepartmentId) {
-        deptSelect.value = selectedDepartmentId;
+
+       const singleGradeLevel = document.getElementById('singleGradeLevel');
+    const deptSelect       = document.getElementById('singleDepartment');
+
+    // Reset first
+    if (singleGradeLevel) singleGradeLevel.value = '';
+    if (deptSelect) {
+        deptSelect.innerHTML = '<option value="" disabled selected>Select grade level first...</option>';
+        deptSelect.disabled = true;
     }
-    
-    // Reset student form fields
-    document.getElementById('singleStudentId').value = '';
+
+    // If a section was already chosen on the Import page, restore Grade + Section
+    if (selectedDepartmentId && singleGradeLevel && deptSelect) {
+        const section = departmentsCache.find(
+            d => String(d.section_id) === String(selectedDepartmentId)
+        );
+        if (section) {
+            singleGradeLevel.value = section.grade_level;
+            filterSectionsByGradeLevel(section.grade_level, 'singleDepartment');
+            deptSelect.value = selectedDepartmentId;
+        }
+    }
+
+    // Generate the ID from the now-selected grade level
+    await updateSingleStudentId();
+
     document.getElementById('singleFirstName').value = '';
     document.getElementById('singleMiddleName').value = '';
     document.getElementById('singleLastName').value = '';
@@ -1370,8 +1420,7 @@ function openSingleStudentModal() {
     document.getElementById('singleSection').value = '';
     document.getElementById('singleEmail').value = '';
     document.getElementById('singleAddress').value = '';
-    
-    // Reset form steps to student step
+
     const studentStep = document.getElementById('studentFormStep');
     const guardianStep = document.getElementById('guardianFormStep');
     const studentFooter = document.getElementById('studentFormFooter');
@@ -1380,16 +1429,38 @@ function openSingleStudentModal() {
     if (guardianStep) guardianStep.style.display = 'none';
     if (studentFooter) studentFooter.style.display = 'flex';
     if (guardianFooter) guardianFooter.style.display = 'none';
-    
-    // Reset guardian forms
+
     clearGuardian1Form();
     clearGuardian2Form();
     const guardian2Section = document.getElementById('guardian2Section');
     const addGuardian2Container = document.getElementById('addGuardian2ButtonContainer');
     if (guardian2Section) guardian2Section.style.display = 'none';
     if (addGuardian2Container) addGuardian2Container.style.display = 'block';
-    
+
+    // Listen for section changes to regenerate Student ID
+    deptSelect?.removeEventListener('change', updateSingleStudentId);
+    deptSelect?.addEventListener('change', updateSingleStudentId);
+
     singleStudentModal.show();
+}
+async function updateSingleStudentId() {
+    const gradeSelect = document.getElementById('singleGradeLevel');
+    const studIdInput = document.getElementById('singleStudentId');
+    if (!gradeSelect || !studIdInput) return;
+
+    const gradeLevel = gradeSelect.value;          // "Kinder", "Grade 1", "Grade 10", etc.
+    if (!gradeLevel) {
+        studIdInput.value = '';
+        return;
+    }
+
+    try {
+        const nextId = await generateNextStudId(gradeLevel);
+        studIdInput.value = nextId;               // e.g. K-0003, 1-0042, 10-0001
+    } catch (err) {
+        console.error('Failed to generate Student ID:', err);
+        studIdInput.value = '';
+    }
 }
 
 function setSingleStudentLoading(isLoading, text) {
@@ -1420,25 +1491,23 @@ function showEmailStatusToast(message, type = 'success') {
     setTimeout(() => toast.remove(), 8000);
 }
 
-// ====== FORM STEP NAVIGATION ======
 function proceedToGuardianStep(e) {
     e?.preventDefault?.();
 
-    // Validate student form
     const sectionId = document.getElementById('singleDepartment')?.value || '';
-    const studentId = String(document.getElementById('singleStudentId')?.value || '').replace(/\D/g, '').trim();
+    const studId = String(document.getElementById('singleStudentId')?.value || '').trim();
     const firstName = String(document.getElementById('singleFirstName')?.value || '').trim();
     const lastName = String(document.getElementById('singleLastName')?.value || '').trim();
     const birthDate = String(document.getElementById('singleYearLevel')?.value || '').trim();
     const gender = String(document.getElementById('singleSection')?.value || '').trim().toLowerCase();
     const email = String(document.getElementById('singleEmail')?.value || '').trim();
 
-    if (!sectionId || !studentId || !firstName || !lastName) {
-        showImportAlert('Please fill in Section, LRN, First Name, and Last Name.', 'warning');
+    if (!sectionId || !studId || !firstName || !lastName) {
+        showImportAlert('Please fill in Section, Student ID, First Name, and Last Name.', 'warning');
         return;
     }
-    if (!/^\d{12}$/.test(studentId)) {
-        showImportAlert('LRN must be exactly 12 digits.', 'warning');
+    if (!STUD_ID_PATTERN.test(studId)) {
+        showImportAlert('Student ID format: K-####, 1-####, ..., 10-####', 'warning');
         return;
     }
     if (!email) {
@@ -1454,7 +1523,6 @@ function proceedToGuardianStep(e) {
         return;
     }
 
-    // All validations passed, move to guardian step
     const studentStep = document.getElementById('studentFormStep');
     const guardianStep = document.getElementById('guardianFormStep');
     const studentFooter = document.getElementById('studentFormFooter');
@@ -1465,7 +1533,6 @@ function proceedToGuardianStep(e) {
     studentFooter.style.display = 'none';
     guardianFooter.style.display = 'flex';
 
-    // Set up "same as student" checkbox listeners
     setupSameAsStudentCheckboxes();
 }
 
@@ -1483,7 +1550,6 @@ function goBackToStudentStep(e) {
     guardianFooter.style.display = 'none';
 }
 
-// ====== SAME AS STUDENT CHECKBOX ======
 function setupSameAsStudentCheckboxes() {
     const studentAddress = document.getElementById('singleAddress');
     const guardian1Checkbox = document.getElementById('guardian1SameAsStudent');
@@ -1493,7 +1559,6 @@ function setupSameAsStudentCheckboxes() {
 
     if (!guardian1Checkbox || !guardian1Address) return;
 
-    // Handle Guardian 1 checkbox
     guardian1Checkbox.addEventListener('change', () => {
         if (guardian1Checkbox.checked) {
             const address = studentAddress?.value || '';
@@ -1508,7 +1573,6 @@ function setupSameAsStudentCheckboxes() {
         }
     });
 
-    // Handle Guardian 2 checkbox if visible
     if (guardian2Checkbox && guardian2Address) {
         guardian2Checkbox.addEventListener('change', () => {
             if (guardian2Checkbox.checked) {
@@ -1525,7 +1589,6 @@ function setupSameAsStudentCheckboxes() {
         });
     }
 
-    // Update guardian addresses when student address changes (if checkbox is checked)
     if (studentAddress) {
         studentAddress.addEventListener('change', () => {
             if (guardian1Checkbox.checked) {
@@ -1538,13 +1601,12 @@ function setupSameAsStudentCheckboxes() {
     }
 }
 
-// ====== GUARDIAN MANAGEMENT FUNCTIONS ======
 function showGuardian2Form(e) {
     e?.preventDefault?.();
-    
+
     const guardian2Section = document.getElementById('guardian2Section');
     const addGuardian2Container = document.getElementById('addGuardian2ButtonContainer');
-    
+
     if (guardian2Section) {
         guardian2Section.style.display = 'block';
         guardian2Section.style.animation = 'slideInUp 0.3s ease-out';
@@ -1581,27 +1643,10 @@ function clearGuardian2Form() {
     const checkbox2 = document.getElementById('guardian2SameAsStudent');
     if (checkbox2) checkbox2.checked = false;
     const statusEl = document.getElementById('guardian2LookupStatus');
-    if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
-    
-    // Hide guardian 2 section
-    const guardian2Section = document.getElementById('guardian2Section');
-    const addGuardian2Container = document.getElementById('addGuardian2ButtonContainer');
-    if (guardian2Section) guardian2Section.style.display = 'none';
-    if (addGuardian2Container) addGuardian2Container.style.display = 'block';
-}
-
-function getGuardianDataFromForm(guardianNum) {
-    const prefix = `guardian${guardianNum}`;
-    return {
-        phone_number: String(document.getElementById(`${prefix}Phone`)?.value || '').trim(),
-        relationship: String(document.getElementById(`${prefix}Relationship`)?.value || '').trim(),
-        first_name: String(document.getElementById(`${prefix}FirstName`)?.value || '').trim(),
-        last_name: String(document.getElementById(`${prefix}LastName`)?.value || '').trim(),
-        middle_name: String(document.getElementById(`${prefix}MiddleName`)?.value || '').trim() || null,
-        alternate_phone_number: String(document.getElementById(`${prefix}AltPhone`)?.value || '').trim() || null,
-        email: String(document.getElementById(`${prefix}Email`)?.value || '').trim() || null,
-        address: String(document.getElementById(`${prefix}Address`)?.value || '').trim() || null,
-    };
+    if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.className = '';
+    }
 }
 
 async function submitSingleStudentForm(event) {
@@ -1609,7 +1654,7 @@ async function submitSingleStudentForm(event) {
 
     const submitBtn = document.getElementById('singleStudentSubmitBtn');
     const sectionId = document.getElementById('singleDepartment')?.value || '';
-    const studentId = String(document.getElementById('singleStudentId')?.value || '').replace(/\D/g, '').trim();
+    const studId = String(document.getElementById('singleStudentId')?.value || '').trim().toUpperCase();
     const firstName = String(document.getElementById('singleFirstName')?.value || '').trim();
     const middleName = String(document.getElementById('singleMiddleName')?.value || '').trim();
     const lastName = String(document.getElementById('singleLastName')?.value || '').trim();
@@ -1622,12 +1667,12 @@ async function submitSingleStudentForm(event) {
         showImportAlert('No active school year found. Please set one in System Settings first.', 'danger');
         return;
     }
-    if (!sectionId || !studentId || !firstName || !lastName) {
-        showImportAlert('Please fill in Section, LRN, First Name, and Last Name.', 'warning');
+    if (!sectionId || !studId || !firstName || !lastName) {
+        showImportAlert('Please fill in Section, Student ID, First Name, and Last Name.', 'warning');
         return;
     }
-    if (!/^\d{12}$/.test(studentId)) {
-        showImportAlert('LRN must be exactly 12 digits.', 'warning');
+    if (!STUD_ID_PATTERN.test(studId)) {
+        showImportAlert('Student ID format: K-####, 1-####, ..., 10-####', 'warning');
         return;
     }
     if (birthDate && Number.isNaN(Date.parse(birthDate))) {
@@ -1639,33 +1684,6 @@ async function submitSingleStudentForm(event) {
         return;
     }
 
-    // Get guardian data from forms
-    const guardian1Data = getGuardianDataFromForm(1);
-    const guardian2Data = getGuardianDataFromForm(2);
-    const guardian2Visible = document.getElementById('guardian2Section')?.style.display !== 'none';
-
-    // Validate guardian 1
-    if (!guardian1Data.phone_number || !guardian1Data.relationship || !guardian1Data.first_name || !guardian1Data.last_name || !guardian1Data.address) {
-        showImportAlert('Please fill in all required Guardian 1 fields (Phone, Relationship, First Name, Last Name, Address).', 'warning');
-        return;
-    }
-
-    // Guardian 2 is optional but if some fields are filled, validate all required fields
-    if (guardian2Visible) {
-        const guardian2HasData = guardian2Data.phone_number || guardian2Data.relationship || guardian2Data.first_name || guardian2Data.last_name || guardian2Data.address;
-        if (guardian2HasData) {
-            if (!guardian2Data.phone_number || !guardian2Data.relationship || !guardian2Data.first_name || !guardian2Data.last_name || !guardian2Data.address) {
-                showImportAlert('Please fill in all required Guardian 2 fields or leave them all empty.', 'warning');
-                return;
-            }
-            // Check duplicate phones
-            if (guardian1Data.phone_number === guardian2Data.phone_number) {
-                showImportAlert('Guardian 1 and Guardian 2 cannot have the same phone number.', 'warning');
-                return;
-            }
-        }
-    }
-
     try {
         setSingleStudentLoading(true, 'Saving student...');
 
@@ -1673,20 +1691,19 @@ async function submitSingleStudentForm(event) {
 
         const { data: existingStudent, error: existingError } = await supabaseClient
             .from('students')
-            .select('lrn')
-            .eq('lrn', studentId)
+            .select('stud_id')
+            .eq('stud_id', studId)
             .maybeSingle();
 
         if (existingError) throw existingError;
         if (existingStudent) {
-            showImportAlert(`LRN ${studentId} already exists. Use import to update existing records.`, 'warning');
+            showImportAlert(`Student ID ${studId} already exists. Use import to update existing records.`, 'warning');
             return;
         }
 
-        const studentUuid = crypto.randomUUID();
         const payload = {
-            student_id: studentUuid,
-            lrn: studentId,
+            student_id: crypto.randomUUID(),
+            stud_id: studId,
             first_name: firstName,
             middle_name: middleName || null,
             last_name: lastName,
@@ -1703,55 +1720,40 @@ async function submitSingleStudentForm(event) {
         const { error: insertError } = await supabaseClient.from('students').insert(payload);
         if (insertError) throw insertError;
 
-        // Link guardian 1 (primary)
-        setSingleStudentLoading(true, 'Linking guardians...');
-        let guardiansAdded = 0;
-        try {
-            await upsertAndLinkGuardian(studentUuid, guardian1Data, true);
-            guardiansAdded = 1;
-        } catch (guardianErr) {
-            console.error('Guardian 1 link failed:', guardianErr);
-            showImportAlert(`Student saved, but Guardian 1 could not be linked: ${guardianErr.message}.`, 'warning');
-        }
-
-        // Link guardian 2 (if filled)
-        if (guardian2Visible && guardian2Data.phone_number && guardian2Data.relationship && guardian2Data.first_name && guardian2Data.last_name) {
-            try {
-                await upsertAndLinkGuardian(studentUuid, guardian2Data, false);
-                guardiansAdded = 2;
-            } catch (guardianErr) {
-                console.error('Guardian 2 link failed:', guardianErr);
-                showImportAlert(`Student and Guardian 1 saved, but Guardian 2 could not be linked: ${guardianErr.message}.`, 'warning');
-            }
-        }
-
-        showImportAlert(`Student ${firstName} ${lastName} (${studentId}) added successfully with ${guardiansAdded} guardian(s).`, 'success');
+        showImportAlert(`Student ${firstName} ${lastName} (${studId}) added successfully.`, 'success');
         document.getElementById('singleStudentForm')?.reset();
-        clearGuardian1Form();
-        clearGuardian2Form();
         setSingleStudentLoading(false);
         singleStudentModal?.hide();
         await loadAllStudentsTable();
 
         if (email) {
-            const sectionLabel = departmentsCache.find(s => String(s.section_id) === String(sectionId))
-                ? `${departmentsCache.find(s => String(s.section_id) === String(sectionId)).grade_level} - ${departmentsCache.find(s => String(s.section_id) === String(sectionId)).section_name}`
-                : '';
+            const selectedSection = departmentsCache.find(s => String(s.section_id) === String(sectionId));
+            const sectionLabel = selectedSection ? `${selectedSection.grade_level} - ${selectedSection.section_name}` : '';
 
             sendStudentQrEmail({
-                studentId, firstName, middleName, lastName, suffix, birthDate, gender, sectionLabel, email,
+                studId,
+                firstName,
+                middleName,
+                lastName,
+                suffix,
+                birthDate,
+                gender,
+                sectionLabel,
+                email,
             }).then((emailResult) => {
                 if (emailResult.sent) {
                     showEmailStatusToast(`QR code emailed to ${email} for ${firstName} ${lastName}.`, 'success');
                 } else {
-                    showEmailStatusToast(`Student saved, but QR email wasn't sent (${emailResult.message}).`, 'warning');
+                    showEmailStatusToast(`Student saved, but QR email was not sent (${emailResult.message}).`, 'warning');
                 }
             });
         }
-
     } catch (err) {
         console.error('Single student registration failed:', err?.message || err, {
-            code: err?.code, details: err?.details, hint: err?.hint, full: err
+            code: err?.code,
+            details: err?.details,
+            hint: err?.hint,
+            full: err,
         });
         showImportAlert(`Failed to save student: ${err?.message || 'Unknown error. Check console for details.'}`, 'danger');
     } finally {
@@ -1777,7 +1779,7 @@ function renderDuplicateRowsTable() {
 
     const mergedRows = [
         ...duplicateRowsInFile.map(row => ({ ...row, reason: 'Duplicate in uploaded file' })),
-        ...duplicateRowsInDatabase.map(row => ({ ...row, reason: 'LRN already exists in database' }))
+        ...duplicateRowsInDatabase.map(row => ({ ...row, reason: 'Student ID already exists in database' }))
     ].sort((a, b) => (a.rowIndex || 0) - (b.rowIndex || 0));
 
     summaryText.textContent = `${mergedRows.length} row(s) were skipped during import validation.`;
@@ -1809,10 +1811,10 @@ function renderDuplicateRowsTable() {
 
 function addLog(container, type, message) {
     const icons = {
-        ok:      '✓',
-        error:   '✗',
+        ok: '✓',
+        error: '✗',
         warning: '⚠',
-        info:    '›',
+        info: '›',
     };
     const line = document.createElement('div');
     line.className = `log-line log-${type}`;
@@ -1842,7 +1844,7 @@ function getStudentQrPayload(student) {
     return [
         'PLP Laboratory Attendance QR',
         `Name: ${fullName || 'N/A'}`,
-        `LRN: ${student.studentId}`,
+        `Student ID: ${student.studId || student.studentId || 'N/A'}`,
         `Birth Date: ${birthDate}`,
         `Gender: ${gender}`,
         `Section: ${sectionLabel}`,
@@ -1858,50 +1860,38 @@ async function sendStudentQrEmail(student) {
         return { sent: false, message: 'email format not deliverable' };
     }
 
-   const payload = {
+    const payload = {
         email,
-        lrn: String(student.studentId || '').trim(),
-        firstName: String(student.firstName || '').trim(),
-        middleName: String(student.middleName || '').trim(),
-        lastName: String(student.lastName || '').trim(),
-        sectionInfo: String(student.sectionLabel || '').trim(),
-        birthDate: String(student.birthDate ?? '').trim(),
-        gender: String(student.gender || '').trim(),
+        studentId: String(student.studId || student.studentId || '').trim(),
+        studId: String(student.studId || student.studentId || '').trim(),
+        stud_id: String(student.studId || student.studentId || '').trim(),
+        fullName: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+        birthDate: student.birthDate || null,
+        gender: student.gender || null,
+        sectionLabel: student.sectionLabel || '',
         qrPayload: getStudentQrPayload(student),
     };
-
-    if (!payload.lrn) {
-        return { sent: false, message: 'missing LRN' };
-    }
-
-  if (!payload.lrn) {
-        return { sent: false, message: 'missing LRN' };
-    }
 
     try {
         const response = await fetch(QR_EMAIL_ENDPOINT, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify(payload),
         });
 
-        let result = null;
-        try {
-            result = await response.json();
-        } catch (parseErr) {
-            result = null;
+        if (!response.ok) {
+            return { sent: false, message: `server returned ${response.status}` };
         }
 
-        if (!response.ok || !result?.success) {
-            const detail = result?.diagnostic
-                ? ` ${result.diagnostic}`
-                : '';
-            return { sent: false, message: `${result?.message || `HTTP ${response.status}`}${detail}`.trim() };
-        }
-
-        return { sent: true, message: result.message || 'sent' };
-    } catch (err) {
-        return { sent: false, message: err.message || 'network error' };
+        const result = await response.json().catch(() => ({}));
+        return {
+            sent: result.sent !== false,
+            message: result.message || 'sent',
+        };
+    } catch (error) {
+        return { sent: false, message: error.message || 'request failed' };
     }
 }
 
@@ -1914,18 +1904,29 @@ function showImportAlert(message, type = 'info') {
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
     const main = document.querySelector('.main-content');
-    main.insertBefore(alertDiv, main.firstChild);
+    if (main) {
+        main.insertBefore(alertDiv, main.firstChild);
+    } else {
+        document.body.insertBefore(alertDiv, document.body.firstChild);
+    }
     setTimeout(() => alertDiv.remove(), 6000);
 }
 
 function escapeHtml(text) {
     if (text === null || text === undefined) return '';
-    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
     return String(text).replace(/[&<>"']/g, m => map[m]);
 }
+
 function downloadStudentTemplate() {
     const headers = [
-        'LRN',
+        'Student ID',
         'Last Name',
         'First Name',
         'Middle Name',
@@ -1941,7 +1942,7 @@ function downloadStudentTemplate() {
         : '2024-2025';
 
     const sampleRow = [
-        '123456789012',
+        'K-0001',
         'Dela Cruz',
         'Juan',
         'Santos',
@@ -1979,7 +1980,6 @@ function removeDuplicateStudentIdsFromParsedRows() {
     const deduped = [];
     const removedRows = [];
 
-    // Keep first occurrence to preserve visible row order in preview.
     for (const row of parsedRows) {
         const key = String(row.studentId || '').trim();
         if (!key) {
@@ -2004,7 +2004,7 @@ async function removeExistingStudentIdsFromParsedRows() {
     const queryableIds = [...new Set(
         parsedRows
             .map(row => String(row.studentId || '').trim())
-            .filter(id => /^\d{12}$/.test(id))
+            .filter(id => STUD_ID_PATTERN.test(id))
     )];
 
     if (queryableIds.length === 0) {
@@ -2013,12 +2013,12 @@ async function removeExistingStudentIdsFromParsedRows() {
 
     const { data: existingStudents, error } = await supabaseClient
         .from('students')
-        .select('lrn')
-        .in('lrn', queryableIds);
+        .select('stud_id')
+        .in('stud_id', queryableIds);
 
     if (error) throw error;
 
-    const existingIds = new Set((existingStudents || []).map(row => row.lrn));
+    const existingIds = new Set((existingStudents || []).map(row => row.stud_id));
     const originalLength = parsedRows.length;
     const removedRows = [];
     parsedRows = parsedRows.filter(row => {
@@ -2032,4 +2032,12 @@ async function removeExistingStudentIdsFromParsedRows() {
     duplicateRowsInDatabase = removedRows;
 
     return originalLength - parsedRows.length;
+}
+
+function removeDuplicateStudIdsFromParsedRows() {
+    return removeDuplicateStudentIdsFromParsedRows();
+}
+
+async function removeExistingStudIdsFromParsedRows() {
+    return removeExistingStudentIdsFromParsedRows();
 }
