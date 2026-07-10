@@ -1,3 +1,28 @@
+:root {
+    font-size: 125%;
+    --blue-dark:    #0b4e78;
+    --blue-mid:     #176aa4;
+    --blue-sidebar: #0a3f61;
+    --blue-btn:     #176aa4;
+    --blue-hover:   #0f5989;
+    --blue-active:  #2f8fce;
+    --sidebar-w:     235px;
+    --topbar-h:      70px;
+    --body-bg:       #eef6fb;
+    --card-bg:       #ffffff;
+    --border:        #dcebf5;
+    --text-main:     #14364c;
+    --text-muted:    #6a8092;
+    --shadow-sm:     0 2px 8px rgba(11, 78, 120, 0.07);
+    --shadow-md:     0 4px 20px rgba(0,0,0,0.10);
+    --radius:        0.85rem;
+
+    /* Alias so any CSS still referencing the old green theme
+       variables automatically renders in the new blue theme */
+    --green-btn:    var(--blue-btn);
+    --green-active: var(--blue-active);
+}
+
 /* ── Base layout ── */
 .settings-container {
     display: grid;
@@ -51,8 +76,8 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    background: #eaf5ee;
-    border: 1px solid #b6dfc4;
+    background: rgba(23, 106, 164, 0.08);   /* was #eaf5ee */
+    border: 1px solid rgba(23, 106, 164, 0.25);  /* was #b6dfc4 */
     border-radius: 0.5rem;
     padding: 0.75rem 1rem;
     font-size: 0.9rem;
@@ -60,7 +85,7 @@
 }
 
 .banner-badge {
-    background: var(--green-btn);
+    background: var(--blue-dark);  /* was var(--green-btn) — darker for contrast against the light blue banner */
     color: white;
     font-size: 0.7rem;
     font-weight: 700;
@@ -137,8 +162,8 @@
     border-radius: 99px;
 }
 
-.status-badge.active   { background: #d1fae5; color: #065f46; }
-.status-badge.inactive { background: #f3f4f6; color: #6b7280; }
+.status-badge.active   { background: #dbeafe; color: #1e40af; }  /* was #d1fae5 / #065f46 */
+.status-badge.inactive { background: #f3f4f6; color: #6b7280; }  /* unchanged, still fine */
 
 /* ── Activate-on-create checkbox row ── */
 .activate-on-create-row {
