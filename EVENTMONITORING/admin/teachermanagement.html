@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Teacher Management — Smart Academic Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="../shared/global.css"/>
+    <link rel="stylesheet" href="../Gemma/gemma.css"/>
+    <link rel="stylesheet" href="admin-specific.css"/>
+    <link rel="stylesheet" href="teachermanagement.css"/>
+</head>
+<body>
+
+<div id="header-container"></div>
+<div id="sidebar-container"></div>
+
+<main class="main-content">
+
+    <!-- Page Header -->
+    <div class="page-header anim anim-1" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;width:100%;">
+        <div>
+            <h1>Teacher Management</h1>
+            <p>Create and manage teacher accounts</p>
+        </div>
+        <div style="display:flex;gap:.6rem;align-items:center;white-space:nowrap;margin-left:auto;flex-shrink:0;">
+            <button type="button" class="btn-download-template" id="addSingleTeacherBtn">
+                <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                Add Single Teacher
+            </button>
+            <button type="button" class="btn-download-template" id="downloadTemplateBtn">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Template
+            </button>
+        </div>
+    </div>
+
+    <!-- Step 1: File Upload -->
+    <div class="import-card anim anim-2" id="stepUpload">
+        <div class="step-badge">Step 1 of 3</div>
+        <h2 class="step-title">Upload Teacher File</h2>
+        <p class="step-desc">Upload your filled Excel or CSV template with teacher data.</p>
+
+        <div class="row g-4 mt-1">
+            <div class="col-12">
+                <label class="form-label-custom">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Upload File <span class="required">*</span>
+                </label>
+                <div class="file-drop-zone" id="fileDropZone">
+                    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden/>
+                    <div class="drop-icon">
+                        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </div>
+                    <p class="drop-text">Drag & drop your file here, or <span class="drop-link">browse</span></p>
+                    <p class="drop-hint">Supports .xlsx, .xls, .csv — Max 10MB</p>
+                    <div class="file-selected" id="fileSelected" style="display:none;">
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span id="fileSelectedName"></span>
+                        <button class="file-remove" id="fileRemoveBtn" title="Remove">
+                            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="step-footer">
+            <div></div>
+            <button class="btn-next" id="parseFileBtn" disabled>
+                Parse & Preview
+                <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Step 2: Preview -->
+    <div class="import-card anim anim-3" id="stepPreview" style="display:none;">
+        <div class="step-badge">Step 2 of 3</div>
+        <h2 class="step-title">Review Import Data</h2>
+        <p class="step-desc">Verify the data below before importing. Rows with errors are highlighted.</p>
+
+        <!-- Summary Bar -->
+        <div class="preview-summary" id="previewSummary">
+            <div class="summary-item valid">
+                <span class="summary-count" id="validCount">0</span>
+                <span class="summary-label">Ready to Import</span>
+            </div>
+            <div class="summary-item duplicate" id="duplicateSummaryCard" title="Rows skipped due to duplicate Employee IDs in the file or existing records in the database">
+                <span class="summary-count" id="duplicatedCount">0</span>
+                <span class="summary-label">Duplicated</span>
+            </div>
+            <div class="summary-item warning">
+                <span class="summary-count" id="warningCount">0</span>
+                <span class="summary-label">Warnings</span>
+            </div>
+            <div class="summary-item error">
+                <span class="summary-count" id="errorCount">0</span>
+                <span class="summary-label">Errors</span>
+            </div>
+            <div class="summary-item total">
+                <span class="summary-count" id="totalCount">0</span>
+                <span class="summary-label">Total Rows</span>
+            </div>
+        </div>
+
+        <!-- Preview Table -->
+        <div class="preview-table-wrap">
+            <table class="preview-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Employee ID</th>
+                        <th>Last Name</th>
+                        <th>First Name</th>
+                        <th>Middle Name</th>
+                        <th>Suffix</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Faculty</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="previewTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="step-footer">
+            <button class="btn-back" id="backToUploadBtn">
+                <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Back
+            </button>
+            <button class="btn-next" id="proceedImportBtn">
+                Proceed to Import
+                <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Step 3: Import Progress -->
+    <div class="import-card anim anim-2" id="stepImport" style="display:none;">
+        <div class="step-badge">Step 3 of 3</div>
+        <h2 class="step-title">Importing Teachers</h2>
+        <p class="step-desc">Please do not close this page while the import is in progress.</p>
+
+        <div class="progress-wrap">
+            <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="progressBarFill" style="width:0%"></div>
+            </div>
+            <div class="progress-labels">
+                <span id="progressText">0 of 0 teachers imported</span>
+                <span id="progressPct">0%</span>
+            </div>
+        </div>
+
+        <div class="import-log" id="importLog"></div>
+
+        <div class="step-footer" id="importFooter" style="display:none;">
+            <button class="btn-back" id="importAnotherBtn">
+                <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Import Another File
+            </button>
+        </div>
+    </div>
+
+    <!-- Info Card -->
+    <div class="info-card anim anim-4">
+        <div class="info-card-header">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Template & Format Guide
+        </div>
+        <div class="info-grid">
+            <div class="info-col">
+                <h4>Required Columns</h4>
+                <ul>
+                    <li><strong>Employee ID</strong> — Unique employee identifier</li>
+                    <li><strong>Last Name</strong> — Teacher's last name</li>
+                    <li><strong>First Name</strong> — Teacher's first name</li>
+                    <li><strong>Email</strong> — Valid institutional email</li>
+                    <li><strong>Faculty</strong> — College or department name</li>
+                </ul>
+            </div>
+            <div class="info-col">
+                <h4>Optional Columns</h4>
+                <ul>
+                    <li><strong>Middle Name</strong> — May be left blank</li>
+                    <li><strong>Suffix</strong> — e.g. Jr., Sr., III — May be left blank</li>
+                    <li><strong>Phone</strong> — Contact number</li>
+                </ul>
+            </div>
+            <div class="info-col">
+                <h4>Notes</h4>
+                <ul>
+                    <li>Employee IDs that already exist in the database are <strong>skipped</strong></li>
+                    <li>Do not delete the header row</li>
+                    <li>Remove sample data before importing</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+<!-- Statistics Cards -->
+<div class="stat-cards anim anim-2" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 2rem; margin-bottom: 1.5rem;">
+    <div class="stat-card" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow-sm);">
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500; margin-bottom: 0.5rem;">Total Teachers</div>
+        <div id="totalTeachersCount" style="font-size: 2rem; font-weight: 700; color: var(--text-main);">0</div>
+    </div>
+    <div class="stat-card" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow-sm);">
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500; margin-bottom: 0.5rem;">Active Teachers</div>
+        <div id="activeTeachersCount" style="font-size: 2rem; font-weight: 700; color: #176aa4;">0</div>
+    </div>
+    <div class="stat-card" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow-sm);">
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500; margin-bottom: 0.5rem;">Inactive Teachers</div>
+        <div id="inactiveTeachersCount" style="font-size: 2rem; font-weight: 700; color: var(--text-muted);">0</div>
+    </div>
+</div>
+
+    <!-- Teachers List -->
+    <div class="panel anim anim-3" id="teachersListSection">
+        <div class="toolbar">
+            <div class="toolbar-title">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"/></svg>
+                All Teachers
+            </div>
+            <div class="toolbar-right">
+                <div class="search-box">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" class="search-input" id="teacherSearchInput" placeholder="Search teachers..."/>
+                </div>
+                <select class="filter-select status-filter" id="teacherStatusFilter">
+                    <option value="">All Statuses</option>
+                    <option>Active</option>
+                    <option>Inactive</option>
+                    <option>Suspended</option>
+                </select>
+                <button type="button" class="btn-back" id="refreshTeachersBtn">Refresh List</button>
+            </div>
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Employee ID</th>
+                    <th>Email</th>
+                    <th>Faculty</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="teachersTableBody">
+                <tr>
+                    <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted);">Loading teachers...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</main>
+
+<!-- Add/Edit Teacher Modal -->
+<div class="modal fade" id="teacherModal" tabindex="-1" aria-labelledby="teacherModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form id="teacherForm" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="teacherModalLabel">Add New Teacher</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="teacherId"/>
+                    <input type="hidden" id="teacherEditMode" value="false"/>
+                    
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label for="teacherEmployeeId" class="form-label">Employee ID <span class="text-danger">*</span></label>
+                            <input type="text" id="teacherEmployeeId" class="form-control" placeholder="Enter employee ID" required>
+                            <div class="form-text">Unique employee identifier.</div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label for="teacherLastName" class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" id="teacherLastName" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="teacherFirstName" class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input type="text" id="teacherFirstName" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="teacherMiddleName" class="form-label">Middle Name</label>
+                            <input type="text" id="teacherMiddleName" class="form-control">
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label for="teacherSuffix" class="form-label">Suffix</label>
+                            <input type="text" id="teacherSuffix" class="form-control" placeholder="e.g. Jr., Sr.">
+                        </div>
+                        <div class="col-md-9">
+                            <label for="teacherEmail" class="form-label">Email <span class="text-danger">*</span></label>
+                            <input type="email" id="teacherEmail" class="form-control" placeholder="name@plpasig.edu.ph" required>
+                            <div class="form-text">A valid institutional email address is required.</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="teacherPhone" class="form-label">Phone Number</label>
+                            <input type="text" id="teacherPhone" class="form-control" placeholder="e.g. 0917 123 4567">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="teacherFaculty" class="form-label">Faculty <span class="text-danger">*</span></label>
+                            <input type="text" id="teacherFaculty" class="form-control" placeholder="e.g. College of Computer Studies" required>
+                            <div class="form-text">The faculty or college this teacher belongs to.</div>
+                        </div>
+                        
+                        <div class="col-12" id="teacherStatusField" style="display:none;">
+                            <label for="teacherStatus" class="form-label">Status</label>
+                            <select id="teacherStatus" class="form-select">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="suspended">Suspended</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="teacherSubmitBtn">Create Teacher</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Duplicate Rows Modal -->
+<div class="modal fade" id="duplicateRowsModal" tabindex="-1" aria-labelledby="duplicateRowsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="duplicateRowsModalLabel">Duplicated / Skipped Rows</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3" id="duplicateRowsSummaryText">Rows skipped due to duplicate Employee IDs.</p>
+                <div class="table-responsive duplicate-rows-table-wrap">
+                    <table class="table table-sm align-middle mb-0 duplicate-rows-table">
+                        <thead>
+                            <tr>
+                                <th>Source Row</th>
+                                <th>Employee ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody id="duplicateRowsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<button class="help-btn">?</button>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config/.env.js"></script>
+<script src="../config/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- SheetJS for Excel parsing -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="../shared/global.js"></script>
+<script src="admin-specific.js"></script>
+<script src="teachermanagement.js"></script>
+<script>
+    requireAdmin();
+    loadHeader();
+    loadSidebar('teachermanagement');
+</script>
+</body>
+</html>

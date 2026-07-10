@@ -1,3 +1,28 @@
+:root {
+    font-size: 125%;
+    --blue-dark:    #0b4e78;
+    --blue-mid:     #176aa4;
+    --blue-sidebar: #0a3f61;
+    --blue-btn:     #176aa4;
+    --blue-hover:   #0f5989;
+    --blue-active:  #2f8fce;
+    --sidebar-w:     235px;
+    --topbar-h:      70px;
+    --body-bg:       #eef6fb;
+    --card-bg:       #ffffff;
+    --border:        #dcebf5;
+    --text-main:     #14364c;
+    --text-muted:    #6a8092;
+    --shadow-sm:     0 2px 8px rgba(11, 78, 120, 0.07);
+    --shadow-md:     0 4px 20px rgba(0,0,0,0.10);
+    --radius:        0.85rem;
+
+    /* Alias so any CSS still referencing the old green theme
+       variables automatically renders in the new blue theme */
+    --green-btn:    var(--blue-btn);
+    --green-active: var(--blue-active);
+}
+
 @keyframes slideInUp {
     from {
         opacity: 0;

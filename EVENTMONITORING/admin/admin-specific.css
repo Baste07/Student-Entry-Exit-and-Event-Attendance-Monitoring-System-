@@ -1,24 +1,24 @@
 /* -------------------------------------------
-   admin-specific.css � Admin module-specific styles
+   admin-specific.css — Admin module-specific styles
    Dependencies: global.css (for shared styles)
    ------------------------------------------- */
 
 :root {
     font-size: 125%;
-    --green-dark:    #0d3b1e;
-    --green-mid:     #145a2e;
-    --green-sidebar: #0f4423;
-    --green-btn:     #1a6b36;
-    --green-hover:   #12522a;
-    --green-active:  #1e7a3e;
+    --blue-dark:    #0b4e78;
+    --blue-mid:     #176aa4;
+    --blue-sidebar: #0a3f61;
+    --blue-btn:     #176aa4;
+    --blue-hover:   #0f5989;
+    --blue-active:  #2f8fce;
     --sidebar-w:     235px;
     --topbar-h:      70px;
-    --body-bg:       #f0f4f1;
+    --body-bg:       #eef6fb;
     --card-bg:       #ffffff;
-    --border:        #e2ebe4;
-    --text-main:     #1a2e1c;
-    --text-muted:    #6b7f6e;
-    --shadow-sm:     0 2px 8px rgba(0,0,0,0.07);
+    --border:        #dcebf5;
+    --text-main:     #14364c;
+    --text-muted:    #6a8092;
+    --shadow-sm:     0 2px 8px rgba(11, 78, 120, 0.07);
     --shadow-md:     0 4px 20px rgba(0,0,0,0.10);
     --radius:        0.85rem;
 }
@@ -93,7 +93,7 @@ body {
 .toolbar-title svg {
     width: 20px;
     height: 20px;
-    stroke: var(--green-btn);
+    stroke: var(--blue-btn);
     stroke-width: 2;
     fill: none;
 }
@@ -133,7 +133,7 @@ body {
     border-radius: 0.55rem;
     font-size: 0.83rem;
     color: var(--text-main);
-    background: #f7faf8;
+    background: #f7fafd;
     width: 100%;
     box-sizing: border-box;
     transition: border-color 0.2s;
@@ -142,7 +142,7 @@ body {
 }
 
 .search-input:focus {
-    border-color: var(--green-mid);
+    border-color: var(--blue-mid);
     background: #fff;
 }
 
@@ -192,7 +192,7 @@ body {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.85rem;
-    color: var(--green-btn);
+    color: var(--blue-btn);
 }
 
 .table .badge {
@@ -201,12 +201,12 @@ body {
     font-weight: 600;
 }
 
-/* Primary Green Button */
+/* Primary Blue Button */
 .btn-primary-green {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    background-color: var(--green-btn);
+    background-color: var(--blue-btn);
     color: white;
     padding: 0.75rem 1.5rem;
     border: none;
@@ -219,7 +219,7 @@ body {
 }
 
 .btn-primary-green:hover {
-    background-color: var(--green-active);
+    background-color: var(--blue-active);
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
 }
@@ -254,7 +254,7 @@ body {
 
 .btn-icon:hover {
     background-color: var(--body-bg);
-    color: var(--green-btn);
+    color: var(--blue-btn);
 }
 
 .btn-icon.danger:hover {
@@ -309,8 +309,8 @@ body {
 }
 
 .modal-body .form-control:focus {
-    border-color: var(--green-btn);
-    box-shadow: 0 0 0 3px rgba(26, 107, 54, 0.1);
+    border-color: var(--blue-btn);
+    box-shadow: 0 0 0 3px rgba(23, 106, 164, 0.1);
 }
 
 .modal-footer {
@@ -362,11 +362,11 @@ body {
 }
 
 .stat-card.green .stat-label svg {
-    stroke: #1a6b36;
+    stroke: #176aa4;
 }
 
 .stat-card.blue .stat-label svg {
-    stroke: #2563eb;
+    stroke: #2f8fce;
 }
 
 .stat-card.purple .stat-label svg {
@@ -389,7 +389,7 @@ body {
 }
 
 .stat-card.blue .stat-value {
-    color: #2563eb;
+    color: #2f8fce;
 }
 
 .stat-card.purple .stat-value {
@@ -406,11 +406,11 @@ body {
 }
 
 .stat-card.green .stat-sub {
-    color: #1a6b36;
+    color: #176aa4;
 }
 
 .stat-card.blue .stat-sub {
-    color: #2563eb;
+    color: #2f8fce;
 }
 
 .stat-card.purple .stat-sub {
@@ -495,4 +495,3 @@ body {
         flex-wrap: wrap;
     }
 }
-
