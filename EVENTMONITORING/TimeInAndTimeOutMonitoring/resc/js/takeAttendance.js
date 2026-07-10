@@ -230,6 +230,7 @@ setInterval(async () => {
                 }
 
                 // When finishing rebuild, show summary toast if available
+                // When finishing rebuild, show a PROMINENT popup with the summary
                 if (_prevFaceDbPhase === 'rebuilding' && newPhase === 'ready') {
                     try {
                         const last = status.last_rebuild_summary || null;
@@ -238,9 +239,35 @@ setInterval(async () => {
                             const a = last.added || 0;
                             const u = last.updated || 0;
                             const r = last.removed || 0;
+                            const k = last.kept || 0;
                             const t = Math.round((last.duration_ms || 0));
-                            showToast(`Background sync complete: +${a} added · ~${u} updated · -${r} removed · ${t}ms`, 'bg-success', 6000);
+
+                            // 🎯 PROMINENT MODAL POPUP with rebuild stats
+                            showNotif({
+                                icon: '🔄',
+                                title: 'Face Database Sync Complete',
+                                msg: [
+                                    `➕ Added: ${a} face profile(s)`,
+                                    `🔄 Updated: ${u} face profile(s)`,
+                                    `❌ Removed: ${r} face profile(s)`,
+                                    `✅ Unchanged: ${k} face profile(s)`,
+                                    ``,
+                                    `⏱️ Duration: ${t} ms`
+                                ].join('\n'),
+                                buttons: [{ label: 'OK', color: 'green' }],
+                                autoDismiss: 10
+                            });
+
+                            // Optional: keep the small toast as a secondary confirmation
+                            showToast(`Sync complete: +${a} · ~${u} · -${r} · ${t}ms`, 'bg-success', 5000);
                         } else {
+                            showNotif({
+                                icon: '✅',
+                                title: 'Face Database Validated',
+                                msg: 'No changes detected. Your existing cache is up to date.',
+                                buttons: [{ label: 'OK', color: 'green' }],
+                                autoDismiss: 6
+                            });
                             showToast('Background sync complete — database validated', 'bg-success', 4000);
                         }
                     } catch (e) {}
