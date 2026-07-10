@@ -27,12 +27,17 @@ document.addEventListener('DOMContentLoaded', async function () {
     await loadSystemFeatures();
     loadDepartmentLogoAndInfo();
     displayUserInfo();
-    showAdminCardIfNeeded();
+
+    // 1. Set hrefs only — never touch visibility here
     setThesisLink();
     setFacultyRequirementLink();
     setViolationLink();
     setTimeInOutLink();
 
+    // 2. ONE function decides who sees what
+    filterCardsByRole();
+
+    // Help button
     const helpBtn = document.querySelector('.help-btn');
     if (helpBtn) {
         helpBtn.addEventListener('click', function () {
@@ -41,20 +46,20 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (userStr) {
                 try {
                     const user = JSON.parse(userStr);
-                    if (user.department) {
-                        departmentName = user.department;
-                    }
-                } catch (e) {
-                    console.error('Error parsing user:', e);
-                }
+                    if (user.department) departmentName = user.department;
+                } catch (e) { /* ignore */ }
             }
             alert(`For assistance, please contact the ${departmentName} System Administrator.`);
         });
     }
 
-    const cards = document.querySelectorAll('.system-card');
-    cards.forEach(function (card) {
+    // Card click animation
+    document.querySelectorAll('.system-card').forEach(function (card) {
         card.addEventListener('click', function (e) {
+            if (card.getAttribute('href') === '#') {
+                e.preventDefault();
+                return;
+            }
             card.style.opacity = '0.8';
             card.style.transform = 'scale(0.98)';
             setTimeout(function () {
@@ -63,79 +68,67 @@ document.addEventListener('DOMContentLoaded', async function () {
             }, 200);
         });
     });
-
 });
 
-function showAdminCardIfNeeded() {
+/* ── SINGLE SOURCE OF TRUTH for card visibility ── */
+function filterCardsByRole() {
     const user = getCurrentUser();
-    if (!user) return;
-
-    const cards = document.querySelectorAll('.system-card');
+    if (!user) {
+        document.querySelectorAll('.system-card').forEach(c => c.style.display = 'none');
+        return;
+    }
 
     const userType = (user.userType || '').toLowerCase();
-    const role = (user.role || '').toLowerCase();
+    const role     = (user.role     || '').toLowerCase();
     const adminLevel = (user.adminLevel || '').toLowerCase();
 
-    const isStudent = userType === 'student' || role === 'student';
-    const isProfessor = userType === 'professor' || role === 'professor' || role === 'faculty' || role === 'dean';
-    const isAdmin = userType === 'admin' || role === 'admin' || role === 'super_admin' || adminLevel === 'super_admin';
+    const isStudent    = userType === 'student' || role === 'student';
+    const isProfessor  = userType === 'professor' || role === 'professor' || role === 'faculty' || role === 'dean';
+    const isAdmin      = role === 'admin';
+    const isSuperAdmin = role === 'super_admin' || adminLevel === 'super_admin';
 
-    // Students can access Thesis/Capstone, Student Violation, and Time In/Out.
-    if (isStudent) {
-        cards.forEach(card => {
-            const href = card.getAttribute('href') || '';
-            const isThesis = href.includes('ThesisAndCapstoneArchiving');
-            const isViolation = href.includes('StudentViolationManagementSystem');
-            const isTimeInOut = href.includes('TimeInAndTimeOutMonitoring');
-            const isTimeInOutCard = isTimeInOut;
+    console.log('[Portal] Role — student:', isStudent, 'prof:', isProfessor, 'admin:', isAdmin, 'super:', isSuperAdmin);
 
-                const canShow = (isThesis && moduleEnabledForHref(href)) ||
-                                (isViolation && moduleEnabledForHref(href)) ||
-                                isTimeInOutCard;
-                card.style.display = canShow ? 'block' : 'none';
-        });
-        return;
-    }
+    document.querySelectorAll('.system-card').forEach(card => {
+        const href = card.getAttribute('href') || '';
+        const isEvent      = card.classList.contains('event-attendance-card');
+        const isEntry      = card.classList.contains('entry-exit-card');
+        const isSuperPanel = card.classList.contains('superadmin-panel-card');
+        const isThesis     = href.includes('ThesisAndCapstoneArchiving');
+        const isFaculty    = href.includes('FacultyRequirementSubmissionSystem');
+        const isViolation  = href.includes('StudentViolationManagementSystem');
+        const isTimeInOut  = href.includes('TimeInAndTimeOutMonitoring');
 
-    // Professors/Faculty can access Thesis/Capstone, Faculty Requirement, and Time In/Out.
-    if (isProfessor) {
-        cards.forEach(card => {
-            const href = card.getAttribute('href') || '';
-            const isThesis = href.includes('ThesisAndCapstoneArchiving');
-            const isFacultyRequirement = href.includes('FacultyRequirementSubmissionSystem');
-            const isTimeInOut = href.includes('TimeInAndTimeOutMonitoring');
-            const isTimeInOutCard = isTimeInOut;
+        let show = false;
 
-                const canShow = ((isThesis && moduleEnabledForHref(href)) ||
-                                 (isFacultyRequirement && moduleEnabledForHref(href)) ||
-                                 isTimeInOutCard);
-                card.style.display = canShow ? 'block' : 'none';
-        });
-        return;
-    }
+        if (isSuperAdmin) {
+            // Superadmin: Event + Entry Exit + Superadmin panel
+            show = isEvent || isEntry || isSuperPanel;
+        } else if (isAdmin) {
+            // Admin: Event + Entry Exit only
+            show = isEvent || isEntry;
+        } else if (isStudent) {
+            show = (isThesis     && moduleEnabledForHref(href)) ||
+                   (isViolation  && moduleEnabledForHref(href)) ||
+                   (isTimeInOut  && moduleEnabledForHref(href));
+        } else if (isProfessor) {
+            show = (isThesis     && moduleEnabledForHref(href)) ||
+                   (isFaculty    && moduleEnabledForHref(href)) ||
+                   (isTimeInOut  && moduleEnabledForHref(href));
+        }
 
-    // Admins keep full portal visibility.
-    if (isAdmin) {
-        cards.forEach(card => {
-            card.style.display = 'block';
-        });
-        return;
-    }
-
-    // Unknown roles are restricted by default.
-    cards.forEach(card => {
-        card.style.display = 'none';
+        card.style.display = show ? 'block' : 'none';
+        console.log('[Portal] Card', href || '(no href)', '→', show ? 'SHOW' : 'HIDE');
     });
 }
 
-
 function moduleEnabledForHref(href) {
-    if (!systemFeatures) return true; // default to enabled when features not loaded
+    if (!systemFeatures) return true;
     try {
         if (href.includes('FacultyRequirementSubmissionSystem')) return systemFeatures.faculty_requirements !== false;
-        if (href.includes('TimeInAndTimeOutMonitoring')) return systemFeatures.time_monitoring !== false;
-        if (href.includes('ThesisAndCapstoneArchiving')) return systemFeatures.thesis_archiving !== false;
-        if (href.includes('StudentViolationManagementSystem')) return systemFeatures.student_violations !== false;
+        if (href.includes('TimeInAndTimeOutMonitoring'))         return systemFeatures.time_monitoring       !== false;
+        if (href.includes('ThesisAndCapstoneArchiving'))         return systemFeatures.thesis_archiving     !== false;
+        if (href.includes('StudentViolationManagementSystem'))   return systemFeatures.student_violations   !== false;
     } catch (e) {
         console.error('Error checking moduleEnabledForHref:', e);
     }
@@ -143,8 +136,7 @@ function moduleEnabledForHref(href) {
 }
 
 function checkUserSession() {
-    const user = sessionStorage.getItem('user');
-    if (!user) {
+    if (!sessionStorage.getItem('user')) {
         window.location.href = '../auth/login.html';
     }
 }
@@ -170,7 +162,6 @@ function loadDepartmentLogoAndInfo() {
             deptLogo.src = user.departmentLogo;
             deptLogo.alt = user.department || 'Department Logo';
         }
-        
         const deptName = document.getElementById('deptNamePortal');
         if (deptName && user.department) {
             deptName.textContent = `Pamantasan ng Lungsod ng Pasig — ${user.department}`;
@@ -180,38 +171,28 @@ function loadDepartmentLogoAndInfo() {
 
 function displayUserInfo() {
     const userStr = sessionStorage.getItem('user');
-    if (userStr) {
-        try {
-            const user = JSON.parse(userStr);
-            const userNameEl = document.querySelector('.user-name');
-            if (userNameEl) {
-                const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-                userNameEl.textContent = fullName;
-            }
-            
-            const userRoleEl = document.querySelector('.user-role');
-            if (userRoleEl) {
-                // Prefer userType over role, and filter out employment types
-                let displayRole = user.userType || user.role;
-                if (displayRole && (displayRole.toUpperCase() === 'FULL_TIME' || displayRole.toUpperCase() === 'PART_TIME')) {
-                    displayRole = '';
-                }
-                if (displayRole) {
-                    userRoleEl.textContent = capitalizeFirst(displayRole);
-                } else {
-                    userRoleEl.textContent = '';
-                }
-            }
-
-            const userAvatarEl = document.querySelector('.user-avatar');
-            if (userAvatarEl) {
-                const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-                const initials = getInitials(fullName);
-                userAvatarEl.textContent = initials;
-            }
-        } catch (e) {
-            console.error('Error parsing user session:', e);
+    if (!userStr) return;
+    try {
+        const user = JSON.parse(userStr);
+        const userNameEl = document.querySelector('.user-name');
+        if (userNameEl) {
+            userNameEl.textContent = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
         }
+        const userRoleEl = document.querySelector('.user-role');
+        if (userRoleEl) {
+            let displayRole = user.userType || user.role;
+            if (displayRole && (displayRole.toUpperCase() === 'FULL_TIME' || displayRole.toUpperCase() === 'PART_TIME')) {
+                displayRole = '';
+            }
+            userRoleEl.textContent = displayRole ? capitalizeFirst(displayRole) : '';
+        }
+        const userAvatarEl = document.querySelector('.user-avatar');
+        if (userAvatarEl) {
+            const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+            userAvatarEl.textContent = getInitials(fullName);
+        }
+    } catch (e) {
+        console.error('Error parsing user session:', e);
     }
 }
 
@@ -221,104 +202,64 @@ function capitalizeFirst(str) {
 
 function getInitials(name) {
     const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-        return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return name.substring(0, 2).toUpperCase();
 }
 
+/* ── Link setters: ONLY change href, never style.display ── */
 function setThesisLink() {
     const userStr = sessionStorage.getItem('user');
-    if (userStr) {
-        try {
-            const user = JSON.parse(userStr);
-            const thesisCard = document.querySelector('a[href*="ThesisAndCapstoneArchiving"]');
-            const userType = (user.userType || '').toLowerCase();
-            const role = (user.role || '').toLowerCase();
-
-            if (thesisCard) {
-                if (!moduleEnabledForHref(thesisCard.getAttribute('href') || '')) {
-                    thesisCard.style.display = 'none';
-                    return;
-                }
-                if (userType === 'student' || role === 'student') {
-                    thesisCard.href = '../ThesisAndCapstoneArchiving/pages/student/dashboard.html';
-                } else if (userType === 'professor' || role === 'professor' || role === 'faculty' || role === 'dean') {
-                    thesisCard.href = '../ThesisAndCapstoneArchiving/pages/professor/dashboard.html';
-                } else {
-                    thesisCard.href = '../ThesisAndCapstoneArchiving/pages/admin/dashboard.html';
-                }
-            }
-        } catch (e) {
-            console.error('Error setting thesis link:', e);
+    if (!userStr) return;
+    try {
+        const user = JSON.parse(userStr);
+        const card = document.querySelector('a[href*="ThesisAndCapstoneArchiving"]');
+        if (!card) return;
+        const userType = (user.userType || '').toLowerCase();
+        const role = (user.role || '').toLowerCase();
+        if (userType === 'student' || role === 'student') {
+            card.href = '../ThesisAndCapstoneArchiving/pages/student/dashboard.html';
+        } else if (userType === 'professor' || role === 'professor' || role === 'faculty' || role === 'dean') {
+            card.href = '../ThesisAndCapstoneArchiving/pages/professor/dashboard.html';
+        } else {
+            card.href = '../ThesisAndCapstoneArchiving/pages/admin/dashboard.html';
         }
+    } catch (e) {
+        console.error('Error setting thesis link:', e);
     }
 }
 
 function setFacultyRequirementLink() {
     const userStr = sessionStorage.getItem('user');
-    if (userStr) {
-        try {
-            const user = JSON.parse(userStr);
-            const userType = (user.userType || '').toLowerCase();
-            const role = (user.role || '').toLowerCase();
-            console.log('User data:', user);
-            console.log('User type:', userType);
-            console.log('User role:', role);
-            
-            const facultyCard = document.querySelector('a[href*="FacultyRequirementSubmissionSystem"]');
-            if (facultyCard && !moduleEnabledForHref(facultyCard.getAttribute('href') || '')) {
-                facultyCard.style.display = 'none';
-                return;
-            }
-            
-            if (facultyCard) {
-                if (userType === 'professor' && role === 'dean') {
-                    console.log('Setting link for DEAN to faculty-upload.html');
-                    facultyCard.href = '../FacultyRequirementSubmissionSystem/pages/faculty-upload.html';
-                } else if (userType === 'professor') {
-                    console.log('Setting link for PROFESSOR to faculty-upload.html');
-                    facultyCard.href = '../FacultyRequirementSubmissionSystem/pages/faculty-upload.html';
-                } else {
-                    console.log('Setting link for ADMIN to dashboard.html');
-                    facultyCard.href = '../FacultyRequirementSubmissionSystem/pages/dashboard.html';
-                }
-                console.log('Final card href:', facultyCard.href);
-            }
-        } catch (e) {
-            console.error('Error setting faculty requirement link:', e);
+    if (!userStr) return;
+    try {
+        const user = JSON.parse(userStr);
+        const userType = (user.userType || '').toLowerCase();
+        const role = (user.role || '').toLowerCase();
+        const card = document.querySelector('a[href*="FacultyRequirementSubmissionSystem"]');
+        if (!card) return;
+        if (userType === 'professor' || role === 'professor' || role === 'dean') {
+            card.href = '../FacultyRequirementSubmissionSystem/pages/faculty-upload.html';
+        } else {
+            card.href = '../FacultyRequirementSubmissionSystem/pages/dashboard.html';
         }
+    } catch (e) {
+        console.error('Error setting faculty requirement link:', e);
     }
 }
 
 function setViolationLink() {
     const userStr = sessionStorage.getItem('user');
     if (!userStr) return;
-
     try {
         const user = JSON.parse(userStr);
-        const violationCard = document.querySelector('a[href*="StudentViolationManagementSystem"]');
-
-        if (!violationCard) return;
-        if (!moduleEnabledForHref(violationCard.getAttribute('href') || '')) {
-            violationCard.style.display = 'none';
-            return;
-        }
-
+        const card = document.querySelector('a[href*="StudentViolationManagementSystem"]');
+        if (!card) return;
         const role = (user.role || '').toLowerCase();
-
-        console.log('Role:', role);
-
         if (role === 'student') {
-            violationCard.href = '../StudentViolationManagementSystem/pages/student/dashboard.html';
-
+            card.href = '../StudentViolationManagementSystem/pages/student/dashboard.html';
         } else if (role === 'admin' || role === 'super_admin') {
-            violationCard.href = '../StudentViolationManagementSystem/pages/admin/dashboard.html';
-
-        } else {
-            violationCard.style.display = 'none'; 
+            card.href = '../StudentViolationManagementSystem/pages/admin/dashboard.html';
         }
-
     } catch (e) {
         console.error('Error setting violation link:', e);
     }
@@ -327,37 +268,18 @@ function setViolationLink() {
 function setTimeInOutLink() {
     const userStr = sessionStorage.getItem('user');
     if (!userStr) return;
-
     try {
         const user = JSON.parse(userStr);
-        const timeInOutCard = document.querySelector('a[href*="TimeInAndTimeOutMonitoring"]');
-
-        if (!timeInOutCard) return;
-
+        const card = document.querySelector('a[href*="TimeInAndTimeOutMonitoring"]');
+        if (!card) return;
         const userType = (user.userType || '').toLowerCase();
         const role = (user.role || '').toLowerCase();
-        const adminLevel = (user.adminLevel || '').toLowerCase();
-
-        const isStudent = userType === 'student' || role === 'student';
+        const isStudent   = userType === 'student' || role === 'student';
         const isProfessor = userType === 'professor' || role === 'professor' || role === 'faculty' || role === 'dean';
-        const isAdmin = userType === 'admin' || role === 'admin' || role === 'super_admin' || adminLevel === 'super_admin';
-
-        if (isAdmin) {
-            timeInOutCard.style.display = 'block';
-            timeInOutCard.href = '../TimeInAndTimeOutMonitoring/admin/dashboard.html';
-            return;
-        }
-
-        if (!moduleEnabledForHref(timeInOutCard.getAttribute('href') || '')) {
-            timeInOutCard.style.display = 'none';
-            return;
-        }
-
         if (isStudent || isProfessor) {
-            timeInOutCard.href = '../TimeInAndTimeOutMonitoring/students/homepage.html';
-        } else {
-            timeInOutCard.style.display = 'none';
+            card.href = '../TimeInAndTimeOutMonitoring/students/homepage.html';
         }
+        // Admin / Superadmin: card is hidden by filterCardsByRole, no href needed
     } catch (e) {
         console.error('Error setting Time In/Out link:', e);
     }

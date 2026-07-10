@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 departmentCode: 'CCS',
                 departmentLogo: '../auth/assets/ccslogo.png'
             },
-            redirect: '../admin/usermanagement.html'
+            redirect: '../portal/portal.html'
         },
         {
             usernames: ['admin', 'admin@plpasig.edu.ph'],
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 departmentCode: 'CCS',
                 departmentLogo: '../auth/assets/ccslogo.png'
             },
-            redirect: '../TimeInAndTimeOutMonitoring/admin/dashboard.html'
+            redirect: '../portal/portal.html'
         }
     ];
 
@@ -423,11 +423,7 @@ async function loginUser(username, password) {
     });
 
     console.log('[loginUser] Redirecting... admin_level=', adminData.admin_level);
-    if (adminData.admin_level === 'super_admin') {
-        window.location.href = '../admin/usermanagement.html';
-    } else {
-        window.location.href = '../TimeinAndTimeOutMonitoring/admin/dashboard.html';
-    }
+    window.location.href = '../portal/portal.html';
 }
 
 async function fetchDepartmentInfoAsync(departmentId) {
