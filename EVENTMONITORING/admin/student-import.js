@@ -1648,7 +1648,6 @@ function clearGuardian2Form() {
         statusEl.className = '';
     }
 }
-
 async function submitSingleStudentForm(event) {
     event.preventDefault();
 
@@ -1662,7 +1661,9 @@ async function submitSingleStudentForm(event) {
     const birthDate = String(document.getElementById('singleYearLevel')?.value || '').trim();
     const gender = String(document.getElementById('singleSection')?.value || '').trim().toLowerCase();
     const email = String(document.getElementById('singleEmail')?.value || '').trim();
+    const address = String(document.getElementById('singleAddress')?.value || '').trim();
 
+    // ── VALIDATION ──
     if (!activeSchoolYear || !activeSchoolYear.id) {
         showImportAlert('No active school year found. Please set one in System Settings first.', 'danger');
         return;
@@ -1684,11 +1685,59 @@ async function submitSingleStudentForm(event) {
         return;
     }
 
+    // ── COLLECT GUARDIAN 1 DATA ──
+    const g1Phone = String(document.getElementById('guardian1Phone')?.value || '').trim();
+    const g1Relationship = String(document.getElementById('guardian1Relationship')?.value || '').trim();
+    const g1FirstName = String(document.getElementById('guardian1FirstName')?.value || '').trim();
+    const g1LastName = String(document.getElementById('guardian1LastName')?.value || '').trim();
+    const g1MiddleName = String(document.getElementById('guardian1MiddleName')?.value || '').trim();
+    const g1AltPhone = String(document.getElementById('guardian1AltPhone')?.value || '').trim();
+    const g1Email = String(document.getElementById('guardian1Email')?.value || '').trim();
+    const g1Address = String(document.getElementById('guardian1Address')?.value || '').trim();
+
+    const hasGuardian1 = g1FirstName && g1LastName && g1Phone && g1Relationship && g1Address;
+    const partialGuardian1 = g1FirstName || g1LastName || g1Phone || g1Relationship || g1Address;
+
+    if (partialGuardian1 && !hasGuardian1) {
+        showImportAlert('Guardian 1 requires First Name, Last Name, Phone, Relationship, and Address.', 'warning');
+        return;
+    }
+
+    // ── COLLECT GUARDIAN 2 DATA ──
+    const g2Phone = String(document.getElementById('guardian2Phone')?.value || '').trim();
+    const g2Relationship = String(document.getElementById('guardian2Relationship')?.value || '').trim();
+    const g2FirstName = String(document.getElementById('guardian2FirstName')?.value || '').trim();
+    const g2LastName = String(document.getElementById('guardian2LastName')?.value || '').trim();
+    const g2MiddleName = String(document.getElementById('guardian2MiddleName')?.value || '').trim();
+    const g2AltPhone = String(document.getElementById('guardian2AltPhone')?.value || '').trim();
+    const g2Email = String(document.getElementById('guardian2Email')?.value || '').trim();
+    const g2Address = String(document.getElementById('guardian2Address')?.value || '').trim();
+
+    const hasGuardian2 = g2FirstName && g2LastName && g2Phone && g2Relationship && g2Address;
+    const partialGuardian2 = g2FirstName || g2LastName || g2Phone || g2Relationship || g2Address;
+
+    if (partialGuardian2 && !hasGuardian2) {
+        showImportAlert('Guardian 2 requires First Name, Last Name, Phone, Relationship, and Address.', 'warning');
+        return;
+    }
+
+    // ── VALIDATE RELATIONSHIP VALUES ──
+    const validRelationships = ['mother', 'father', 'legal_guardian', 'other'];
+    if (hasGuardian1 && !validRelationships.includes(g1Relationship)) {
+        showImportAlert('Guardian 1 relationship must be Mother, Father, Legal Guardian, or Other.', 'warning');
+        return;
+    }
+    if (hasGuardian2 && !validRelationships.includes(g2Relationship)) {
+        showImportAlert('Guardian 2 relationship must be Mother, Father, Legal Guardian, or Other.', 'warning');
+        return;
+    }
+
     try {
-        setSingleStudentLoading(true, 'Saving student...');
+        setSingleStudentLoading(true, 'Saving student and guardians...');
 
         if (!supabaseClient) throw new Error('Database connection not available. Please refresh the page and try again.');
 
+        // ── CHECK FOR DUPLICATE STUDENT ID ──
         const { data: existingStudent, error: existingError } = await supabaseClient
             .from('students')
             .select('stud_id')
@@ -1701,8 +1750,11 @@ async function submitSingleStudentForm(event) {
             return;
         }
 
+        const studentUuid = crypto.randomUUID();
+
+        // ── INSERT STUDENT ──
         const payload = {
-            student_id: crypto.randomUUID(),
+            student_id: studentUuid,
             stud_id: studId,
             first_name: firstName,
             middle_name: middleName || null,
@@ -1713,6 +1765,7 @@ async function submitSingleStudentForm(event) {
             section_id: sectionId,
             school_year_id: activeSchoolYear.id,
             status: 'active',
+            address: address || null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         };
@@ -1720,12 +1773,51 @@ async function submitSingleStudentForm(event) {
         const { error: insertError } = await supabaseClient.from('students').insert(payload);
         if (insertError) throw insertError;
 
+        // ── INSERT / LINK GUARDIAN 1 ──
+        if (hasGuardian1) {
+            try {
+                await upsertAndLinkGuardian(studentUuid, {
+                    first_name: g1FirstName,
+                    middle_name: g1MiddleName || null,
+                    last_name: g1LastName,
+                    relationship: g1Relationship,
+                    phone_number: g1Phone,
+                    alternate_phone_number: g1AltPhone || null,
+                    email: g1Email || null,
+                    address: g1Address,
+                }, true);  // is_primary_contact = true
+            } catch (g1Err) {
+                console.error('Failed to link Guardian 1:', g1Err);
+                showImportAlert(`Student saved, but failed to link Guardian 1: ${g1Err.message}`, 'warning');
+            }
+        }
+
+        // ── INSERT / LINK GUARDIAN 2 ──
+        if (hasGuardian2) {
+            try {
+                await upsertAndLinkGuardian(studentUuid, {
+                    first_name: g2FirstName,
+                    middle_name: g2MiddleName || null,
+                    last_name: g2LastName,
+                    relationship: g2Relationship,
+                    phone_number: g2Phone,
+                    alternate_phone_number: g2AltPhone || null,
+                    email: g2Email || null,
+                    address: g2Address,
+                }, false);  // is_primary_contact = false
+            } catch (g2Err) {
+                console.error('Failed to link Guardian 2:', g2Err);
+                showImportAlert(`Student saved, but failed to link Guardian 2: ${g2Err.message}`, 'warning');
+            }
+        }
+
         showImportAlert(`Student ${firstName} ${lastName} (${studId}) added successfully.`, 'success');
         document.getElementById('singleStudentForm')?.reset();
         setSingleStudentLoading(false);
         singleStudentModal?.hide();
         await loadAllStudentsTable();
 
+        // ── SEND QR EMAIL ──
         if (email) {
             const selectedSection = departmentsCache.find(s => String(s.section_id) === String(sectionId));
             const sectionLabel = selectedSection ? `${selectedSection.grade_level} - ${selectedSection.section_name}` : '';
