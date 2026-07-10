@@ -7,15 +7,15 @@
 :root {
     --sidebar-collapsed:    64px;
     --sidebar-expanded:     240px;
-    --sidebar-bg:           #1a4731;
-    --sidebar-hover-bg:     rgba(255,255,255,.08);
-    --sidebar-active-bg:    rgba(255,255,255,.15);
-    --sidebar-border:       rgba(255,255,255,.08);
-    --sidebar-text:         rgba(255,255,255,.80);
-    --sidebar-text-active:  #ffffff;
-    --sidebar-icon:         rgba(255,255,255,.65);
-    --sidebar-icon-active:  #ffffff;
-    --accent-bar:           #f4c430;
+    --sidebar-bg:           #dbeefe;
+    --sidebar-hover-bg:     #c7e3fb;
+    --sidebar-active-bg:    #a9d4f5;
+    --sidebar-border:       rgba(20,54,76,.10);
+    --sidebar-text:         #2c4860;
+    --sidebar-text-active:  #14364c;
+    --sidebar-icon:         #4b7896;
+    --sidebar-icon-active:  #14364c;
+    --accent-bar:           #176aa4;
 }
 
 /* ===== SIDEBAR ===== */
@@ -28,7 +28,7 @@
     background: var(--sidebar-bg);
     display: flex;
     flex-direction: column;
-    box-shadow: 3px 0 18px rgba(0,0,0,.18);
+    box-shadow: 3px 0 18px rgba(20,54,76,.12);
     z-index: 100;
     overflow: hidden;
     /* Push content below the fixed header */
@@ -154,7 +154,7 @@
     left: calc(var(--sidebar-collapsed) + 10px);
     top: 50%;
     transform: translateY(-50%);
-    background: #1e293b;
+    background: #176aa4;
     color: #fff;
     font-size: 12px;
     font-weight: 600;
@@ -175,7 +175,7 @@
     transform: translateY(-50%);
     border-width: 5px 5px 5px 0;
     border-style: solid;
-    border-color: transparent #1e293b transparent transparent;
+    border-color: transparent #176aa4 transparent transparent;
 }
 
 /* Show tooltip only when sidebar is NOT hovered */
