@@ -703,8 +703,8 @@ async function startImport() {
 
         try {
             const studentData = {
-                stud_id: row.studId,
-                first_name: row.firstName,
+                 stud_id: row.studId,
+                 first_name: row.firstName,
                 middle_name: row.middleName || null,
                 last_name: row.lastName,
                 suffix: row.suffix || null,
@@ -712,9 +712,10 @@ async function startImport() {
                 gender: row.gender || null,
                 section_id: selectedDepartmentId,
                 school_year_id: activeSchoolYear.id,
+                email: row.email || null,  // <-- ADDED
                 status: 'active',
                 updated_at: new Date().toISOString(),
-            };
+                };
 
             let error;
 
@@ -1204,7 +1205,8 @@ function openEditStudentModal(studId) {
     document.getElementById('editSuffix').value = student.suffix || '';
     document.getElementById('editYearLevel').value = student.birth_date || '';
     document.getElementById('editSection').value = (student.gender || '').toLowerCase();
-    document.getElementById('editStatus').value = student.status || 'inactive';
+   document.getElementById('editEmail').value = student.email || '';
+document.getElementById('editStatus').value = student.status || 'inactive';
 
     editStudentModal.show();
 }
@@ -1222,6 +1224,7 @@ async function submitEditStudentForm(event) {
     const suffix = String(document.getElementById('editSuffix')?.value || '').trim();
     const birthDate = String(document.getElementById('editYearLevel')?.value || '').trim();
     const gender = String(document.getElementById('editSection')?.value || '').trim().toLowerCase();
+    const email = String(document.getElementById('editEmail')?.value || '').trim();  // <-- ADD THIS LINE
     const status = String(document.getElementById('editStatus')?.value || 'inactive').trim();
 
     if (!sectionId || !firstName || !lastName) {
@@ -1240,16 +1243,17 @@ async function submitEditStudentForm(event) {
     }
 
     const updatePayload = {
-        first_name: firstName,
-        middle_name: middleName || null,
-        last_name: lastName,
-        suffix: suffix || null,
-        birth_date: birthDate || null,
-        gender: gender || null,
-        section_id: sectionId,
-        status,
-        updated_at: new Date().toISOString(),
-    };
+    first_name: firstName,
+    middle_name: middleName || null,
+    last_name: lastName,
+    suffix: suffix || null,
+    birth_date: birthDate || null,
+    gender: gender || null,
+    section_id: sectionId,
+    email: email || null,  // <-- ADDED (you'll need to capture email from the edit form)
+    status,
+    updated_at: new Date().toISOString(),
+};
 
     try {
         if (saveBtn) {
@@ -1753,22 +1757,23 @@ async function submitSingleStudentForm(event) {
         const studentUuid = crypto.randomUUID();
 
         // ── INSERT STUDENT ──
-        const payload = {
-            student_id: studentUuid,
-            stud_id: studId,
-            first_name: firstName,
-            middle_name: middleName || null,
-            last_name: lastName,
-            suffix: suffix || null,
-            birth_date: birthDate || null,
-            gender: gender || null,
-            section_id: sectionId,
-            school_year_id: activeSchoolYear.id,
-            status: 'active',
-            address: address || null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        };
+       const payload = {
+    student_id: studentUuid,
+    stud_id: studId,
+    first_name: firstName,
+    middle_name: middleName || null,
+    last_name: lastName,
+    suffix: suffix || null,
+    birth_date: birthDate || null,
+    gender: gender || null,
+    section_id: sectionId,
+    school_year_id: activeSchoolYear.id,
+    email: email || null,  // <-- ADDED
+    status: 'active',
+    address: address || null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+};
 
         const { error: insertError } = await supabaseClient.from('students').insert(payload);
         if (insertError) throw insertError;

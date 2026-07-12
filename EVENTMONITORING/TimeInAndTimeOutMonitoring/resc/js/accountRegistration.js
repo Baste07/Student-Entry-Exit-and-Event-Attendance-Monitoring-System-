@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auto-switch to professor tab if role=professor
     if (params.get('role') === 'professor') switchRole('professor');
 
-    // Pre-fill student LRN from URL
+    // Pre-fill student ID from URL
     const sid = params.get('student_id');
     if (sid && currentRole === 'student') {
         const idInput = document.getElementById('studentIdInput');
@@ -56,6 +56,56 @@ const professorScanBtn = document.getElementById('professorScanBtn');
 const studentInfoCard  = document.getElementById('studentInfoCard');
 const professorInfoCard = document.getElementById('professorInfoCard');
 
+
+// ═══════════════════════════════════════════
+// STUDENT ID AUTO-FORMATTER
+// ═══════════════════════════════════════════
+
+function formatStudentId(raw) {
+    const sanitized = raw.replace(/[^0-9Kk\-]/g, '').toUpperCase();
+    const dashIndex = sanitized.indexOf('-');
+    const clean = sanitized.replace(/[^0-9K]/g, '');
+    if (!clean) return '';
+
+    // Kinder: K-XXXX
+    if (clean[0] === 'K') {
+        return 'K-' + clean.slice(1).slice(0, 4);
+    }
+
+    // Explicit dash after first digit (grade 1-9)
+    if (dashIndex === 1 && /^[1-9]$/.test(clean[0])) {
+        return clean[0] + '-' + clean.slice(1).slice(0, 4);
+    }
+
+    // Explicit dash after second digit (grade 10)
+    if (dashIndex === 2 && clean.startsWith('10')) {
+        return '10-' + clean.slice(2).slice(0, 4);
+    }
+
+    // Grade 10 auto-detect
+    if (clean.startsWith('10')) {
+        return '10-' + clean.slice(2).slice(0, 4);
+    }
+
+    // Grades 2-9: safe to auto-dash immediately (no ambiguity)
+    if (/^[2-9]$/.test(clean[0])) {
+        return clean[0] + '-' + clean.slice(1).slice(0, 4);
+    }
+
+    // Grade 1: wait for the next digit to decide between 1 and 10
+    if (clean[0] === '1') {
+        if (clean.length === 1) {
+            return '1'; // no dash yet
+        }
+        // If we reach here, it's grade 1 (e.g., "12", "13"... "10" was caught above)
+        return '1-' + clean.slice(1).slice(0, 4);
+    }
+
+    return clean;
+}
+
+
+
 async function hasFaceFiles(datasetPath) {
     if (!datasetPath) return false;
 
@@ -96,10 +146,10 @@ function updateScanButtonsState() {
             btn.innerHTML = '<i class="fa-solid fa-power-off" style="color:#fca5a5;"></i> Please Start Engine First';
         } else if (!data) {
             btn.disabled = true;
-            btn.innerHTML = defaultText; // Wait for student/professor data
+            btn.innerHTML = defaultText;
         } else {
             btn.disabled = false;
-            btn.innerHTML = defaultText; // Ready to scan!
+            btn.innerHTML = defaultText;
         }
     };
 
@@ -209,7 +259,7 @@ studentScanBtn.addEventListener('click', async () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                id_number: studentData.lrn,
+                id_number: studentData.stud_id,
                 firstName: studentData.first_name,
                 lastName:  studentData.last_name,
                 role:      'student'
@@ -246,12 +296,10 @@ function startProgressPolling() {
                 progressPoller = null;
                 captureStatus.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--green-bright)"></i> Registration Complete! Preparing for next registrant...';
 
-                // Notify attendance engine to incrementally rebuild encodings (debounced)
                 try {
                     captureStatus.innerHTML = '<i class="fa-solid fa-cloud-arrow-up" style="color:var(--green-bright)"></i> Notifying attendance engine...';
                     await triggerRebuildDebounced(false);
-                    // Wait briefly for the attendance engine to apply the incremental update
-                    const ready = await waitForAttendanceEngineReady(20, 500); // ~10s max
+                    const ready = await waitForAttendanceEngineReady(20, 500);
                     if (ready) {
                         captureStatus.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--green-bright)"></i> Attendance engine updated.';
                     } else {
@@ -292,16 +340,41 @@ async function waitForFlask(retries = 30, delayMs = 1500) {
 // ═══════════════════════════════════════════
 // STUDENT ID INPUT LOGIC
 // ═══════════════════════════════════════════
-studentIdInput.addEventListener('input', function () {
-    const val = this.value.trim();
-    
+
+// ═══════════════════════════════════════════
+// STUDENT ID INPUT LOGIC
+// ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+// STUDENT ID INPUT LOGIC
+// ═══════════════════════════════════════════
+studentIdInput.addEventListener('input', function (e) {
+    // Detect deletion actions (Backspace, Delete, Cut)
+    const isDeleting = e.inputType && e.inputType.startsWith('delete');
+
+    let val;
+    if (isDeleting) {
+        // On delete: only strip invalid characters, don't force-add dashes
+        // so the user can backspace all the way to empty
+        val = this.value.replace(/[^0-9Kk\-]/g, '').toUpperCase();
+        if (this.value !== val) {
+            this.value = val;
+        }
+    } else {
+        // On typing / pasting: apply full auto-format
+        const formatted = formatStudentId(this.value);
+        if (this.value !== formatted) {
+            this.value = formatted;
+        }
+        val = this.value;
+    }
+
     clearTimeout(studentTimer);
     document.getElementById('idError').textContent = '';
     document.getElementById('idSuccess').innerHTML = '';
     studentInfoCard.classList.remove('show');
-    
-    studentData = null; // Reset data
-    updateScanButtonsState(); // Lock button
+
+    studentData = null;
+    updateScanButtonsState();
 
     if (val.length >= 3) {
         document.getElementById('idSuccess').innerHTML = 'Searching... <span class="loading"></span>';
@@ -309,12 +382,12 @@ studentIdInput.addEventListener('input', function () {
     }
 });
 
-async function searchStudent(lrn) {
+async function searchStudent(studentId) {
     try {
         const { data } = await supabaseClient
             .from('students')
             .select('*')
-            .eq('lrn', lrn)
+            .eq('stud_id', studentId)
             .maybeSingle();
 
         document.getElementById('idSuccess').innerHTML = '';
@@ -327,7 +400,7 @@ async function searchStudent(lrn) {
             studentData = null;
             document.getElementById('idError').textContent = '⚠ Student not found.';
         }
-        updateScanButtonsState(); // Unlock button if engine is ready
+        updateScanButtonsState();
     } catch (err) { console.error(err); }
 }
 
@@ -337,7 +410,6 @@ async function fillStudentFields(data) {
     document.getElementById('s_lastName').value   = data.last_name   || '';
     document.getElementById('s_email').value      = data.email       || '';
 
-    // Fetch section info from sections table
     let gradeLevel = 'N/A';
     let sectionName = 'N/A';
     
@@ -414,7 +486,7 @@ async function searchProfessor(id) {
     } else {
         professorData = null;
     }
-    updateScanButtonsState(); // Unlock button if engine is ready
+    updateScanButtonsState();
 }
 
 async function fillProfessorFields(data) {
@@ -490,7 +562,6 @@ document.getElementById('professorClearBtn').addEventListener('click', () => {
 // ═══════════════════════════════════════════
 // ENGINE STATUS POLLING
 // ═══════════════════════════════════════════
-// Debounced trigger for notifying attendance engine to rebuild encodings
 let _rebuildTimer = null;
 async function triggerRebuild(force = false) {
     try {
@@ -547,13 +618,13 @@ setInterval(async () => {
         document.getElementById('startEngineNavBtn').style.display = 'inline-flex';
     }
     
-    updateScanButtonsState(); // Auto-update buttons every 3 seconds based on engine status
+    updateScanButtonsState();
 }, 3000);
 
 async function bootRegistrationEngine() {
     const startBtn = document.getElementById('startEngineNavBtn');
     isBooting = true; 
-    updateScanButtonsState(); // Forces "Booting..." state on scan buttons
+    updateScanButtonsState();
     
     startBtn.disabled = true;
     startBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Booting...';
@@ -576,7 +647,7 @@ async function bootRegistrationEngine() {
         isBooting = false; 
         startBtn.disabled = false;
         startBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Start Engine';
-        updateScanButtonsState(); // Re-check buttons
+        updateScanButtonsState();
     }
 }
 
@@ -599,5 +670,5 @@ async function stopEngine() {
     startBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Start Engine';
     
     isEngineOnline = false;
-    updateScanButtonsState(); // Locks buttons immediately
+    updateScanButtonsState();
 }
