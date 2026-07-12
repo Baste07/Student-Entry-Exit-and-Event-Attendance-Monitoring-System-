@@ -340,7 +340,7 @@ def upload_to_supabase():
     else:
         cloud_folder = f"students/student_{session['id_number']}"
         table_name   = "students"
-        id_column    = "lrn"
+        id_column    = "stud_id"  # <-- CHANGED from "lrn" to "stud_id"
 
     valid_count = 0
     current_paths = list(session["paths"])
@@ -420,7 +420,7 @@ def generate_frames():
 
     frame_count = 0        
     process_every_n = 3    
-    last_locs = []         
+    last_locs = []     
     
     # Track recent face center positions to measure stability
     center_history = []    

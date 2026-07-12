@@ -1,5 +1,6 @@
 import sys, os
 
+
 # 1. Define the exact folder path
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -23,6 +24,12 @@ try:
     import torch
 except Exception:
     torch = None
+
+    # ═════════════════════════════════════════════════════════════
+# EVENT ATTENDANCE STATE
+# ═════════════════════════════════════════════════════════════
+
+student_details_cache = {}   # student_id -> {stud_id, grade_level, section_name}
 
 timein_root_dir = os.path.dirname(script_dir)
 anti_spoof_import_error = None
@@ -488,7 +495,7 @@ def _activate_face_db(encodings, meta):
 
 def _fetch_face_rows():
     students_result = supabase.table("students")\
-        .select("student_id, lrn, first_name, middle_name, last_name, facial_dataset_path")\
+        .select("student_id, stud_id, first_name, middle_name, last_name, facial_dataset_path, section_id")\
         .not_.is_("facial_dataset_path", "null")\
         .neq("facial_dataset_path", "")\
         .execute()
@@ -556,6 +563,45 @@ def load_encodings_from_storage(cloud_folder, meta, enc_store, meta_store):
 #
 # Result: only the people who actually changed are re-processed.
 # ═════════════════════════════════════════════════════════════════════════════
+
+
+
+def _fetch_student_details(student_ids):
+    """Fetch grade/section info for a list of student IDs from Supabase."""
+    if not student_ids:
+        return {}
+    try:
+        res = supabase.table("students")\
+            .select("student_id, section_id, stud_id")\
+            .in_("student_id", student_ids)\
+            .execute()
+        students = res.data or []
+
+        section_ids = list({str(s["section_id"]) for s in students if s.get("section_id")})
+        sections = {}
+        if section_ids:
+            sec_res = supabase.table("sections")\
+                .select("section_id, grade_level, section_name")\
+                .in_("section_id", section_ids)\
+                .execute()
+            for sec in sec_res.data or []:
+                sections[str(sec["section_id"])] = sec
+
+        mapping = {}
+        for s in students:
+            sid = str(s["student_id"])
+            sec_id = str(s.get("section_id")) if s.get("section_id") else None
+            sec_info = sections.get(sec_id) if sec_id else {}
+            mapping[sid] = {
+                "stud_id": s.get("stud_id"),
+                "grade_level": sec_info.get("grade_level"),
+                "section_name": sec_info.get("section_name"),
+            }
+        return mapping
+    except Exception as e:
+        print(f"⚠ Failed to fetch student details: {e}")
+        return {}
+    
 def load_all_faces(force_rebuild=False):
     global known_encodings, known_meta, known_encodings_np, face_db_loading_started, last_rebuild_summary, current_face_fingerprint
 
@@ -613,6 +659,10 @@ def load_all_faces(force_rebuild=False):
         _set_engine_boot_state(face_db_phase="validating")
         fp_t0 = time.perf_counter()
         students_rows, teachers_rows = _fetch_face_rows()
+                # Build student grade/section cache
+        student_ids = [str(r["student_id"]) for r in students_rows if r.get("student_id")]
+        global student_details_cache
+        student_details_cache = _fetch_student_details(student_ids)
 
         # Build the facial-path fingerprint (used to detect only face dataset path changes)
         try:
@@ -779,11 +829,15 @@ def load_all_faces(force_rebuild=False):
 
             if entry["role"] == "student":
                 mid  = row.get("middle_name") or ""
+                details = student_details_cache.get(str(row["student_id"]), {})
                 meta = {
-                    "role":      "student",
-                    "id":        row["student_id"],
-                    "lrn":       row["lrn"],
-                    "name":      f"{row['first_name']} {mid} {row['last_name']}".strip(),
+                    "role":        "student",
+                    "id":          row["student_id"],
+                    "stud_id":     row["stud_id"],
+                    "name":        f"{row['first_name']} {mid} {row['last_name']}".strip(),
+                    "stud_id":     details.get("stud_id"),
+                    "grade_level": details.get("grade_level"),
+                    "section_name":details.get("section_name"),
                 }
             else:
                 mid  = row.get("middle_name") or ""
@@ -904,11 +958,193 @@ def get_guide_bounds(frame_shape):
     y2 = y1 + guide_h
     return x1, y1, x2, y2
 
-def _greet_person(meta):
-    _push({
-        "message": f"HELLO {meta['name']}",
-        "name": meta["name"]
-    })
+def _handle_recognition(meta):
+    """Called by the recognition worker when a known face passes liveness."""
+    if meta.get("role") != "student":
+        _push({
+            "message": f"HELLO {meta['name']}",
+            "name": meta["name"],
+            "type": "greeting_only",
+            "role": "teacher"
+        })
+        return
+    # Offload the DB write to the thread pool so the video loop never blocks
+    thread_pool.submit(_record_event_attendance, meta["id"], meta)
+
+
+def _record_event_attendance(student_id, meta):
+    """
+    Auto-detect event from the student's participation list.
+    Priority: ongoing → completed → upcoming.
+    """
+    try:
+        # 1. Find every event this student is registered for
+        part_res = supabase.table("event_participants")\
+            .select("event_id")\
+            .eq("student_id", student_id)\
+            .execute()
+        event_ids = [p["event_id"] for p in part_res.data] if part_res.data else []
+
+        if not event_ids:
+            _push({
+                "message": "NOT REGISTERED",
+                "name": meta["name"],
+                "type": "not_participant",
+                "reason": "You are not registered for any event."
+            })
+            return
+
+        # 2. Pull those events, newest first
+        ev_res = supabase.table("events")\
+            .select("*")\
+            .in_("event_id", event_ids)\
+            .in_("status", ["ongoing", "completed", "upcoming"])\
+            .order("event_date", desc=True)\
+            .order("time_start", desc=True)\
+            .execute()
+        events = ev_res.data or []
+
+        if not events:
+            _push({
+                "message": "NO ACTIVE EVENT",
+                "name": meta["name"],
+                "type": "error",
+                "reason": "No active or completed event found."
+            })
+            return
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        ongoing   = [e for e in events if e.get("status") == "ongoing"]
+        completed = [e for e in events if e.get("status") == "completed"]
+        upcoming  = [e for e in events if e.get("status") == "upcoming"]
+
+        # ═══════════════════════════════════════════════════
+        # PRIORITY 1: ONGOING → time_in
+        # ═══════════════════════════════════════════════════
+        if ongoing:
+            ev    = ongoing[0]
+            ev_id = ev["event_id"]
+
+            att_res = supabase.table("event_attendance")\
+                .select("*")\
+                .eq("event_id", ev_id)\
+                .eq("student_id", student_id)\
+                .execute()
+            row = att_res.data[0] if att_res.data else None
+
+            if not row:
+                supabase.table("event_attendance").insert({
+                    "event_id": ev_id,
+                    "student_id": student_id,
+                    "time_in": now.isoformat(),
+                    "verified_by_facial_recognition": True,
+                }).execute()
+                _push({
+                    "message": f"TIME IN {meta['name']}",
+                    "name": meta["name"],
+                    "type": "time_in",
+                    "time": now.strftime("%I:%M %p"),
+                    "grade": meta.get("grade_level", ""),
+                    "section": meta.get("section_name", ""),
+                    "stud_id": meta.get("stud_id", ""),
+                    "event_name": ev.get("event_name", "")
+                })
+                return
+
+            elif row and not row.get("time_out"):
+                _push({
+                    "message": "ALREADY TIMED IN",
+                    "name": meta["name"],
+                    "type": "already_recorded",
+                    "grade": meta.get("grade_level", ""),
+                    "section": meta.get("section_name", ""),
+                    "stud_id": meta.get("stud_id", ""),
+                    "event_name": ev.get("event_name", ""),
+                    "reason": "You have already timed in for this event."
+                })
+                return
+
+            else:
+                _push({
+                    "message": "ATTENDANCE COMPLETE",
+                    "name": meta["name"],
+                    "type": "already_recorded",
+                    "grade": meta.get("grade_level", ""),
+                    "section": meta.get("section_name", ""),
+                    "stud_id": meta.get("stud_id", ""),
+                    "event_name": ev.get("event_name", ""),
+                    "reason": "Time-in and time-out already recorded."
+                })
+                return
+
+        # ═══════════════════════════════════════════════════
+        # PRIORITY 2: COMPLETED → time_out (if missing)
+        # ═══════════════════════════════════════════════════
+        if completed:
+            for ev in completed:
+                ev_id = ev["event_id"]
+                att_res = supabase.table("event_attendance")\
+                    .select("*")\
+                    .eq("event_id", ev_id)\
+                    .eq("student_id", student_id)\
+                    .execute()
+                row = att_res.data[0] if att_res.data else None
+
+                if row and row.get("time_in") and not row.get("time_out"):
+                    supabase.table("event_attendance").update({
+                        "time_out": now.isoformat(),
+                        "verified_by_facial_recognition": True,
+                    }).eq("attendance_id", row["attendance_id"]).execute()
+                    _push({
+                        "message": f"TIME OUT {meta['name']}",
+                        "name": meta["name"],
+                        "type": "time_out",
+                        "time": now.strftime("%I:%M %p"),
+                        "grade": meta.get("grade_level", ""),
+                        "section": meta.get("section_name", ""),
+                        "stud_id": meta.get("stud_id", ""),
+                        "event_name": ev.get("event_name", "")
+                    })
+                    return
+
+            _push({
+                "message": "NO TIME IN FOUND",
+                "name": meta["name"],
+                "type": "error",
+                "reason": "You did not time in for any completed event."
+            })
+            return
+
+        # ═══════════════════════════════════════════════════
+        # PRIORITY 3: UPCOMING
+        # ═══════════════════════════════════════════════════
+        if upcoming:
+            ev = upcoming[0]
+            _push({
+                "message": "EVENT NOT STARTED",
+                "name": meta["name"],
+                "type": "error",
+                "event_name": ev.get("event_name", ""),
+                "reason": f"Event '{ev.get('event_name')}' hasn't started yet."
+            })
+            return
+
+        _push({
+            "message": "NO ACTION",
+            "name": meta["name"],
+            "type": "error",
+            "reason": "No attendance action available."
+        })
+
+    except Exception as e:
+        print(f"⚠ Auto event attendance failed: {e}")
+        import traceback; traceback.print_exc()
+        _push({
+            "message": "RECORD ERROR",
+            "name": meta["name"],
+            "type": "error",
+            "reason": "Failed to process attendance. Please try again."
+        })
 
 def recognition_worker():
     global latest_frame
@@ -970,6 +1206,7 @@ def recognition_worker():
                         _push({
                             "message": "SPOOF DETECTED",
                             "name": meta["name"],
+                            "type": "spoof",
                             "reason": f"Liveness check failed (score={score_txt}, threshold={ANTI_SPOOF_THRESHOLD:.2f}). Please face the camera directly and try again.",
                         })
                         new_locs.append((top, right, bottom, left))
@@ -977,7 +1214,7 @@ def recognition_worker():
                         new_colors.append(color)
                         continue
                     recently_seen[key] = datetime.datetime.now()
-                    thread_pool.submit(_greet_person, meta)
+                    _handle_recognition(meta)
             else:
                 label = "Unknown"
                 color = (0, 0, 255)
@@ -1156,6 +1393,7 @@ def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/engine_status')
+
 def engine_status():
     with engine_boot_lock:
         payload = dict(engine_boot_state)
@@ -1356,6 +1594,17 @@ def scanner():
 def index():
     return ('<h2 style="font-family:sans-serif;padding:20px">School Attendance ✓ &nbsp;'
             '<a href="/scanner">Open Scanner →</a></h2>')
+
+@app.route('/ongoing_events', methods=['GET'])
+def ongoing_events():
+    try:
+        res = supabase.table("events")\
+            .select("event_id, event_name, status, event_date, time_start, time_end")\
+            .eq("status", "ongoing")\
+            .execute()
+        return jsonify({"success": True, "events": res.data or []})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 if __name__ == '__main__':
     threading.Thread(target=load_all_faces, kwargs={"force_rebuild": FORCE_FACE_CACHE_REBUILD}, daemon=True).start()

@@ -1,6 +1,6 @@
 /* ============================================================
    takeAttendance.js — School Attendance Edition
-   Simplified for greeting-only facial recognition engine
+   Auto-detect event attendance per student scan
 ============================================================ */
 
 // ══════════════════════════════════════════════════
@@ -36,25 +36,43 @@ let _prevRebuildSummaryTs = null;
 let greetTimer = null;
 let greetCountdownInterval = null;
 
+let ongoingEvents = [];
+
 // ══════════════════════════════════════════════════
 // GREETING OVERLAY
 // ══════════════════════════════════════════════════
-function showGreeting(name, message, isSpoof = false) {
+function showGreeting(name, message, isSpoof = false, details = {}) {
     clearTimeout(greetTimer);
     clearInterval(greetCountdownInterval);
 
     greetName.textContent = name || '';
     greetMsg.textContent = message || '';
 
+    const metaParts = [];
+    if (details.event_name) metaParts.push(details.event_name);
+    if (details.stud_id) metaParts.push(`ID: ${details.stud_id}`);
+    if (details.grade) metaParts.push(`Grade: ${details.grade}`);
+    if (details.section) metaParts.push(`Section: ${details.section}`);
+    document.getElementById('greetMeta').textContent = metaParts.join('  •  ');
+
+    const timeEl = document.getElementById('greetTime');
+    if (details.time) {
+        timeEl.textContent = `🕒 ${details.time}`;
+        timeEl.style.display = 'block';
+    } else {
+        timeEl.textContent = '';
+        timeEl.style.display = 'none';
+    }
+
     if (isSpoof) {
         greetCard.classList.add('spoof');
         greetAvatar.textContent = '❌';
     } else {
         greetCard.classList.remove('spoof');
-        greetAvatar.textContent = '👋';
+        greetAvatar.textContent = details.type === 'time_out' ? '👋' : '✅';
     }
 
-    let remaining = 3;
+    let remaining = 4;
     greetCountdown.textContent = `Auto-dismiss in ${remaining}s`;
     greetCountdownInterval = setInterval(() => {
         remaining--;
@@ -63,7 +81,7 @@ function showGreeting(name, message, isSpoof = false) {
     }, 1000);
 
     greetOverlay.classList.add('on');
-    greetTimer = setTimeout(dismissGreeting, 3500);
+    greetTimer = setTimeout(dismissGreeting, 4000);
 }
 
 function dismissGreeting() {
@@ -191,6 +209,22 @@ function showToast(msg, colorClass, duration = 4000) {
     toast.style.display = 'block';
     setTimeout(() => { toast.style.display = 'none'; }, duration);
 }
+
+// ══════════════════════════════════════════════════
+// ONGOING EVENTS POLLING
+// ══════════════════════════════════════════════════
+async function fetchOngoingEvents() {
+    if (!isEngineOnline) return;
+    try {
+        const res = await fetch('http://127.0.0.1:5000/ongoing_events');
+        const data = await res.json();
+        ongoingEvents = (data.success && data.events) ? data.events : [];
+    } catch (e) {
+        ongoingEvents = [];
+    }
+}
+setInterval(fetchOngoingEvents, 8000);
+fetchOngoingEvents();
 
 // ══════════════════════════════════════════════════
 // ENGINE STATUS POLLING
@@ -405,6 +439,49 @@ function stopAttendanceSession() {
 // ══════════════════════════════════════════════════
 // SSE — GREETING STREAM
 // ══════════════════════════════════════════════════
+function handleRecognitionEvent(d) {
+    const name = d.name || '';
+    const message = d.message || '';
+    const details = {
+        event_name: d.event_name || '',
+        grade: d.grade || '',
+        section: d.section || '',
+        time: d.time || '',
+        stud_id: d.stud_id || '',
+        type: d.type || 'greeting'
+    };
+
+    if (d.type === 'spoof' || message.includes('SPOOF')) {
+        showGreeting(name, d.reason || 'Liveness check failed.', true);
+        showToast('Spoof detected — please use a real face', 'red', 4000);
+        return;
+    }
+
+    if (d.type === 'time_in') {
+        showGreeting(name, message, false, details);
+        showToast(`${name} timed in · ${details.event_name || 'Event'}`, 'green', 3000);
+        return;
+    }
+    if (d.type === 'time_out') {
+        showGreeting(name, message, false, details);
+        showToast(`${name} timed out · ${details.event_name || 'Event'}`, 'green', 3000);
+        return;
+    }
+    if (d.type === 'already_recorded') {
+        showGreeting(name, d.reason || message, false, details);
+        showToast(d.reason || message, 'amber', 3000);
+        return;
+    }
+    if (d.type === 'not_participant' || d.type === 'error') {
+        showGreeting(name, d.reason || message, false, details);
+        showToast(d.reason || message, 'red', 4000);
+        return;
+    }
+
+    // Default greeting (teacher, or no event)
+    showGreeting(name, message, false, details);
+}
+
 if (window.EventSource) {
     const src = new EventSource('http://127.0.0.1:5000/attendee_stream');
     src.onmessage = (e) => {
@@ -416,26 +493,4 @@ if (window.EventSource) {
     src.onerror = () => {
         console.log('SSE connection lost, will retry...');
     };
-}
-
-function handleRecognitionEvent(d) {
-    // The simplified engine sends: { "message": "HELLO JOHN DOE", "name": "JOHN DOE" }
-    // Or for spoof: { "message": "SPOOF DETECTED", "name": "...", "reason": "..." }
-
-    const name = d.name || '';
-    const message = d.message || '';
-
-    if (message.includes('SPOOF') || message.includes('spoof')) {
-        showGreeting(name, d.reason || 'Liveness check failed. Please present a real face.', true);
-        showToast('Spoof detected — please use a real face', 'red', 4000);
-        return;
-    }
-
-    if (message.startsWith('HELLO') || message.startsWith('Hello')) {
-        showGreeting(name, message, false);
-        return;
-    }
-
-    // Fallback for any other messages
-    showGreeting(name, message, false);
 }
