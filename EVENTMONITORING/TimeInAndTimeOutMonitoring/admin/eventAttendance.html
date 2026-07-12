@@ -6,7 +6,7 @@
     <title>Event Attendance | Laboratory Attendance System</title>
 
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -27,48 +27,63 @@
     <main class="main-content">
         <div class="container">
 
+            <!-- Page Header -->
             <div class="page-header">
                 <div class="header-titles">
                     <h1><i class="fa-solid fa-calendar-check"></i> Event Attendance</h1>
-                    <p>Track student and teacher attendance for school events</p>
+                    <p>Track student attendance for school events</p>
                 </div>
-
-                <div class="stats-badges">
-                    <span class="stat-badge total"><i class="fa-solid fa-check"></i> <span id="badgePresent">0</span> Present</span>
-                    <span class="stat-badge active"><i class="fa-solid fa-clock"></i> <span id="badgeLate">0</span> Late</span>
-                    <span class="stat-badge inactive"><i class="fa-solid fa-xmark"></i> <span id="badgeAbsent">0</span> Absent</span>
-                </div>
-
-                <button class="btn-add" onclick="openAddModal()" id="btnAddAttendance" disabled>
-                    <i class="fa-solid fa-plus"></i> Record Attendance
-                </button>
             </div>
             <hr>
 
-            <!-- Event Selector + Filters -->
-            <div class="controls-card">
-                <div class="controls-header">
-                    <h2><i class="fa-solid fa-sliders-h"></i> Select Event &amp; Filter</h2>
+            <!-- Event Selector -->
+            <div class="event-selector-card">
+                <div class="selector-header">
+                    <i class="fa-solid fa-calendar-day" style="color: var(--blue-bright);"></i>
+                    <h2>Select Event</h2>
                 </div>
-                <div class="table-controls">
-                    <div class="control-group" style="flex:2 1 0; min-width:240px;">
-                        <label for="eventSelect"><i class="fa-solid fa-calendar-day"></i> Event</label>
+                <div class="selector-body">
+                    <div class="selector-field">
+                        <label for="eventSelect"><i class="fa-solid fa-list"></i> Choose an Event</label>
                         <select id="eventSelect">
                             <option value="">-- Select an Event --</option>
                         </select>
-                        <small id="eventTargetHint" style="display:block;margin-top:4px;color:#666"></small>
+                        <small id="eventTargetHint" style="display:block; margin-top:6px; color: var(--text-muted); font-size: 12px;"></small>
                     </div>
-                    <div class="control-group">
+                    <div class="event-stats" id="eventStats" style="display:none;">
+                        <div class="estat present">
+                            <i class="fa-solid fa-check"></i>
+                            <span class="eval" id="badgePresent">0</span>
+                            <span class="elbl">Present</span>
+                        </div>
+                        <div class="estat late">
+                            <i class="fa-solid fa-clock"></i>
+                            <span class="eval" id="badgeLate">0</span>
+                            <span class="elbl">Late</span>
+                        </div>
+                        <div class="estat absent">
+                            <i class="fa-solid fa-xmark"></i>
+                            <span class="eval" id="badgeAbsent">0</span>
+                            <span class="elbl">Absent</span>
+                        </div>
+                        <div class="estat total">
+                            <i class="fa-solid fa-users"></i>
+                            <span class="eval" id="badgeTotal">0</span>
+                            <span class="elbl">Total</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="controls-card" id="controlsCard" style="display:none;">
+                <div class="controls-header">
+                    <h2><i class="fa-solid fa-sliders-h"></i> Filters & Search</h2>
+                </div>
+                <div class="table-controls">
+                    <div class="control-group" style="flex:2;">
                         <label for="searchInput"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
-                        <input type="text" id="searchInput" placeholder="Search by name or ID" />
-                    </div>
-                    <div class="control-group">
-                        <label for="roleFilter"><i class="fa-solid fa-user-tag"></i> Filter by Role</label>
-                        <select id="roleFilter">
-                            <option value="">All</option>
-                            <option value="student">Students</option>
-                            <option value="teacher">Teachers</option>
-                        </select>
+                        <input type="text" id="searchInput" placeholder="Search by name or student ID..." />
                     </div>
                     <div class="control-group">
                         <label for="statusFilter"><i class="fa-solid fa-filter"></i> Filter by Status</label>
@@ -82,92 +97,50 @@
                     </div>
                     <div class="control-group" style="display:flex; align-items:flex-end;">
                         <button id="clearFilters" class="btn btn-clear">
-                            <i class="fa-solid fa-eraser"></i> Clear Filters
+                            <i class="fa-solid fa-eraser"></i> Clear
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Table -->
-            <div class="table-container">
+            <!-- Attendance Table -->
+            <div class="table-container" id="tableContainer" style="display:none;">
+                <div class="table-header">
+                    <h3><i class="fa-solid fa-users"></i> Attendance Records</h3>
+                    <span class="record-count" id="recordCount">0 records</span>
+                </div>
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Role</th>
-                            <th>ID</th>
+                            <th>Student</th>
+                            <th>Student ID</th>
+                            <th>Grade & Section</th>
                             <th>Status</th>
                             <th>Time In</th>
                             <th>Time Out</th>
                             <th>Remarks</th>
-                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="attendanceTableBody">
                         <tr id="loadingRow">
-                            <td colspan="8" class="loading-cell">
-                                <i class="fa-solid fa-calendar-day" style="font-size:20px;"></i>
-                                Select an event above to view its attendance.
+                            <td colspan="7" class="loading-cell">
+                                <i class="fa-solid fa-calendar-day" style="font-size:28px; color: var(--blue-light); margin-bottom:12px; display:block;"></i>
+                                Select an event above to view attendance records.
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
 
+            <!-- Empty State -->
+            <div class="empty-state" id="emptyState" style="display:none;">
+                <i class="fa-solid fa-clipboard-list"></i>
+                <h3>No Attendance Records</h3>
+                <p>No students have checked in for this event yet.</p>
+            </div>
+
         </div>
     </main>
-
-    <!-- ══ ADD / EDIT MODAL ══ -->
-    <div id="attendanceModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle"><i class="fa-solid fa-plus"></i> Record Attendance</h2>
-                <button class="close-modal" onclick="closeModal()">&times;</button>
-            </div>
-            <form id="attendanceForm">
-                <input type="hidden" id="attendanceId">
-                <div class="form-group">
-                    <label>Role <span class="required">*</span></label>
-                    <select id="personRole" required>
-                        <option value="student">Student</option>
-                        <option value="teacher">Teacher</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Person <span class="required">*</span></label>
-                    <select id="personId" required>
-                        <option value="" disabled selected>-- Select --</option>
-                    </select>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Status <span class="required">*</span></label>
-                        <select id="status" required>
-                            <option value="present">Present</option>
-                            <option value="late">Late</option>
-                            <option value="absent">Absent</option>
-                            <option value="excused">Excused</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Time In</label>
-                        <input type="time" id="timeIn">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Time Out</label>
-                    <input type="time" id="timeOut">
-                </div>
-                <div class="form-group">
-                    <label>Remarks</label>
-                    <textarea id="remarks" placeholder="Optional"></textarea>
-                </div>
-                <button type="submit" class="btn-submit" style="width:100%">
-                    <i class="fa-solid fa-save"></i> <span id="submitBtnText">Save Record</span>
-                </button>
-            </form>
-        </div>
-    </div>
 
     <!-- Toast -->
     <div class="toast" id="toast">

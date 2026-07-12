@@ -75,6 +75,36 @@
                 </div>
             </div>
 
+           <!-- ═══ ONGOING EVENTS ═══ -->
+<div id="ongoingEventsSection" style="display:none; margin-top:32px;">
+    <div class="section" style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+        <i class="fa-solid fa-circle-play" style="color:#22c55e; font-size:22px;"></i>
+        <h2 style="margin:0; font-size:20px; color:#111827;">Ongoing Events</h2>
+        <span class="cnt" id="ongoingBadge" style="background:#dcfce7; color:#166534; padding:2px 10px; border-radius:12px; font-size:13px; font-weight:700;">0</span>
+    </div>
+    <div class="grid" id="ongoingEventsGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:16px;"></div>
+</div>
+
+<!-- ═══ UPCOMING EVENTS ═══ -->
+<div id="upcomingEventsSection" style="display:none; margin-top:32px;">
+    <div class="section" style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+        <i class="fa-solid fa-calendar-day" style="color:#0369a1; font-size:22px;"></i>
+        <h2 style="margin:0; font-size:20px; color:#111827;">Upcoming Events</h2>
+        <span class="cnt" id="upcomingBadge" style="background:#e0f2fe; color:#0369a1; padding:2px 10px; border-radius:12px; font-size:13px; font-weight:700;">0</span>
+    </div>
+    <div class="grid" id="upcomingEventsGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px;"></div>
+</div>
+
+<!-- ═══ COMPLETED EVENTS ═══ -->
+<div id="completedEventsSection" style="display:none; margin-top:32px;">
+    <div class="section" style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+        <i class="fa-solid fa-check-circle" style="color:#6b7280; font-size:22px;"></i>
+        <h2 style="margin:0; font-size:20px; color:#111827;">Completed Events</h2>
+        <span class="cnt" id="completedEventsBadge" style="background:#f1f5f9; color:#475569; padding:2px 10px; border-radius:12px; font-size:13px; font-weight:700;">0</span>
+    </div>
+    <div class="grid" id="completedEventsGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px;"></div>
+</div>
+
             <!-- MY SESSIONS (enrolled & active today) -->
             <div id="mySessionsSection" style="display:none">
                 <div class="section">
@@ -130,7 +160,7 @@
     <script src="../../config/.env.js"></script>
     <script src="../../config/config.js"></script>
     <script src="../includes/sidebar.js"></script>
-    <script src="../resc/js/studentHome.js"></script>
+   <script src="../resc/js/homepage.js"></script>
 
     <script>
         loadHeader();
