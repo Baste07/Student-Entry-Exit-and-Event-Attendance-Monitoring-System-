@@ -114,85 +114,246 @@
         </div>
     </main>
 
-    <!-- ══ ADD / EDIT MODAL ══ -->
-    <div id="eventModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle"><i class="fa-solid fa-plus"></i> Add Event</h2>
-                <button class="close-modal" onclick="closeModal()">&times;</button>
+   <!-- ══ ADD / EDIT EVENT MODAL ══ -->
+<div id="eventModal" class="modal">
+    <div class="modal-content modal-xl">
+        <div class="modal-header">
+            <h2 id="modalTitle"><i class="fa-solid fa-plus"></i> Add Event</h2>
+            <button class="close-modal" onclick="closeModal()">&times;</button>
+        </div>
+        <form id="eventForm">
+            <input type="hidden" id="eventId">
+
+            <!-- Live Validation Summary -->
+            <div id="liveValidationBox" class="live-validation-box" style="display:none;">
+                <div class="live-validation-header">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span>Heads up:</span>
+                </div>
+                <ul id="liveValidationList"></ul>
             </div>
-            <form id="eventForm">
-                <input type="hidden" id="eventId">
+
+            <div class="form-group">
+                <label>Event Name <span class="required">*</span></label>
+                <input type="text" id="eventName" required placeholder="e.g., Foundation Day" onblur="validateLive()">
+                <span class="field-error" id="error-eventName"></span>
+            </div>
+
+            <div class="form-row">
                 <div class="form-group">
-                    <label>Event Name <span class="required">*</span></label>
-                    <input type="text" id="eventName" required placeholder="e.g., Foundation Day">
+                    <label>Event Date <span class="required">*</span></label>
+                    <input type="date" id="eventDate" required onchange="validateLive()">
+                    <span class="field-error" id="error-eventDate"></span>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Event Date <span class="required">*</span></label>
-                        <input type="date" id="eventDate" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Event Type <span class="required">*</span></label>
-                        <select id="eventType" required>
-                            <option value="" disabled selected>-- Select --</option>
-                            <option value="assembly">Assembly</option>
-                            <option value="meeting">Meeting</option>
-                            <option value="sports">Sports</option>
-                            <option value="ceremony">Ceremony</option>
-                            <option value="exam">Exam</option>
-                            <option value="holiday">Holiday</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
+                <div class="form-group" style="display:flex;align-items:flex-end;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="isMultiDay" onchange="toggleEndDate(); validateLive();">
+                        <span class="checkbox-text">Not a 1 day event?</span>
+                    </label>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Start Time</label>
-                        <input type="time" id="timeStart">
-                    </div>
-                    <div class="form-group">
-                        <label>End Time</label>
-                        <input type="time" id="timeEnd">
-                    </div>
+            </div>
+
+            <div class="form-row" id="endDateRow" style="display:none;">
+                <div class="form-group">
+                    <label>End Date <span class="required">*</span></label>
+                    <input type="date" id="eventEndDate" onchange="validateLive()">
+                    <span class="field-error" id="error-eventEndDate"></span>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Location</label>
-                        <input type="text" id="location" placeholder="e.g., Covered Court">
-                    </div>
-                    <div class="form-group">
-                        <label>Status <span class="required">*</span></label>
-                        <select id="status" required>
-                            <option value="upcoming">Upcoming</option>
-                            <option value="ongoing">Ongoing</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
-                        </select>
-                    </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Event Type <span class="required">*</span></label>
+                    <select id="eventType" required>
+                        <option value="" disabled selected>-- Select --</option>
+                        <option value="assembly">Assembly</option>
+                        <option value="meeting">Meeting</option>
+                        <option value="sports">Sports</option>
+                        <option value="ceremony">Ceremony</option>
+                        <option value="exam">Exam</option>
+                        <option value="holiday">Holiday</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <span class="field-error" id="error-eventType"></span>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Target Grade Level <span class="required">*</span></label>
-                        <select id="targetGradeLevel" required>
-                            <option value="" disabled selected>-- Select --</option>
-                            <option value="Grade 11">Grade 11</option>
-                            <option value="Grade 12">Grade 12</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Target Section <span style="font-weight:400;color:#888">(optional)</span></label>
-                        <input type="text" id="targetSection" placeholder="e.g., ASSH — leave blank for whole grade level">
-                    </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Start Time</label>
+                    <input type="time" id="timeStart" onchange="validateLive()">
+                    <span class="field-error" id="error-timeStart"></span>
                 </div>
                 <div class="form-group">
-                    <label>Description</label>
-                    <textarea id="description" placeholder="Optional: Enter event details"></textarea>
+                    <label>End Time</label>
+                    <input type="time" id="timeEnd" onchange="validateLive()">
+                    <span class="field-error" id="error-timeEnd"></span>
                 </div>
-                <button type="submit" class="btn-submit" style="width:100%">
-                    <i class="fa-solid fa-save"></i> <span id="submitBtnText">Add Event</span>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" id="location" placeholder="e.g., Covered Court">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <div class="status-badge-static">
+                        <i class="fa-solid fa-clock"></i> Upcoming
+                    </div>
+                    <small class="status-hint">
+                        <i class="fa-solid fa-circle-info"></i> Auto-updates to Ongoing → Completed
+                    </small>
+                </div>
+            </div>
+
+            <!-- Participant Selection Mode -->
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label>Participant Selection Mode</label>
+                    <select id="participantMode" onchange="toggleParticipantMode();">
+                        <option value="grade">Target by Grade/Section</option>
+                        <option value="individual">Select Individual Students</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Grade/Section Targeting -->
+            <div id="gradeSectionTarget">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Target Grade Levels <span class="required">*</span></label>
+                        <div class="multi-select" id="gradeMultiSelect">
+                            <div class="multi-select-trigger" onclick="toggleDropdown('gradeDropdown')">
+                                <span id="gradeTriggerText">-- Select Grades --</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="multi-select-dropdown" id="gradeDropdown">
+                                <div class="multi-select-option" onclick="toggleAllGrades()">
+                                    <i class="fa-solid fa-square" id="gradeAllIcon"></i>
+                                    <span><strong>Select All Grades</strong></span>
+                                </div>
+                                <div class="multi-select-divider"></div>
+                                <div id="gradeOptionsList"></div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="targetGradeLevel" required>
+                        <span class="field-error" id="error-targetGradeLevel"></span>
+                    </div>
+                    <div class="form-group">
+                        <label>Target Sections <span style="font-weight:400;color:#888">(optional)</span></label>
+                        <div class="multi-select" id="sectionMultiSelect">
+                            <div class="multi-select-trigger" onclick="toggleDropdown('sectionDropdown')">
+                                <span id="sectionTriggerText">-- All Sections --</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="multi-select-dropdown" id="sectionDropdown">
+                                <div class="multi-select-option" onclick="toggleAllSections()">
+                                    <i class="fa-solid fa-square" id="sectionAllIcon"></i>
+                                    <span><strong>Select All Sections</strong></span>
+                                </div>
+                                <div class="multi-select-divider"></div>
+                                <div id="sectionOptionsList">
+                                    <div class="multi-select-hint">Select grade(s) first</div>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="targetSection">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Individual Student Selection -->
+            <div id="individualParticipantsSummary" style="display:none;">
+                <div class="form-group">
+                    <label>Selected Students <span class="required">*</span></label>
+                    <div class="selected-students-summary" id="mainSelectedSummary">
+                        <span class="no-selection">No students selected. Click "Choose Students" to select.</span>
+                    </div>
+                    <span class="field-error" id="error-selectedStudents"></span>
+                    <div class="student-actions-row">
+                        <button type="button" class="btn btn-outline-primary" onclick="openStudentModal()">
+                            <i class="fa-solid fa-users"></i> Choose Students
+                        </button>
+                        <button type="button" class="btn btn-outline-success" onclick="addAllStudents()">
+                            <i class="fa-solid fa-user-plus"></i> Add All Students
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="description" placeholder="Optional: Enter event details"></textarea>
+            </div>
+
+            <!-- Overlap Warning -->
+            <div id="overlapWarning" class="overlap-warning">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <div>
+                    <strong>Schedule Conflict Detected!</strong>
+                    <p id="overlapDetails"></p>
+                </div>
+                <label>
+                    <input type="checkbox" id="confirmOverlap" onchange="validateLive()"> Proceed anyway
+                </label>
+                <span class="field-error" id="error-overlap"></span>
+            </div>
+
+            <button type="submit" class="btn-submit" style="width:100%">
+                <i class="fa-solid fa-save"></i> <span id="submitBtnText">Add Event</span>
+            </button>
+        </form>
+    </div>
+</div>
+
+    <!-- ══ STUDENT SELECTION MODAL (outside the form) ══ -->
+    <div id="studentModal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-users"></i> Select Students</h2>
+                <button class="close-modal" onclick="closeStudentModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label>Filter by Grade</label>
+                        <select id="modalFilterGrade" onchange="onModalGradeChange()">
+                            <option value="">All Grades</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Filter by Section</label>
+                        <select id="modalFilterSection" onchange="loadStudentsForModal()" disabled>
+                            <option value="">All Sections</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label>Search</label>
+                        <input type="text" id="modalStudentSearch" placeholder="Search by name or ID..." oninput="loadStudentsForModal()">
+                    </div>
+                </div>
+
+                <div class="selection-toolbar">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="selectAllVisibleStudents()">
+                        <i class="fa-solid fa-check-double"></i> Select All Visible
+                    </button>
+                    <button type="button" class="btn btn-sm btn-clear" onclick="clearAllVisibleSelections()">
+                        <i class="fa-solid fa-eraser"></i> Clear All Visible
+                    </button>
+                    <span class="selection-count" id="modalSelectionCount">0 students selected</span>
+                </div>
+
+                <div class="student-list-container" id="modalStudentList">
+                    <div class="loading-students"><i class="fa-solid fa-spinner fa-spin"></i> Loading students...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeStudentModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="confirmStudentSelection()">
+                    <i class="fa-solid fa-check"></i> Confirm Selection
                 </button>
-            </form>
+            </div>
         </div>
     </div>
 
