@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | Laboratory Attendance System</title>
+    <title>Dashboard | School Attendance System</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
@@ -26,7 +26,7 @@
             <div class="page-header">
                 <div class="header-titles">
                     <h1><i class="fa-solid fa-chart-pie"></i> Dashboard</h1>
-                    <p>Real-time overview of laboratory usage, attendance, and system metrics</p>
+                    <p>Real-time overview of school attendance, events, and system metrics</p>
                 </div>
             </div>
             
@@ -96,12 +96,12 @@
                     <div class="card event-card">
                         <div class="card-subheader">
                             <i class="fa-solid fa-calendar-check card-icon"></i>
-                            <h3>Active Schedules</h3>
+                            <h3>Active Events</h3>
                         </div>
-                        <p><strong id="totalSchedules">0</strong> Active Class/es</p>
+                        <p><strong id="totalEvents">0</strong> Upcoming / Ongoing</p>
                         <div class="view">
-                            <a href="schedules.html">
-                                Click to view Schedules <i class="fa-solid fa-chevron-right"></i>
+                            <a href="events.html">
+                                Click to view Events <i class="fa-solid fa-chevron-right"></i>
                             </a>
                         </div>
                     </div>
@@ -121,13 +121,13 @@
 
                     <div class="card admin-card">
                         <div class="card-subheader">
-                            <i class="fa-solid fa-user-tie card-icon"></i>
-                            <h3>Professors</h3>
+                            <i class="fa-solid fa-chalkboard-user card-icon"></i>
+                            <h3>Teachers</h3>
                         </div>
-                        <p><strong id="totalProfessors">0</strong> Active Prof/s</p>
+                        <p><strong id="totalTeachers">0</strong> Active Teacher/s</p>
                         <div class="view">
                             <a href="teachers.html">
-                                Click to view Professors <i class="fa-solid fa-chevron-right"></i>
+                                Click to view Teachers <i class="fa-solid fa-chevron-right"></i>
                             </a>
                         </div>
                     </div>
@@ -149,12 +149,12 @@
 
             <section class="lab-section">
                 <div class="lab-header-title">
-                    <i class="fa-solid fa-building"></i>
-                    Laboratory Status &amp; Schedules
+                    <i class="fa-solid fa-calendar-days"></i>
+                    Recent Events & Attendance
                 </div>
-                <div class="lab-grid" id="labGrid">
+                <div class="lab-grid" id="eventsGrid">
                     <p class="no-schedules">
-                        <i class="fa-solid fa-spinner fa-spin"></i> Loading laboratories...
+                        <i class="fa-solid fa-spinner fa-spin"></i> Loading events...
                     </p>
                 </div>
             </section>
