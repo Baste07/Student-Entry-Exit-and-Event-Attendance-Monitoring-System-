@@ -29,11 +29,15 @@ async function loadHeader() {
 
         // Start the Manila clock once the header DOM exists
         _startClock();
+
+        // Apply department logo and panel label
+        applyDepartmentLogoToHeader();
+
+        // Force all header links to stay in the same tab
+        _forceSameTabNavigation(container);
     } catch (err) {
         console.error('[sidebar.js] Could not load header.html:', err);
     }
-      // Add this at the end, after the HTML is injected into the DOM:
-    applyDepartmentLogoToHeader();
 }
 
 function applyDepartmentLogoToHeader() {
@@ -88,6 +92,9 @@ async function loadSidebar(activePage = '') {
 
         // Sidebar expand ↔ main-content push
         _initSidebarPush();
+
+        // Force all sidebar links to stay in the same tab
+        _forceSameTabNavigation(container);
     } catch (err) {
         console.error('[sidebar.js] Could not load sidebar.html:', err);
     }
@@ -133,4 +140,22 @@ function _initSidebarPush() {
 
     sidebar.addEventListener('mouseenter', () => mainContent.classList.add('sidebar-open'));
     sidebar.addEventListener('mouseleave', () => mainContent.classList.remove('sidebar-open'));
+}
+
+/* ── Internal: force navigation to stay in one tab ───────────── */
+function _forceSameTabNavigation(scope = document) {
+    scope.querySelectorAll('header a, .header-right a, .top-left a, .sidebar-nav a, .sidebar a').forEach(link => {
+        // Remove any accidental target="_blank"
+        if (link.getAttribute('target') === '_blank') {
+            link.setAttribute('target', '_self');
+        }
+
+        // Intercept Ctrl/Cmd+click and middle-click (mouse wheel)
+        link.addEventListener('click', function (e) {
+            if (e.ctrlKey || e.metaKey || e.button === 1) {
+                e.preventDefault();
+                window.location.href = this.href;
+            }
+        });
+    });
 }
