@@ -158,6 +158,8 @@ anti_spoof_state = {
 }
 anti_spoof_cache = {}
 
+EVENT_LATE_GRACE_MINUTES = 15
+
 # Module-level face DB globals (must exist before any function uses them)
 known_encodings    = []
 known_meta         = []
@@ -337,6 +339,35 @@ def _to_json_safe(value):
     if isinstance(value, (str, int, float, bool)):
         return value
     return str(value)
+
+def _parse_event_start_datetime(event_row):
+    event_date = event_row.get("event_date")
+    time_start = event_row.get("time_start")
+    if not event_date or not time_start:
+        return None
+
+    if isinstance(event_date, datetime.date):
+        event_date_value = event_date
+    else:
+        event_date_value = datetime.date.fromisoformat(str(event_date))
+
+    if isinstance(time_start, datetime.time):
+        event_time_value = time_start
+    else:
+        event_time_value = datetime.time.fromisoformat(str(time_start))
+
+    return datetime.datetime.combine(event_date_value, event_time_value)
+
+def _event_late_minutes(event_row, scan_time):
+    event_start = _parse_event_start_datetime(event_row)
+    if not event_start or not scan_time:
+        return 0
+
+    grace_cutoff = event_start + datetime.timedelta(minutes=EVENT_LATE_GRACE_MINUTES)
+    if scan_time <= grace_cutoff:
+        return 0
+
+    return int((scan_time - event_start).total_seconds() // 60)
 
 def _list_face_images_for_folder(cloud_folder):
     last_error = None
@@ -1014,6 +1045,7 @@ def _record_event_attendance(student_id, meta):
             return
 
         now = datetime.datetime.now(datetime.timezone.utc)
+        now_local = datetime.datetime.now()
         ongoing   = [e for e in events if e.get("status") == "ongoing"]
         completed = [e for e in events if e.get("status") == "completed"]
         upcoming  = [e for e in events if e.get("status") == "upcoming"]
@@ -1024,6 +1056,8 @@ def _record_event_attendance(student_id, meta):
         if ongoing:
             ev    = ongoing[0]
             ev_id = ev["event_id"]
+            late_minutes = _event_late_minutes(ev, now_local)
+            attendance_remarks = f"Late by {late_minutes} min" if late_minutes > 0 else "On time"
 
             att_res = supabase.table("event_attendance")\
                 .select("*")\
@@ -1037,6 +1071,7 @@ def _record_event_attendance(student_id, meta):
                     "event_id": ev_id,
                     "student_id": student_id,
                     "time_in": now.isoformat(),
+                    "remarks": attendance_remarks,
                     "verified_by_facial_recognition": True,
                 }).execute()
                 _push({
@@ -1047,7 +1082,9 @@ def _record_event_attendance(student_id, meta):
                     "grade": meta.get("grade_level", ""),
                     "section": meta.get("section_name", ""),
                     "stud_id": meta.get("stud_id", ""),
-                    "event_name": ev.get("event_name", "")
+                    "event_name": ev.get("event_name", ""),
+                    "late_minutes": late_minutes,
+                    "attendance_status": "late" if late_minutes > 0 else "on-time",
                 })
                 return
 
@@ -1111,7 +1148,7 @@ def _record_event_attendance(student_id, meta):
                 "message": "NO TIME IN FOUND",
                 "name": meta["name"],
                 "type": "error",
-                "reason": "You did not time in for any completed event."
+                "reason": "You cannot time out because no valid time-in exists for any completed event."
             })
             return
 

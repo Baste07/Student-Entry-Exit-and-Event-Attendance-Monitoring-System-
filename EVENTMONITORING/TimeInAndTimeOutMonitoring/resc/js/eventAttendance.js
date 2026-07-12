@@ -52,6 +52,36 @@ function formatDate(d) {
     return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function parseEventStartDateTime(eventRow) {
+    if (!eventRow || !eventRow.event_date || !eventRow.time_start) return null;
+
+    const eventStart = new Date(`${eventRow.event_date}T${eventRow.time_start}`);
+    return Number.isNaN(eventStart.getTime()) ? null : eventStart;
+}
+
+function getLateMinutes(record) {
+    if (!record || !record.time_in) return 0;
+
+    const eventStart = parseEventStartDateTime(currentEvent);
+    const timeIn = new Date(record.time_in);
+    if (eventStart && !Number.isNaN(timeIn.getTime())) {
+        const graceCutoff = eventStart.getTime() + (15 * 60 * 1000);
+        if (timeIn.getTime() > graceCutoff) {
+            return Math.floor((timeIn.getTime() - eventStart.getTime()) / 60000);
+        }
+        return 0;
+    }
+
+    const remarks = String(record.remarks || '').toLowerCase();
+    const match = remarks.match(/late by\s+(\d+)\s+min/);
+    return match ? Number(match[1]) || 1 : (remarks.includes('late') ? 1 : 0);
+}
+
+function getAttendanceStatus(record) {
+    if (!record || !record.time_in) return 'absent';
+    return getLateMinutes(record) > 0 ? 'late' : 'present';
+}
+
 // ══════════════════════════════════════════════════════════
 // DATA LOADING (per selected event)
 // ══════════════════════════════════════════════════════════
@@ -144,12 +174,10 @@ async function loadAttendanceForEvent(eventId) {
 
 function updateBadges() {
     // Count based on time_in presence (since event_attendance doesn't have a status column)
-    const present = currentRecords.filter(r => r.time_in !== null).length;
-    const absent = currentRecords.filter(r => r.time_in === null).length;
+    const present = currentRecords.filter(r => getAttendanceStatus(r) === 'present').length;
+    const late = currentRecords.filter(r => getAttendanceStatus(r) === 'late').length;
+    const absent = currentRecords.filter(r => getAttendanceStatus(r) === 'absent').length;
     const total = currentRecords.length;
-
-    // For late, we'd need time comparison - simplified here
-    const late = 0;
 
     setText('badgePresent', present);
     setText('badgeLate', late);
@@ -179,14 +207,16 @@ function renderTable(rows) {
         const sectionInfo = student?.sections 
             ? `${student.sections.grade_level || ''} - ${student.sections.section_name || ''}` 
             : '—';
+        const lateMinutes = getLateMinutes(r);
 
         // Determine status based on time_in
         let status = 'absent';
         let statusClass = 'absent';
+        let statusIcon = 'xmark';
         if (r.time_in) {
-            status = 'present';
-            statusClass = 'present';
-            // Could add late logic here by comparing time_in with event start time
+            status = lateMinutes > 0 ? `late${lateMinutes ? ` (${lateMinutes} min)` : ''}` : 'present';
+            statusClass = lateMinutes > 0 ? 'late' : 'present';
+            statusIcon = lateMinutes > 0 ? 'clock' : 'check';
         }
 
         return `
@@ -194,7 +224,7 @@ function renderTable(rows) {
             <td><span class="primary-cell">${escHtml(name)}</span></td>
             <td>${escHtml(studId)}</td>
             <td><span class="secondary-cell">${escHtml(sectionInfo)}</span></td>
-            <td><span class="badge ${statusClass}"><i class="fa-solid fa-${status === 'present' ? 'check' : 'xmark'}"></i> ${status}</span></td>
+            <td><span class="badge ${statusClass}"><i class="fa-solid fa-${statusIcon}"></i> ${status}</span></td>
             <td>${r.time_in ? formatTime(r.time_in) : '—'}</td>
             <td>${r.time_out ? formatTime(r.time_out) : '—'}</td>
             <td><span class="secondary-cell">${escHtml(truncate(r.remarks, 40))}</span></td>
