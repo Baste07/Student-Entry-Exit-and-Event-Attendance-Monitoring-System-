@@ -45,62 +45,93 @@ function getManilaNow() {
     const now = new Date();
     return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
 }
-
 function computeEventStatus(event) {
     if (event.status === 'cancelled') return 'cancelled';
 
     const now = getManilaNow();
     const todayStr = now.toLocaleDateString('en-CA');
-    const currentTime = now.toTimeString().slice(0, 5);
+    const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
 
     const startDate = event.event_date;
-    const endDate = event.end_date || event.event_date;
+    const endDate = event.end_date || event.event_date; // <-- FIX: fallback to event_date if no end_date
     const startTime = event.time_start;
     const endTime = event.time_end;
 
-    if (endDate < todayStr) return 'completed';
-    if (endDate === todayStr && endTime && currentTime >= endTime) return 'completed';
-
-    if (startDate < todayStr) {
-        if (endDate >= todayStr) return 'ongoing';
+    // ── Already past the end date ──
+    if (endDate < todayStr) {
+        return 'completed';
     }
-    if (startDate === todayStr) {
-        if (!startTime || currentTime >= startTime) {
-            if (!endTime || currentTime < endTime) {
-                return 'ongoing';
-            } else {
-                return 'completed';
-            }
+
+    // ── Same day as end date ──
+    if (endDate === todayStr) {
+        // If we have an end time and current time is past it → completed
+        if (endTime && currentTime >= endTime) {
+            return 'completed';
         }
+        // If we have a start time and current time is before it → upcoming
+        if (startTime && currentTime < startTime) {
+            return 'upcoming';
+        }
+        // Otherwise we're between start and end (or no times set) → ongoing
+        return 'ongoing';
+    }
+
+    // ── Before the start date ──
+    if (startDate > todayStr) {
+        return 'upcoming';
+    }
+
+    // ── Start date is today, but end date is later (multi-day) ──
+    if (startDate === todayStr) {
+        if (startTime && currentTime < startTime) {
+            return 'upcoming';
+        }
+        return 'ongoing';
+    }
+
+    // ── Start date passed, end date hasn't arrived yet (multi-day spanning) ──
+    if (startDate < todayStr && endDate > todayStr) {
+        return 'ongoing';
     }
 
     return 'upcoming';
 }
-
 async function updateEventStatusesLocal() {
     const updates = [];
 
     allEvents.forEach(ev => {
+        if (ev.status === 'cancelled') return;
+
         const computed = computeEventStatus(ev);
-        if (computed !== ev.status && ev.status !== 'cancelled') {
-            ev.status = computed;
+        // Compare against the REAL DB status (ev.status), not a locally mutated one
+        if (computed !== ev.status) {
             updates.push({ event_id: ev.event_id, status: computed });
         }
     });
 
-    if (updates.length > 0) {
-        updateBadges();
-        renderTable(allEvents);
+    if (updates.length === 0) return;
 
-        for (const upd of updates) {
-            try {
-                await supabaseClient
-                    .from('events')
-                    .update({ status: upd.status, updated_at: new Date().toISOString() })
-                    .eq('event_id', upd.event_id);
-            } catch (err) {
-                console.error('Status sync failed for', upd.event_id, err);
-            }
+    // Update UI immediately so it feels responsive
+    updateBadges();
+    renderTable(allEvents);
+
+    for (const upd of updates) {
+        try {
+            const { error } = await supabaseClient
+                .from('events')
+                .update({ status: upd.status, updated_at: new Date().toISOString() })
+                .eq('event_id', upd.event_id);
+
+            if (error) throw error;
+
+            // Only adopt the new status locally once the DB confirms it
+            const ev = allEvents.find(e => e.event_id === upd.event_id);
+            if (ev) ev.status = upd.status;
+
+        } catch (err) {
+            console.error('Status sync failed for', upd.event_id, err);
+            // If it fails, ev.status stays as the DB value, so the next
+            // 30-second interval will retry automatically.
         }
     }
 }
@@ -111,10 +142,10 @@ async function updateEventStatusesLocal() {
 
 async function loadGradeLevels() {
     try {
-        const { data, error } = await supabaseClient
-            .from('sections')
-            .select('grade_level, section_name')
-            .order('grade_level');
+   const { data, error } = await supabaseClient
+    .from('sections')
+    .select('section_id, grade_level, section_name')
+    .order('grade_level');
 
         if (error) throw error;
 
@@ -138,7 +169,6 @@ async function loadGradeLevels() {
         renderSectionOptions([]);
     }
 }
-
 async function loadEvents() {
     setTableLoading(true);
     try {
@@ -151,9 +181,10 @@ async function loadEvents() {
 
         allEvents = data || [];
 
-        allEvents.forEach(ev => {
-            ev.status = computeEventStatus(ev);
-        });
+        // REMOVE this block — don't overwrite the DB status locally
+        // allEvents.forEach(ev => {
+        //     ev.status = computeEventStatus(ev);
+        // });
 
         updateBadges();
         renderTable(allEvents);
@@ -341,22 +372,58 @@ document.getElementById('eventForm').addEventListener('submit', async function (
 
         if (saveErr) throw saveErr;
 
-        if (savedEventId) {
-            if (participantMode === 'individual') {
-                if (isEdit) {
-                    await supabaseClient.from('event_participants').delete().eq('event_id', savedEventId);
-                }
-                const participants = Array.from(selectedStudentIds).map(studentId => ({
-                    event_id: savedEventId,
-                    student_id: studentId,
-                    added_by: null
-                }));
-                const { error: pError } = await supabaseClient.from('event_participants').insert(participants);
-                if (pError) throw pError;
-            } else if (isEdit) {
-                await supabaseClient.from('event_participants').delete().eq('event_id', savedEventId);
-            }
+       if (savedEventId) {
+    // ── 1. Always wipe old links on edit so we can re-sync cleanly ──
+    if (isEdit) {
+        await supabaseClient.from('event_participants').delete().eq('event_id', savedEventId);
+    }
+
+    let studentIdsToInsert = new Set();
+
+    // ── 2. Individual mode: use the hand-picked set ──
+    if (participantMode === 'individual') {
+        studentIdsToInsert = new Set(selectedStudentIds);
+    }
+    // ── 3. Grade/Section mode: query all matching active students ──
+    else if (participantMode === 'grade') {
+        // Build the list of section_ids that match the selected grades + sections
+   const matchingSectionIds = allSectionsData
+    .filter(s => {
+        const gradeMatch  = selectedGrades.size === 0  || selectedGrades.has(s.grade_level);
+        const sectionMatch = selectedSections.size === 0 || selectedSections.has(s.section_name);
+        return gradeMatch && sectionMatch;
+    })
+    .map(s => s.section_id)
+    .filter(id => id);   // <-- strips any undefined / null
+
+
+        if (matchingSectionIds.length > 0) {
+            const { data: matchedStudents, error: studentErr } = await supabaseClient
+                .from('students')
+                .select('student_id')
+                .in('section_id', matchingSectionIds)
+                .eq('status', 'active');
+
+            if (studentErr) throw studentErr;
+            matchedStudents?.forEach(s => studentIdsToInsert.add(s.student_id));
         }
+    }
+
+    // ── 4. Bulk insert the participants ──
+    if (studentIdsToInsert.size > 0) {
+        const participants = Array.from(studentIdsToInsert).map(studentId => ({
+            event_id: savedEventId,
+            student_id: studentId,
+            added_by: null   // ← swap to currentUserId if you track the creator
+        }));
+
+        const { error: pError } = await supabaseClient
+            .from('event_participants')
+            .insert(participants);
+
+        if (pError) throw pError;
+    }
+}
 
         showToast(isEdit ? 'Event updated successfully!' : 'Event added successfully!');
         btn.disabled = false;
