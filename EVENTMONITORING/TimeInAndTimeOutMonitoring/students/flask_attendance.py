@@ -1160,7 +1160,7 @@ def _record_event_attendance(student_id, meta):
             _push({
                 "message": "EVENT NOT STARTED",
                 "name": meta["name"],
-                "type": "error",
+                "type": "errfaor",
                 "event_name": ev.get("event_name", ""),
                 "reason": f"Event '{ev.get('event_name')}' hasn't started yet."
             })
