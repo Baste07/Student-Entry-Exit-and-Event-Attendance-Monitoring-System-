@@ -41,7 +41,9 @@ let studentTimer = null;
 let isEngineOnline = false;
 let isBooting = false; 
 const REG_ENGINE_BASE = 'http://127.0.0.1:5001';
+const ATT_ENGINE_BASE = 'http://127.0.0.1:5000';
 const FACE_BUCKET = 'facial_data';
+let currentCameraOwner = 'unknown';
 
 const opencvFeed      = document.getElementById('opencvFeed');
 const cameraLoading   = document.getElementById('cameraLoading');
@@ -55,7 +57,85 @@ const studentScanBtn   = document.getElementById('studentScanBtn');
 const professorScanBtn = document.getElementById('professorScanBtn');
 const studentInfoCard  = document.getElementById('studentInfoCard');
 const professorInfoCard = document.getElementById('professorInfoCard');
+const switchCameraBtn = document.getElementById('switchCameraBtn');
 
+// ═══════════════════════════════════════════
+// CAMERA OWNERSHIP SWITCH
+// ═══════════════════════════════════════════
+// Calls BOTH engines' /camera_control so whichever one currently holds the
+// camera device gets an explicit release call, regardless of call order.
+// Success is judged by whether ANY response confirms owner === targetOwner —
+// never by a single response's self-relative "owns_camera" field, since that
+// field is only meaningful for the engine that answered it.
+async function switchCameraOwner(targetOwner) {
+    const endpoints = [REG_ENGINE_BASE, ATT_ENGINE_BASE].map(base => `${base}/camera_control`);
+    let sawConfirmedOwner = false;
+
+    for (const url of endpoints) {
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ owner: targetOwner, force: true })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.success && data.owner === targetOwner) {
+                    sawConfirmedOwner = true;
+                }
+            }
+        } catch (_) {}
+    }
+
+    return { success: sawConfirmedOwner, owner: sawConfirmedOwner ? targetOwner : null };
+}
+
+async function fetchCameraOwnerStatus() {
+    const endpoints = [`${REG_ENGINE_BASE}/camera_control`, `${ATT_ENGINE_BASE}/camera_control`];
+    for (const url of endpoints) {
+        try {
+            const res = await fetch(url, { method: 'GET' });
+            if (!res.ok) continue;
+            const data = await res.json();
+            return data.owner || 'none';
+        } catch (_) {}
+    }
+    return 'unknown';
+}
+
+function renderCameraSwitchButton(owner = currentCameraOwner) {
+    if (!switchCameraBtn) return;
+
+    if (owner === 'registration') {
+        switchCameraBtn.innerHTML = '<i class="fa-solid fa-camera"></i> Camera: Registration';
+        switchCameraBtn.style.background = '#14532d';
+    } else if (owner === 'attendance') {
+        switchCameraBtn.innerHTML = '<i class="fa-solid fa-repeat"></i> Switch Camera from Attendance';
+        switchCameraBtn.style.background = '#0b4e78';
+    } else {
+        switchCameraBtn.innerHTML = '<i class="fa-solid fa-repeat"></i> Use Camera for Registration';
+        switchCameraBtn.style.background = '#14532d';
+    }
+}
+
+if (switchCameraBtn) {
+    switchCameraBtn.addEventListener('click', async () => {
+        switchCameraBtn.disabled = true;
+        switchCameraBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Switching...';
+        try {
+            const result = await switchCameraOwner('registration');
+            if (result && result.success) {
+                currentCameraOwner = result.owner || 'registration';
+                captureStatus.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--green-bright)"></i> Camera switched to Registration engine.';
+            } else {
+                captureStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b"></i> Failed to switch camera owner.';
+            }
+        } finally {
+            switchCameraBtn.disabled = false;
+            renderCameraSwitchButton(currentCameraOwner);
+        }
+    });
+}
 
 // ═══════════════════════════════════════════
 // STUDENT ID AUTO-FORMATTER
@@ -337,13 +417,6 @@ async function waitForFlask(retries = 30, delayMs = 1500) {
     return false;
 }
 
-// ═══════════════════════════════════════════
-// STUDENT ID INPUT LOGIC
-// ═══════════════════════════════════════════
-
-// ═══════════════════════════════════════════
-// STUDENT ID INPUT LOGIC
-// ═══════════════════════════════════════════
 // ═══════════════════════════════════════════
 // STUDENT ID INPUT LOGIC
 // ═══════════════════════════════════════════

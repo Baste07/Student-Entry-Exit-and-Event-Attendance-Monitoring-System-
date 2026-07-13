@@ -23,6 +23,7 @@ import face_recognition
 import mediapipe as mp
 import requests
 import datetime
+import json
 
 mp_selfie_segmentation = mp.solutions.selfie_segmentation
 
@@ -47,6 +48,9 @@ ATTENDANCE_TRIGGER_TOKEN = (
     or os.getenv("REBUILD_SECRET")
     or ""
 ).strip()
+CAMERA_OWNER_FILE = os.path.join(script_dir, "camera_owner.json")
+CAMERA_OWNER_STALE_SECONDS = float(os.getenv("CAMERA_OWNER_STALE_SECONDS", "90"))
+ENGINE_CAMERA_OWNER = "registration"
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     print(f"CRITICAL ERROR: Could not load credentials from {env_path}")
@@ -107,6 +111,60 @@ _audit_event("startup", {"message": "Registration Supabase client ready"})
 
 app = Flask(__name__)
 CORS(app)
+
+camera_owner_lock = threading.Lock()
+
+
+def _read_camera_owner_state():
+    try:
+        if not os.path.exists(CAMERA_OWNER_FILE):
+            return {"owner": None, "updated_at": 0}
+        with open(CAMERA_OWNER_FILE, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        owner = str(data.get("owner") or "").strip().lower()
+        updated_at = float(data.get("updated_at") or 0)
+        if owner not in {"attendance", "registration"}:
+            owner = None
+        return {"owner": owner, "updated_at": updated_at}
+    except Exception:
+        return {"owner": None, "updated_at": 0}
+
+
+def _write_camera_owner_state(owner):
+    owner = str(owner or "").strip().lower()
+    payload = {"owner": owner if owner in {"attendance", "registration"} else None, "updated_at": time.time()}
+    tmp = CAMERA_OWNER_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh)
+    os.replace(tmp, CAMERA_OWNER_FILE)
+    return payload
+
+
+def _is_owner_stale(updated_at):
+    return (time.time() - float(updated_at or 0)) > CAMERA_OWNER_STALE_SECONDS
+
+
+def _set_camera_owner(owner):
+    with camera_owner_lock:
+        return _write_camera_owner_state(owner)
+
+
+def _claim_camera_owner(force=False):
+    with camera_owner_lock:
+        state = _read_camera_owner_state()
+        owner = state.get("owner")
+        if force or owner in (None, ENGINE_CAMERA_OWNER) or _is_owner_stale(state.get("updated_at")):
+            return _write_camera_owner_state(ENGINE_CAMERA_OWNER), True
+        return state, False
+
+
+def _camera_owner_now():
+    state = _read_camera_owner_state()
+    return state.get("owner")
+
+
+def _has_camera_owner():
+    return _camera_owner_now() == ENGINE_CAMERA_OWNER
 
 # Simple XML audit logger (writes to students/engine_log.xml)
 import xml.etree.ElementTree as ET
@@ -291,8 +349,23 @@ def _capture_worker():
         else:
             time.sleep(0.01)
 
+
+def _release_registration_camera():
+    global cap, capture_running, latest_frame
+    capture_running = False
+    with capture_lock:
+        latest_frame = None
+    try:
+        if cap is not None and cap.isOpened():
+            cap.release()
+    except Exception:
+        pass
+    cap = None
+
 def ensure_capture_ready():
     global cap, segmentor, capture_thread, capture_running, latest_frame
+    if not _has_camera_owner():
+        return False
     if cap is None:
         cap = _open_capture_device()
         try:
@@ -309,6 +382,7 @@ def ensure_capture_ready():
             capture_thread.start()
     if segmentor is None:
         segmentor = mp_selfie_segmentation.SelfieSegmentation(model_selection=0)
+    return cap is not None and cap.isOpened()
 
 # Added countdown variables to the session state
 session = {
@@ -426,6 +500,30 @@ def generate_frames():
     center_history = []    
 
     while True:
+        if not _has_camera_owner():
+            _release_registration_camera()
+            owner = _camera_owner_now() or "none"
+            wait_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            cv2.putText(wait_frame, "Camera is assigned to another engine", (38, 220),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.62, (220, 220, 220), 2)
+            cv2.putText(wait_frame, f"Current owner: {owner}", (38, 255),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (120, 190, 255), 2)
+            _, buffer = cv2.imencode('.jpg', wait_frame)
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+            time.sleep(0.08)
+            continue
+
+        if not ensure_capture_ready():
+            wait_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            cv2.putText(wait_frame, "Unable to open camera", (180, 220),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.62, (220, 220, 220), 2)
+            cv2.putText(wait_frame, "Check camera permissions/hardware", (145, 255),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (120, 190, 255), 2)
+            _, buffer = cv2.imencode('.jpg', wait_frame)
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+            time.sleep(0.12)
+            continue
+
         with capture_lock:
             frame = None if latest_frame is None else latest_frame.copy()
 
@@ -635,6 +733,7 @@ def generate_frames():
 @app.route('/start_registration', methods=['POST'])
 def start_reg():
     global session
+    _claim_camera_owner(force=True)
     session['active'] = False 
     session['completed'] = False 
     
@@ -666,7 +765,46 @@ def start_reg():
 
 @app.route('/status')
 def status(): 
-    return jsonify(session)
+    owner_state = _read_camera_owner_state()
+    payload = dict(session)
+    payload["camera_owner"] = owner_state.get("owner")
+    payload["camera_owned_by_this_engine"] = owner_state.get("owner") == ENGINE_CAMERA_OWNER
+    return jsonify(payload)
+
+
+@app.route('/camera_control', methods=['GET', 'POST'])
+def camera_control():
+    if request.method == 'GET':
+        state = _read_camera_owner_state()
+        return jsonify({
+            "success": True,
+            "owner": state.get("owner"),
+            "updated_at": state.get("updated_at"),
+            "engine": ENGINE_CAMERA_OWNER,
+            "owns_camera": state.get("owner") == ENGINE_CAMERA_OWNER,
+        })
+
+    data = request.get_json(silent=True) or {}
+    target_owner = str(data.get("owner") or "").strip().lower()
+    force = bool(data.get("force", True))
+    if target_owner not in {"attendance", "registration"}:
+        return jsonify({"success": False, "message": "owner must be attendance or registration"}), 400
+
+    if target_owner == ENGINE_CAMERA_OWNER:
+        state, changed = _claim_camera_owner(force=force)
+    else:
+        state = _set_camera_owner(target_owner)
+        changed = True
+        _release_registration_camera()
+
+    return jsonify({
+        "success": True,
+        "owner": state.get("owner"),
+        "updated_at": state.get("updated_at"),
+        "engine": ENGINE_CAMERA_OWNER,
+        "owns_camera": state.get("owner") == ENGINE_CAMERA_OWNER,
+        "changed": bool(changed),
+    })
 
 @app.route('/video_feed')
 def video_feed():
@@ -676,11 +814,7 @@ def video_feed():
 def shutdown():
     global cap, capture_running, latest_frame
     try:
-        capture_running = False
-        latest_frame = None
-        if cap is not None and cap.isOpened():
-            cap.release()
-            cap = None
+        _release_registration_camera()
     except Exception:
         pass
     os.kill(os.getpid(), signal.SIGTERM)

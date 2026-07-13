@@ -395,6 +395,71 @@ async function waitForFlask(retries = 60, delayMs = 1000) {
     throw new Error('Engine did not respond. Check Task Manager for pythonw.exe');
 }
 
+
+// ══════════════════════════════════════════════════
+// CAMERA OWNERSHIP SWITCH
+// ══════════════════════════════════════════════════
+const switchCameraBtn = document.getElementById('switchCameraBtn');
+const REG_ENGINE_BASE = 'http://127.0.0.1:5001';
+const ATT_ENGINE_BASE = 'http://127.0.0.1:5000';
+
+// Calls BOTH engines' /camera_control so whichever one currently holds the
+// camera device gets an explicit release call, regardless of call order.
+// Success is judged by whether ANY response confirms owner === targetOwner —
+// never by a single response's self-relative "owns_camera" field, since that
+// field is only meaningful for the engine that answered it.
+async function switchCameraOwner(targetOwner) {
+    const endpoints = [ATT_ENGINE_BASE, REG_ENGINE_BASE].map(base => `${base}/camera_control`);
+    let sawConfirmedOwner = false;
+
+    for (const url of endpoints) {
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ owner: targetOwner, force: true })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.success && data.owner === targetOwner) {
+                    sawConfirmedOwner = true;
+                }
+            }
+        } catch (_) {}
+    }
+
+    return { success: sawConfirmedOwner, owner: sawConfirmedOwner ? targetOwner : null };
+}
+
+if (switchCameraBtn) {
+    switchCameraBtn.addEventListener('click', async () => {
+        switchCameraBtn.disabled = true;
+        switchCameraBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Switching...';
+
+        try {
+            const result = await switchCameraOwner('attendance');
+            if (result && result.success) {
+                setOutput('success', 'fa-solid fa-camera', 'Camera switched to Attendance engine.');
+                showToast('Camera is now assigned to Attendance', 'green', 3000);
+
+                // If a session is already live, refresh the stream so it reconnects
+                // now that this engine actually owns the camera.
+                if (stopBtn.style.display !== 'none') {
+                    videoStream.src = `${ATT_ENGINE_BASE}/video_feed?t=${Date.now()}`;
+                }
+            } else {
+                setOutput('error', 'fa-solid fa-triangle-exclamation', 'Failed to switch camera owner.');
+                showToast('Camera switch failed', 'red', 3000);
+            }
+        } catch (err) {
+            setOutput('error', 'fa-solid fa-triangle-exclamation', 'Camera switch request failed.');
+        } finally {
+            switchCameraBtn.disabled = false;
+            switchCameraBtn.innerHTML = '<i class="fa-solid fa-repeat"></i> Use Camera for Attendance';
+        }
+    });
+}
+
 // ══════════════════════════════════════════════════
 // SESSION START / STOP
 // ══════════════════════════════════════════════════
