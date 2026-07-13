@@ -28,7 +28,25 @@ function initializeUserSession() {
 
 // ==================== LOAD & DISPLAY ====================
 
+function renderTeachersSkeleton() {
+    const tbody = document.getElementById('teachersTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = Array.from({ length: 5 }, () => `
+        <tr class="skeleton-row">
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+        </tr>
+    `).join('');
+}
+
 async function loadTeachers() {
+    renderTeachersSkeleton();
+
     try {
         if (!supabaseClient) {
             console.error('Supabase client not initialized');

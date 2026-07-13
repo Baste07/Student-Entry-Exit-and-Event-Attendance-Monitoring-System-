@@ -779,16 +779,31 @@ async function startImport() {
     document.getElementById('importFooter').style.display = 'flex';
 }
 
+function renderStudentsSkeleton() {
+    const tbody = document.getElementById('allStudentsTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = Array.from({ length: 5 }, () => `
+        <tr class="skeleton-row">
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+        </tr>
+    `).join('');
+}
+
 async function loadAllStudentsTable() {
+    renderStudentsSkeleton();
+
     const tbody = document.getElementById('allStudentsTableBody');
     const countEl = document.getElementById('allStudentsCount');
     if (!tbody || !countEl || !supabaseClient) return;
-
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="9" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
-        </tr>
-    `;
 
     try {
         const { data, error } = await supabaseClient
@@ -858,7 +873,10 @@ function renderAllStudentsTable() {
         const fullName = student.last_name ? (student.last_name + ', ' + nameParts.join(' ')) : nameParts.join(' ');
         const gradeLevel = student.sections?.grade_level || 'N/A';
         const sectionName = student.sections?.section_name || 'N/A';
-        const status = student.status || 'inactive';
+        const rawStatus = student.status || 'inactive';
+        const normalizedStatus = String(rawStatus).trim().toLowerCase();
+        const statusLabel = normalizedStatus === 'active' ? 'Active' : normalizedStatus === 'suspended' ? 'Suspended' : 'Inactive';
+        const statusClass = normalizedStatus === 'active' ? 'badge-active' : normalizedStatus === 'suspended' ? 'badge-suspended' : 'badge-inactive';
 
         const guardianLinks = student.student_guardians || [];
         let guardianCell = '';
@@ -892,7 +910,7 @@ function renderAllStudentsTable() {
                 <td>${escapeHtml(student.birth_date || '—')}</td>
                 <td>${escapeHtml(student.gender || '—')}</td>
                 <td>${guardianCell}</td>
-                <td>${escapeHtml(status)}</td>
+                <td><span class="badge ${statusClass}">${escapeHtml(statusLabel)}</span></td>
                 <td>
                     <div class="action-buttons">
                         <button class="btn-icon" title="Edit" data-action="edit" data-id="${escapeHtml(student.stud_id || '')}">
@@ -1024,7 +1042,7 @@ function openViewGuardiansModal(studentUuid, studentName, studentStudId) {
                     <div style="flex: 1;">
                         <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
                             <h6 style="margin: 0; color: var(--text-main); font-weight: 600;">Guardian ${index + 1}</h6>
-                            ${isPrimary ? '<span style="display: inline-block; background: #10b981; color: white; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 600;">Primary</span>' : ''}
+                            ${isPrimary ? '<span style="display: inline-block; background: #176aa4; color: white; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 600;">Primary</span>' : ''}
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 0.75rem;">
                             <div>

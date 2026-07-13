@@ -82,20 +82,66 @@ function getDepartmentLogo() {
 
 document.addEventListener('DOMContentLoaded', function () {
     checkSupabaseConnection();
+
+    const modalBackdrop = document.createElement('div');
+    modalBackdrop.className = 'logout-modal-backdrop';
+    modalBackdrop.innerHTML = `
+        <div class="logout-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="logoutModalTitle">
+            <div class="logout-modal-content">
+                <h3 id="logoutModalTitle">Log out?</h3>
+                <p>Are you sure you want to log out?</p>
+                <div class="logout-modal-actions">
+                    <button type="button" class="btn-logout-cancel">Cancel</button>
+                    <button type="button" class="btn-logout-confirm">Log Out</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modalBackdrop);
+
+    let pendingLogout = false;
+
+    const openLogoutModal = () => {
+        pendingLogout = true;
+        modalBackdrop.classList.add('active');
+    };
+
+    const closeLogoutModal = () => {
+        pendingLogout = false;
+        modalBackdrop.classList.remove('active');
+    };
+
     document.addEventListener('click', function(e) {
         const logoutBtn = e.target.closest('.btn-logout');
         if (logoutBtn) {
             e.preventDefault();
-            if (confirm('Are you sure you want to log out?')) {
-                sessionStorage.removeItem('user');
-                const path = window.location.pathname;
-                let authPath = '../auth/login.html';
-                if (path.includes('/pages/') || path.includes('/includes/')) {
-                    authPath = '../../auth/login.html';
-                }
-                
-                window.location.href = authPath;
+            openLogoutModal();
+        }
+
+        if (e.target.closest('.btn-logout-cancel')) {
+            closeLogoutModal();
+        }
+
+        if (e.target.closest('.btn-logout-confirm')) {
+            sessionStorage.removeItem('user');
+            const path = window.location.pathname;
+            let authPath = '../auth/login.html';
+            if (path.includes('/pages/') || path.includes('/includes/')) {
+                authPath = '../../auth/login.html';
             }
+            window.location.href = authPath;
+        }
+    });
+
+    modalBackdrop.addEventListener('click', function (e) {
+        if (e.target === modalBackdrop) {
+            closeLogoutModal();
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && pendingLogout) {
+            closeLogoutModal();
         }
     });
 
