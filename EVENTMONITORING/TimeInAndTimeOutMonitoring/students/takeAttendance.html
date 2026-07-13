@@ -405,6 +405,36 @@
     </div>
 </div>
 
+<!-- ══ SYNC SUMMARY MODAL ══ -->
+<div class="sync-overlay" id="syncOverlay" onclick="if(event.target===this)dismissSyncModal()">
+    <div class="sync-box" id="syncBox">
+        <div class="sync-icon" id="syncIcon"><i class="fa-solid fa-rotate"></i></div>
+        <h3 id="syncTitle">Facial Data Synced</h3>
+        <p id="syncSubtext">Changes were detected and applied in the background.</p>
+
+        <div class="sync-stats">
+            <div class="sync-stat add">
+                <div class="sync-stat-num" id="syncAdded">0</div>
+                <div class="sync-stat-label"><i class="fa-solid fa-plus"></i> Added</div>
+            </div>
+            <div class="sync-stat upd">
+                <div class="sync-stat-num" id="syncUpdated">0</div>
+                <div class="sync-stat-label"><i class="fa-solid fa-rotate"></i> Updated</div>
+            </div>
+            <div class="sync-stat rem" id="syncRemStat">
+                <div class="sync-stat-num" id="syncRemoved">0</div>
+                <div class="sync-stat-label"><i class="fa-solid fa-minus"></i> Removed</div>
+            </div>
+        </div>
+
+        <div class="sync-duration" id="syncDuration"></div>
+
+        <button class="sync-btn-close" id="syncCloseBtn" onclick="dismissSyncModal()">
+            <i class="fa-solid fa-check"></i> Got it
+        </button>
+    </div>
+</div>
+
 <!-- ══ CREDENTIAL MODAL ══ -->
 <div class="cred-overlay" id="credOverlay" onclick="if(event.target===this)closeCredModal()">
     <div class="cred-box">
