@@ -13,7 +13,7 @@ const DEFAULTS = {
     antiSpoof:      true,
     autoExit:       true,
     cooldown:       10,
-    smsEnabled:     false,
+    emailEnabled:     false,
     notifyEntryOnly:false
 };
 
@@ -49,7 +49,7 @@ function applyToForm(s) {
     setInput('cooldown',       s.cooldown);
     setCheck('antiSpoof',      toBool(s.antiSpoof));
     setCheck('autoExit',       toBool(s.autoExit));
-    setCheck('smsEnabled',     toBool(s.smsEnabled));
+    setCheck('emailEnabled',     toBool(s.emailEnabled));
     setCheck('notifyEntryOnly',toBool(s.notifyEntryOnly));
 }
 
@@ -62,7 +62,7 @@ async function saveSettings() {
         antiSpoof:       document.getElementById('antiSpoof').checked,
         autoExit:        document.getElementById('autoExit').checked,
         cooldown:        parseInt(document.getElementById('cooldown').value, 10) || 10,
-        smsEnabled:      document.getElementById('smsEnabled').checked,
+        emailEnabled:      document.getElementById('emailEnabled').checked,
         notifyEntryOnly: document.getElementById('notifyEntryOnly').checked
     };
 
