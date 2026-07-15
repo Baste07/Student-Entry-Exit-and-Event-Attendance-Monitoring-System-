@@ -8,6 +8,7 @@
     --blue-dark:   #0b4e78;
     --blue-mid:    #176aa4;
     --blue-bright: #2f8fce;
+    --blue-light:   #ebf8ff;
     --yellow:       #f6b23e;
     --yellow-light: #fff1c6;
     --white:        #ffffff;
@@ -48,10 +49,11 @@ header {
 }
 
 .top-left-logos img {
-    width: 42px;
-    height: 42px;
+    height: 48px;
+    width: 48px;
     object-fit: contain;
-    border-radius: 6px;
+    border-radius: 50%;
+    padding: 4px;
 }
 
 .top-left-divider {

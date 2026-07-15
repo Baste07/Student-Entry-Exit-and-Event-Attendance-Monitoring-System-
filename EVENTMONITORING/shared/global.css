@@ -1,12 +1,13 @@
 :root {
-    font-size: 125%;
+    font-size: 100%;
     --blue-dark:    #0b4e78;
     --blue-mid:     #176aa4;
     --blue-sidebar: #0a3f61;
     --blue-btn:     #176aa4;
     --blue-hover:   #0f5989;
     --blue-active:  #2f8fce;
-    --sidebar-w:     235px;
+    --blue-light:   #ebf8ff;
+    --sidebar-w:     300px;
     --topbar-h:      70px;
     --body-bg:       #eef6fb;
     --card-bg:       #ffffff;
@@ -19,7 +20,7 @@
 }
 
 html {
-    font-size: 125%;
+    font-size: 100%;
 }
 
 body {
@@ -49,9 +50,12 @@ body {
 }
 
 .topbar-logo {
-    height: 46px;
-    width: 46px;
+    height: 48px;
+    width: 48px;
     object-fit: contain;
+    border-radius: 50%;
+    background: var(--blue-light);
+    padding: 4px;
 }
 
 .topbar-logo-ccs {
@@ -99,8 +103,8 @@ body {
 }
 
 .btn-logout:hover {
-    background: rgba(255,255,255,0.12);
-    border-color: rgba(255,255,255,0.55);
+    background: rgba(220, 38, 38, 0.18);
+    border-color: rgba(248, 113, 113, 0.8);
     color: #fff;
 }
 
@@ -108,6 +112,70 @@ body {
     width: 15px; height: 15px;
     stroke: currentColor; fill: none;
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+.logout-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .2s ease, visibility .2s ease;
+}
+
+.logout-modal-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.logout-modal-dialog {
+    width: min(100%, 420px);
+    background: #fff;
+    border-radius: 1rem;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.25);
+    padding: 1.4rem;
+    color: #14364c;
+}
+
+.logout-modal-content h3 {
+    margin: 0 0 .5rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.logout-modal-content p {
+    margin: 0 0 1.2rem;
+    color: #52606d;
+}
+
+.logout-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .75rem;
+}
+
+.btn-logout-cancel,
+.btn-logout-confirm {
+    border: none;
+    border-radius: .55rem;
+    padding: .7rem 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-logout-cancel {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.btn-logout-confirm {
+    background: #dc2626;
+    color: #fff;
 }
 
 .supabase-indicator {
@@ -165,7 +233,6 @@ body {
     background: var(--blue-sidebar);
     display: flex;
     flex-direction: column;
-    padding: 1.5rem 0;
     z-index: 90;
     overflow-y: auto;
 }
@@ -174,10 +241,10 @@ body {
     display: flex;
     align-items: center;
     gap: .85rem;
-    padding: .78rem 1.6rem;
+    padding: 16px 16px;
     color: rgba(255,255,255,0.72);
-    font-size: .9rem;
-    font-weight: 500;
+    font-size: 16px;
+    font-weight: 600;
     cursor: pointer;
     transition: background .18s, color .18s;
     text-decoration: none;

@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
+    <title>Gate Scanner | Entry-Exit Module</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- QR scanning library -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <style>
+        :root {
+            --blue-dark:  #0b4e78;
+            --blue-mid:   #176aa4;
+            --blue-bright:#2f8fce;
+            --white:      #ffffff;
+            --surface:    #edf7ff;
+            --text-dark:  #14364c;
+            --text-muted: #6a8092;
+            --border:     #dcebf5;
+            --green:      #059669;
+            --red:        #dc2626;
+            --radius:     14px;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Nunito Sans', sans-serif;
+            background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue-mid) 100%);
+            min-height: 100vh; display: flex; flex-direction: column;
+            align-items: center; justify-content: flex-start;
+            padding: 24px 16px;
+        }
+
+        /* Header bar */
+        .gate-header {
+            width: 100%; max-width: 560px;
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 24px;
+        }
+        .gate-title {
+            font-family: 'Nunito', sans-serif; font-size: 20px; font-weight: 800;
+            color: var(--white); display: flex; align-items: center; gap: 10px;
+        }
+        .gate-title i { color: #f6b23e; }
+        .gate-nav { display: flex; gap: 10px; }
+        .gate-nav a {
+            color: rgba(255,255,255,.75); text-decoration: none;
+            font-size: 13px; font-weight: 600; padding: 7px 14px;
+            border: 1.5px solid rgba(255,255,255,.2); border-radius: 7px;
+            transition: all .2s; display: flex; align-items: center; gap: 6px;
+        }
+        .gate-nav a:hover { background: rgba(255,255,255,.12); color: var(--white); }
+        .gate-nav a.active { background: rgba(255,255,255,.18); color: var(--white); }
+
+        /* Mode tabs */
+        .mode-tabs {
+            width: 100%; max-width: 560px;
+            display: flex; gap: 8px; margin-bottom: 20px;
+        }
+        .mode-tab {
+            flex: 1; padding: 10px; border: none; border-radius: 10px;
+            background: rgba(255,255,255,.12); color: rgba(255,255,255,.7);
+            font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 700;
+            cursor: pointer; transition: all .2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .mode-tab.active { background: var(--white); color: var(--blue-dark); }
+
+        /* Scanner card */
+        .scanner-card {
+            width: 100%; max-width: 560px;
+            background: var(--white); border-radius: 18px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.25);
+            overflow: hidden; margin-bottom: 20px;
+        }
+        .scanner-body { padding: 24px; }
+
+        /* Video feed */
+        #videoFeed {
+            width: 100%; border-radius: 12px; background: #000;
+            display: block; min-height: 280px; object-fit: cover;
+        }
+        #qrReader { width: 100%; border-radius: 12px; overflow: hidden; }
+
+        .scan-status {
+            margin-top: 16px; padding: 14px 18px;
+            border-radius: 10px; text-align: center;
+            font-size: 15px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            min-height: 52px;
+        }
+        .scan-status.idle     { background: var(--surface); color: var(--text-muted); }
+        .scan-status.scanning { background: #dbeafe; color: var(--blue-dark); }
+        .scan-status.success  { background: #d1fae5; color: #065f46; }
+        .scan-status.error    { background: #fee2e2; color: var(--red); }
+        .scan-status.late     { background: #fef9c3; color: #854d0e; }
+
+        /* Result card */
+        .result-card {
+            display: none; padding: 20px 24px;
+            border-top: 1.5px solid var(--border);
+        }
+        .result-card.show { display: block; }
+        .result-student {
+            display: flex; align-items: center; gap: 14px; margin-bottom: 14px;
+        }
+        .result-avatar {
+            width: 52px; height: 52px; border-radius: 50%;
+            background: var(--surface); border: 2px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; color: var(--blue-mid); flex-shrink: 0;
+        }
+        .result-info strong { display: block; font-size: 16px; color: var(--text-dark); font-weight: 700; }
+        .result-info span   { font-size: 13px; color: var(--text-muted); }
+        .result-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+        .rbadge {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 12px; border-radius: 999px;
+            font-size: 12.5px; font-weight: 700;
+        }
+        .rbadge-entry  { background: #d1fae5; color: #065f46; }
+        .rbadge-exit   { background: #fee2e2; color: var(--red); }
+        .rbadge-late   { background: #fef9c3; color: #854d0e; }
+
+        /* Controls */
+        .scanner-controls {
+            padding: 16px 24px; border-top: 1.5px solid var(--border);
+            display: flex; gap: 10px;
+        }
+        .btn-start, .btn-stop, .btn-manual {
+            flex: 1; padding: 11px; border: none; border-radius: 9px;
+            font-size: 14px; font-weight: 700; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            font-family: 'Nunito', sans-serif; transition: all .2s;
+        }
+        .btn-start  { background: var(--blue-dark); color: var(--white); }
+        .btn-start:hover  { background: var(--blue-mid); }
+        .btn-stop   { background: #dc2626; color: var(--white); display: none; }
+        .btn-stop:hover   { background: #b91c1c; }
+        .btn-manual { background: var(--surface); color: var(--blue-dark);
+                      border: 1.5px solid var(--border); flex: 0 0 auto; padding: 11px 18px; }
+        .btn-manual:hover { background: #dbeafe; }
+
+        /* Manual entry modal */
+        .modal-backdrop {
+            display: none; position: fixed; inset: 0;
+            background: rgba(14,30,48,.5); z-index: 1000;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .modal-backdrop.open { display: flex; }
+        .modal-box {
+            background: var(--white); border-radius: 16px;
+            padding: 28px; width: 100%; max-width: 400px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.25);
+        }
+        .modal-box h3 {
+            font-family: 'Nunito', sans-serif; font-size: 17px;
+            font-weight: 700; color: var(--text-dark); margin-bottom: 18px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .modal-input {
+            width: 100%; padding: 11px 14px; margin-bottom: 10px;
+            border: 1.5px solid var(--border); border-radius: 9px;
+            font-size: 14px; font-family: 'Nunito Sans', sans-serif;
+            color: var(--text-dark);
+        }
+        .modal-input:focus { outline: none; border-color: var(--blue-mid); }
+        .modal-row { display: flex; gap: 10px; margin-top: 6px; }
+        .modal-btn {
+            flex: 1; padding: 10px; border: none; border-radius: 8px;
+            font-size: 13.5px; font-weight: 700; cursor: pointer;
+            font-family: 'Nunito', sans-serif; transition: background .2s;
+        }
+        .modal-btn.primary { background: var(--blue-dark); color: var(--white); }
+        .modal-btn.primary:hover { background: var(--blue-mid); }
+        .modal-btn.secondary { background: var(--surface); color: var(--text-muted); border: 1.5px solid var(--border); }
+
+        /* Clock strip */
+        .clock-strip {
+            width: 100%; max-width: 560px;
+            color: rgba(255,255,255,.6); font-size: 13px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        #gateClock { font-size: 15px; font-weight: 700; color: var(--white); }
+    </style>
+</head>
+<body>
+
+    <div class="gate-header">
+        <div class="gate-title">
+            <i class="fa-solid fa-qrcode"></i> Gate Scanner
+        </div>
+        <div class="gate-nav">
+            <a href="accountRegistration.html"><i class="fa-solid fa-camera"></i> Register</a>
+            <a href="../admin/dashboard.html"><i class="fa-solid fa-shield-halved"></i> Admin</a>
+        </div>
+    </div>
+
+    <!-- Mode tabs -->
+    <div class="mode-tabs">
+        <button class="mode-tab active" id="tabFace" onclick="switchMode('face')">
+            <i class="fa-solid fa-face-smile"></i> Face Recognition
+        </button>
+        <button class="mode-tab" id="tabQR" onclick="switchMode('qr')">
+            <i class="fa-solid fa-qrcode"></i> QR Code
+        </button>
+    </div>
+
+    <!-- Scanner card -->
+    <div class="scanner-card">
+        <div class="scanner-body">
+
+            <!-- Face mode -->
+            <div id="faceMode">
+                <video id="videoFeed" autoplay muted playsinline></video>
+                <div class="scan-status idle" id="faceStatus">
+                    <i class="fa-solid fa-camera-slash"></i> Camera not started
+                </div>
+            </div>
+
+            <!-- QR mode -->
+            <div id="qrMode" style="display:none;">
+                <div id="qrReader"></div>
+                <div class="scan-status idle" id="qrStatus">
+                    <i class="fa-solid fa-qrcode"></i> QR scanner not started
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Result -->
+        <div class="result-card" id="resultCard">
+            <div class="result-student">
+                <div class="result-avatar"><i class="fa-solid fa-user-graduate"></i></div>
+                <div class="result-info">
+                    <strong id="resultName">—</strong>
+                    <span id="resultMeta">—</span>
+                </div>
+            </div>
+            <div class="result-badges" id="resultBadges"></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="scanner-controls">
+            <button class="btn-start" id="btnStart" onclick="startScanner()">
+                <i class="fa-solid fa-play"></i> Start Scanner
+            </button>
+            <button class="btn-stop" id="btnStop" onclick="stopScanner()">
+                <i class="fa-solid fa-stop"></i> Stop
+            </button>
+            <button class="btn-manual" onclick="openManual()">
+                <i class="fa-solid fa-keyboard"></i> Manual
+            </button>
+        </div>
+    </div>
+
+    <div class="clock-strip">
+        <span>Entry-Exit Module</span>
+        <span id="gateClock">—</span>
+    </div>
+
+    <!-- Manual entry modal -->
+    <div class="modal-backdrop" id="manualModal">
+        <div class="modal-box">
+            <h3><i class="fa-solid fa-keyboard"></i> Manual Log Entry</h3>
+            <input type="text" class="modal-input" id="manualStudId" placeholder="Student ID (e.g. 2024-00001)">
+            <select class="modal-input" id="manualType">
+                <option value="entry">Entry</option>
+                <option value="exit">Exit</option>
+            </select>
+            <div class="modal-row">
+                <button class="modal-btn primary" onclick="submitManual()">
+                    <i class="fa-solid fa-check"></i> Log
+                </button>
+                <button class="modal-btn secondary" onclick="closeManual()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script>
+    /* ── Gate Scanner logic ── */
+    'use strict';
+
+    let currentMode    = 'face';
+    let videoStream    = null;
+    let faceInterval   = null;
+    let qrScanner      = null;
+    let cooldownMap    = {}; // studentId -> timestamp
+    let COOLDOWN_MS    = 10000; // default 10s; override from gate_settings
+    let AUTO_EXIT      = true;
+    let GATE_SETTINGS  = {};
+
+    /* ── Clock ── */
+    (function tick() {
+        const now   = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+        let h = now.getHours(), mm = String(now.getMinutes()).padStart(2,'0'),
+            ss = String(now.getSeconds()).padStart(2,'0'), ap = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        const el = document.getElementById('gateClock');
+        if (el) el.textContent = `${h}:${mm}:${ss} ${ap}`;
+        setTimeout(tick, 1000);
+    })();
+
+    /* ── Init ── */
+    document.addEventListener('DOMContentLoaded', async () => {
+        if (!supabaseClient) return;
+        await loadGateSettings();
+    });
+
+    async function loadGateSettings() {
+        try {
+            const { data } = await supabaseClient.from('gate_settings').select('key,value');
+            (data || []).forEach(r => { GATE_SETTINGS[r.key] = r.value; });
+            COOLDOWN_MS = (parseInt(GATE_SETTINGS.cooldown, 10) || 10) * 1000;
+            AUTO_EXIT   = GATE_SETTINGS.autoExit !== 'false';
+        } catch (_) {}
+    }
+
+    /* ── Mode switch ── */
+    function switchMode(mode) {
+        stopScanner();
+        currentMode = mode;
+        document.getElementById('faceMode').style.display = mode === 'face' ? 'block' : 'none';
+        document.getElementById('qrMode').style.display   = mode === 'qr'   ? 'block' : 'none';
+        document.getElementById('tabFace').classList.toggle('active', mode === 'face');
+        document.getElementById('tabQR').classList.toggle('active',   mode === 'qr');
+        document.getElementById('resultCard').classList.remove('show');
+    }
+
+    /* ── Start / Stop ── */
+    async function startScanner() {
+        document.getElementById('btnStart').style.display = 'none';
+        document.getElementById('btnStop').style.display  = 'flex';
+
+        if (currentMode === 'face') {
+            await startFaceMode();
+        } else {
+            startQRMode();
+        }
+    }
+
+    function stopScanner() {
+        if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+        if (faceInterval) { clearInterval(faceInterval); faceInterval = null; }
+        if (qrScanner)    { qrScanner.stop().catch(() => {}); qrScanner = null; }
+        setStatus('faceStatus', 'idle', '<i class="fa-solid fa-camera-slash"></i> Camera stopped');
+        setStatus('qrStatus',   'idle', '<i class="fa-solid fa-qrcode"></i> QR scanner stopped');
+        document.getElementById('btnStart').style.display = 'flex';
+        document.getElementById('btnStop').style.display  = 'none';
+    }
+
+    /* ── Face recognition mode (via Flask backend) ── */
+    async function startFaceMode() {
+        setStatus('faceStatus', 'scanning', '<i class="fa-solid fa-spinner fa-spin"></i> Starting camera...');
+        try {
+            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            const video = document.getElementById('videoFeed');
+            video.srcObject = videoStream;
+            setStatus('faceStatus', 'scanning', '<i class="fa-solid fa-spinner fa-spin"></i> Scanning for face...');
+
+            // Poll Flask gate backend every 2 seconds
+            faceInterval = setInterval(pollFaceBackend, 2000);
+        } catch (e) {
+            setStatus('faceStatus', 'error', '<i class="fa-solid fa-triangle-exclamation"></i> Camera access denied');
+            stopScanner();
+        }
+    }
+
+    async function pollFaceBackend() {
+        try {
+            const res  = await fetch('http://127.0.0.1:5050/latest_recognition');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data && data.student_id && data.student_id !== 'unknown') {
+                if (isInCooldown(data.student_id)) return;
+                setCooldown(data.student_id);
+                await logEntry(data.student_id, 'face');
+            }
+        } catch (_) {
+            // Flask not running — show idle note but don't crash
+            setStatus('faceStatus', 'scanning', '<i class="fa-solid fa-spinner fa-spin"></i> Waiting for face engine...');
+        }
+    }
+
+    /* ── QR mode ── */
+    function startQRMode() {
+        setStatus('qrStatus', 'scanning', '<i class="fa-solid fa-spinner fa-spin"></i> Starting QR scanner...');
+        qrScanner = new Html5Qrcode('qrReader');
+        qrScanner.start(
+            { facingMode: 'environment' },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            async (decodedText) => {
+                if (isInCooldown(decodedText)) return;
+                setCooldown(decodedText);
+                await logEntry(decodedText, 'qr');
+            },
+            () => {}
+        ).then(() => {
+            setStatus('qrStatus', 'scanning', '<i class="fa-solid fa-qrcode"></i> Point camera at QR code...');
+        }).catch(e => {
+            setStatus('qrStatus', 'error', '<i class="fa-solid fa-triangle-exclamation"></i> Camera error: ' + e);
+            stopScanner();
+        });
+    }
+
+    /* ── Core: look up student and log entry/exit ── */
+    async function logEntry(studentIdentifier, method) {
+        try {
+            // Look up student by stud_id (QR stores stud_id; face backend returns student_id UUID or stud_id)
+            const isUUID = /^[0-9a-f-]{36}$/i.test(studentIdentifier);
+            const field  = isUUID ? 'id' : 'stud_id';
+
+            const { data: students, error } = await supabaseClient
+                .from('students')
+                .select('id, stud_id, first_name, last_name, grade_level, section_name')
+                .eq(field, studentIdentifier)
+                .limit(1);
+
+            if (error || !students || students.length === 0) {
+                setStatus(currentMode + 'Status', 'error', '<i class="fa-solid fa-user-xmark"></i> Student not found');
+                return;
+            }
+
+            const student  = students[0];
+            const today    = new Date().toLocaleDateString('en-CA');
+            const logType  = await determineLogType(student.id, today);
+            const isLate   = await checkIfLate();
+
+            const { error: insertError } = await supabaseClient
+                .from('entry_exit_logs')
+                .insert({
+                    student_id:    student.id,
+                    log_type:      logType,
+                    scan_method:   method,
+                    log_date:      today,
+                    log_timestamp: new Date().toISOString(),
+                    is_late:       isLate && logType === 'entry'
+                });
+
+            if (insertError) throw insertError;
+
+            // Show result
+            showResult(student, logType, isLate);
+            const statusId = currentMode === 'face' ? 'faceStatus' : 'qrStatus';
+            const icon  = logType === 'entry' ? 'fa-door-open' : 'fa-right-from-bracket';
+            const label = logType === 'entry' ? 'Entry Logged' : 'Exit Logged';
+            const cls   = isLate && logType === 'entry' ? 'late' : 'success';
+            setStatus(statusId, cls, `<i class="fa-solid ${icon}"></i> ${label}: ${student.last_name}, ${student.first_name}`);
+
+            // Reset status after 3s
+            setTimeout(() => {
+                setStatus(statusId, 'scanning',
+                    currentMode === 'face'
+                        ? '<i class="fa-solid fa-spinner fa-spin"></i> Scanning for face...'
+                        : '<i class="fa-solid fa-qrcode"></i> Point camera at QR code...'
+                );
+            }, 3000);
+
+        } catch (e) {
+            console.error('[scanGate] logEntry error:', e);
+            const statusId = currentMode === 'face' ? 'faceStatus' : 'qrStatus';
+            setStatus(statusId, 'error', '<i class="fa-solid fa-triangle-exclamation"></i> Log failed. Check connection.');
+        }
+    }
+
+    async function determineLogType(studentId, today) {
+        if (!AUTO_EXIT) return 'entry';
+        try {
+            const { data } = await supabaseClient
+                .from('entry_exit_logs')
+                .select('log_type')
+                .eq('student_id', studentId)
+                .eq('log_date', today)
+                .order('log_timestamp', { ascending: false })
+                .limit(1)
+                .single();
+            // Toggle: if last was entry → now exit; else entry
+            return data?.log_type === 'entry' ? 'exit' : 'entry';
+        } catch (_) {
+            return 'entry';
+        }
+    }
+
+    async function checkIfLate() {
+        const threshold = GATE_SETTINGS.lateThreshold || '07:30';
+        const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+        const [th, tm] = threshold.split(':').map(Number);
+        return now.getHours() > th || (now.getHours() === th && now.getMinutes() >= tm);
+    }
+
+    function showResult(student, logType, isLate) {
+        document.getElementById('resultName').textContent = `${student.last_name}, ${student.first_name}`;
+        document.getElementById('resultMeta').textContent = `${student.stud_id} · Grade ${student.grade_level} — ${student.section_name}`;
+        const badgesEl = document.getElementById('resultBadges');
+        const typeBadge = logType === 'entry'
+            ? '<span class="rbadge rbadge-entry"><i class="fa-solid fa-door-open"></i> Entry</span>'
+            : '<span class="rbadge rbadge-exit"><i class="fa-solid fa-right-from-bracket"></i> Exit</span>';
+        const lateBadge = isLate && logType === 'entry'
+            ? '<span class="rbadge rbadge-late"><i class="fa-solid fa-clock"></i> Late</span>' : '';
+        badgesEl.innerHTML = typeBadge + lateBadge;
+        document.getElementById('resultCard').classList.add('show');
+    }
+
+    /* ── Manual entry ── */
+    function openManual()  { document.getElementById('manualModal').classList.add('open'); }
+    function closeManual() { document.getElementById('manualModal').classList.remove('open'); }
+
+    async function submitManual() {
+        const studId = document.getElementById('manualStudId').value.trim();
+        const type   = document.getElementById('manualType').value;
+        if (!studId) return;
+        closeManual();
+
+        try {
+            const { data: students } = await supabaseClient
+                .from('students').select('id,stud_id,first_name,last_name,grade_level,section_name')
+                .eq('stud_id', studId).limit(1);
+
+            if (!students || students.length === 0) {
+                alert('Student ID not found: ' + studId); return;
+            }
+            const student = students[0];
+            const today   = new Date().toLocaleDateString('en-CA');
+            const isLate  = await checkIfLate();
+
+            await supabaseClient.from('entry_exit_logs').insert({
+                student_id:    student.id,
+                log_type:      type,
+                scan_method:   'manual',
+                log_date:      today,
+                log_timestamp: new Date().toISOString(),
+                is_late:       isLate && type === 'entry'
+            });
+
+            showResult(student, type, isLate);
+            document.getElementById('manualStudId').value = '';
+        } catch (e) {
+            alert('Error logging manual entry: ' + e.message);
+        }
+    }
+
+    /* ── Helpers ── */
+    function isInCooldown(id) {
+        const last = cooldownMap[id];
+        return last && (Date.now() - last) < COOLDOWN_MS;
+    }
+    function setCooldown(id) { cooldownMap[id] = Date.now(); }
+    function setStatus(id, cls, html) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.className = `scan-status ${cls}`;
+        el.innerHTML = html;
+    }
+    </script>
+</body>
+</html>

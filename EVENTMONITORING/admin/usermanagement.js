@@ -15,7 +15,25 @@ function initializeUserSession() {
     }
 }
 
+function renderAdminsSkeleton() {
+    const tbody = document.getElementById('adminsTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = Array.from({ length: 5 }, () => `
+        <tr class="skeleton-row">
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
+        </tr>
+    `).join('');
+}
+
 async function loadAdmins() {
+    renderAdminsSkeleton();
+
     try {
         if (!supabaseClient) {
             console.error('Supabase client not initialized');

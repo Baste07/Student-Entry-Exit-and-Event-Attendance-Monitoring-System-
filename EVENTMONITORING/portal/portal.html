@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="icon" type="image/png" href="../auth/assets/ElTresEresCenciaEscuelaLogo.png">
     <title>Attendance Monitoring System — Portal</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -19,16 +20,16 @@
             <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo" class="topbar-logo"/>
             <div class="topbar-title">
                 ATTENDANCE MONITORING SYSTEM
-                <span>El Tres Eres Ciencia Escuela</span>
+                <span>El Tres Eres Cencia Escuela</span>
             </div>
         </div>
 
         <div class="topbar-user">
             <div class="user-info">
-                <div class="user-name">Juanito Alvarez</div>
-                <div class="user-role">Faculty</div>
+                <div class="user-name"></div>
+                <div class="user-role"></div>
             </div>
-            <div class="user-avatar">JD</div>
+            <div class="user-avatar"></div>
             <button class="btn-logout">Log Out</button>
         </div>
     </header>
@@ -36,81 +37,48 @@
     <main class="main-content">
 
         <div class="portal-heading">
-            <h2>Select a System</h2>
-            <p>Choose a module below to get started</p>
+            <h2>System Portal</h2>
+            <p>Choose a module below to get started.</p>
         </div>
 
-        <div class="systems-grid">
+        <div class="systems-grid portal-skeleton" aria-live="polite" aria-busy="true">
+            <div class="system-card skeleton-card" aria-hidden="true">
+                <div class="skeleton-icon"></div>
+                <div class="skeleton-line skeleton-line--title"></div>
+                <div class="skeleton-line skeleton-line--text"></div>
+                <div class="skeleton-line skeleton-line--text short"></div>
+            </div>
+            <div class="system-card skeleton-card" aria-hidden="true">
+                <div class="skeleton-icon"></div>
+                <div class="skeleton-line skeleton-line--title"></div>
+                <div class="skeleton-line skeleton-line--text"></div>
+                <div class="skeleton-line skeleton-line--text short"></div>
+            </div>
+            <div class="system-card skeleton-card" aria-hidden="true">
+                <div class="skeleton-icon"></div>
+                <div class="skeleton-line skeleton-line--title"></div>
+                <div class="skeleton-line skeleton-line--text"></div>
+                <div class="skeleton-line skeleton-line--text short"></div>
+            </div>
 
-            <!-- Card 1: Thesis & Capstone -->
-            <a href="../ThesisAndCapstoneArchiving/pages/admin/dashboard.html" class="system-card">
+            <!-- Card 1: Event Attendance (Admin/Superadmin only) -->
+            <a href="../TimeInAndTimeOutMonitoring/admin/dashboard.html" class="system-card event-attendance-card">
                 <span class="card-number">01</span>
                 <div class="card-icon-wrap">
-                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="4" y="5" width="16" height="15" rx="2"/>
+                        <path d="M8 3v4"/>
+                        <path d="M16 3v4"/>
+                        <path d="M4 10h16"/>
+                    </svg>
                 </div>
-                <div class="card-bottom">
-                    <div class="card-label">Archive</div>
-                    <div class="card-title-text">Thesis & Capstone Archiving</div>
-                    <div class="card-desc">Browse, submit, and manage student thesis and capstone project records in a centralized repository.</div>
-                    <div class="card-arrow">
-                        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Card 2: Faculty Requirement -->
-            <a href="../FacultyRequirementSubmissionSystem/pages/dashboard.html" class="system-card">
-                <span class="card-number">02</span>
-                <div class="card-icon-wrap">
-                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
-                </div>
-                <div class="card-bottom">
-                    <div class="card-label">Submission</div>
-                    <div class="card-title-text">Faculty Requirement Submission</div>
-                    <div class="card-desc">Upload and track required faculty documents, clearances, and academic deliverables for each semester.</div>
-                    <div class="card-arrow">
-                        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Card 3: Student Violation -->
-            <a href="../StudentViolationManagementSystem/pages/admin/dashboard.html" class="system-card">
-                <span class="card-number">03</span>
-                <div class="card-icon-wrap">
-                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
-                </div>
-                <div class="card-bottom">
-                    <div class="card-label">Discipline</div>
-                    <div class="card-title-text">Student Violation Management</div>
-                    <div class="card-desc">Record, monitor, and resolve student disciplinary cases and incident reports across departments.</div>
-                    <div class="card-arrow">
-                        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Card 4: Time In/Out -->
-            <a href="../TimeInAndTimeOutMonitoring/students/homepage.html" class="system-card">
-                <span class="card-number">04</span>
-                <div class="card-icon-wrap">
-                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
-                </div>
-                <div class="card-bottom">
-                    <div class="card-label">Monitoring</div>
-                    <div class="card-title-text">Time In & Time Out Monitoring</div>
-                    <div class="card-desc">Scan attendance, view active lab sessions, and manage time in/out entries.</div>
-                    <div class="card-arrow">
-                        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Card 5: Event Attendance (Admin/Superadmin only) -->
-            <a href="../TimeInAndTimeOutMonitoring/admin/dashboard.html" class="system-card event-attendance-card">
-                <span class="card-number">05</span>
-                <div class="card-icon-wrap">
-                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
+                <div class="card-bg-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="4" y="5" width="16" height="15" rx="2"/>
+                        <path d="M8 3v4"/>
+                        <path d="M16 3v4"/>
+                        <path d="M4 10h16"/>
+                    </svg>
                 </div>
                 <div class="card-bottom">
                     <div class="card-label">Monitoring</div>
@@ -122,27 +90,49 @@
                 </div>
             </a>
 
-            <!-- Card 6: Entry & Exit Attendance (Admin/Superadmin only) -->
-            <a href="#" class="system-card entry-exit-card" onclick="event.preventDefault();" title="Coming soon">
-                <span class="card-number">06</span>
+            <!-- Card 2: Entry & Exit Attendance (Admin/Superadmin only) -->
+            <a href="../EntryExitMonitoring/admin/dashboard.html" class="system-card entry-exit-card">
+                <span class="card-number">02</span>
                 <div class="card-icon-wrap">
-                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 3h10v18H5z"/>
+                        <circle cx="12" cy="12" r="0.6" fill="currentColor"/>
+                        <path d="M15 12h5"/>
+                        <path d="M18 9l3 3-3 3"/>
+                    </svg>
+                </div>
+                <div class="card-bg-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M5 3h10v18H5z"/>
+                        <circle cx="12" cy="12" r="0.6" fill="currentColor"/>
+                        <path d="M15 12h5"/>
+                        <path d="M18 9l3 3-3 3"/>
+                    </svg>
                 </div>
                 <div class="card-bottom">
                     <div class="card-label">Monitoring</div>
-                    <div class="card-title-text">Entry & Exit Attendance</div>
-                    <div class="card-desc">Monitor daily entry and exit attendance records. (Coming soon)</div>
+                    <div class="card-title-text">Entry & Exit Records</div>
+                    <div class="card-desc">Monitor daily school entry and exit records.</div>
                     <div class="card-arrow">
                         <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                     </div>
                 </div>
             </a>
 
-            <!-- Card 7: SUPERADMIN Panel (Superadmin only) -->
+            <!-- Card 3: SUPERADMIN Panel (Superadmin only) -->
             <a href="../admin/usermanagement.html" class="system-card superadmin-panel-card">
-                <span class="card-number">07</span>
+                <span class="card-number">03</span>
                 <div class="card-icon-wrap">
-                    <img src="../auth/assets/ElTresEresCenciaEscuelaLogo.png" alt="School Logo"/>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 3l7 4v5c0 4.6-2.8 8.3-7 9-4.2-.7-7-4.4-7-9V7l7-4z"/>
+                        <path d="M9.5 12.5l1.5 1.5 3.5-3.5"/>
+                    </svg>
+                </div>
+                <div class="card-bg-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 3l7 4v5c0 4.6-2.8 8.3-7 9-4.2-.7-7-4.4-7-9V7l7-4z"/>
+                        <path d="M9.5 12.5l1.5 1.5 3.5-3.5"/>
+                    </svg>
                 </div>
                 <div class="card-bottom">
                     <div class="card-label">Administration</div>
@@ -158,7 +148,7 @@
     </main>
 
     <footer class="footer">
-        © 2025 El Tres Eres Ciencia Escuela
+        © 2026 El Tres Eres Cencia Escuela
     </footer>
 </div>
 
