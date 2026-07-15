@@ -1,6 +1,5 @@
 /* ============================================================
    homepage.js — School Attendance Dashboard
-   Simplified for greeting-only facial recognition engine
    ============================================================ */
 
 // ── Date / Time Helpers ──────────────────────────────────
@@ -39,15 +38,16 @@ function formatDateTime(isoString) {
 
 function tickClock() {
     const now = new Date();
-    document.getElementById('liveClock').textContent =
-        now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
-    document.getElementById('liveDate').textContent =
-        now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    const clock = document.getElementById('liveClock');
+    const date  = document.getElementById('liveDate');
+    if (clock) clock.textContent = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+    if (date)  date.textContent  = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 tickClock();
 setInterval(tickClock, 1000);
-document.getElementById('footerYear').textContent = new Date().getFullYear();
+const footerYear = document.getElementById('footerYear');
+if (footerYear) footerYear.textContent = new Date().getFullYear();
 
 // ── Fetch: Today's Attendance Summary ────────────────────
 
@@ -55,30 +55,18 @@ async function fetchTodayAttendance() {
     try {
         const { data, error } = await supabaseClient
             .from('daily_attendance')
-            .select('status, student_id, teacher_id, created_at')
-            .eq('date', todayISO);
+            .select('time_in_status, late_minutes, student_id, created_at')
+            .eq('attendance_date', todayISO);
 
         if (error) { console.error('fetchTodayAttendance:', error); return null; }
 
         const records = data || [];
-        const present = records.filter(r => r.status === 'present').length;
-        const absent  = records.filter(r => r.status === 'absent').length;
-        const late    = records.filter(r => r.status === 'late').length;
-        const excused = records.filter(r => r.status === 'excused').length;
+        const present = records.filter(r => r.time_in_status === 'on-time').length;
+        const late    = records.filter(r => r.time_in_status === 'late').length;
 
-        // Get unique people who checked in today
         const studentIds = new Set(records.filter(r => r.student_id).map(r => r.student_id));
-        const teacherIds = new Set(records.filter(r => r.teacher_id).map(r => r.teacher_id));
 
-        return {
-            total: records.length,
-            present,
-            absent,
-            late,
-            excused,
-            studentCount: studentIds.size,
-            teacherCount: teacherIds.size
-        };
+        return { total: records.length, present, late, studentCount: studentIds.size };
     } catch (err) {
         console.error('fetchTodayAttendance error:', err);
         return null;
@@ -113,11 +101,10 @@ async function fetchRecentAttendance(limit = 10) {
         const { data, error } = await supabaseClient
             .from('daily_attendance')
             .select(`
-                attendance_id, status, date, time_in, time_out, remarks, created_at,
-                students ( student_id, first_name, last_name, lrn, section_id, sections ( section_name, grade_level ) ),
-                teachers ( teacher_id, first_name, last_name, employee_id )
+                attendance_id, attendance_date, time_in, time_out, remarks, created_at,
+                students ( student_id, first_name, last_name, stud_id, section_id, sections ( section_name, grade_level ) )
             `)
-            .eq('date', todayISO)
+            .eq('attendance_date', todayISO)
             .order('created_at', { ascending: false })
             .limit(limit);
 
@@ -129,26 +116,133 @@ async function fetchRecentAttendance(limit = 10) {
     }
 }
 
-// ── Fetch: Upcoming Events ───────────────────────────────
+// ══════════════════════════════════════════════════════════
+// EVENTS FETCH & RENDER
+// ══════════════════════════════════════════════════════════
 
-async function fetchUpcomingEvents() {
+async function fetchOngoingEvents() {
     try {
         const { data, error } = await supabaseClient
             .from('events')
-            .select('event_id, event_name, event_date, event_type, location, description')
-            .gte('event_date', todayISO)
-            .order('event_date', { ascending: true })
-            .limit(5);
+            .select('event_id, event_name, event_date, end_date, time_start, time_end, event_type, location, description, target_grade_level, target_section, status')
+            .eq('status', 'ongoing')
+            .order('time_start', { ascending: true });
 
-        if (error) { console.error('fetchUpcomingEvents:', error); return []; }
+        if (error) { console.error('fetchOngoingEvents:', error); return []; }
         return data || [];
     } catch (err) {
-        console.error('fetchUpcomingEvents error:', err);
+        console.error('fetchOngoingEvents error:', err);
         return [];
     }
 }
 
-// ── Render: Attendance Stat Card ─────────────────────────
+async function fetchEventAttendanceCount(eventId) {
+    try {
+        const { count, error } = await supabaseClient
+            .from('event_attendance')
+            .select('attendance_id', { count: 'exact', head: true })
+            .eq('event_id', eventId)
+            .not('time_in', 'is', null);
+
+        if (error) { console.error('fetchEventAttendanceCount:', error); return 0; }
+        return count || 0;
+    } catch (err) {
+        console.error('fetchEventAttendanceCount error:', err);
+        return 0;
+    }
+}
+
+// ── Fetch ALL event statuses (upcoming + ongoing + completed) ──
+async function fetchAllEvents() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('events')
+            .select('event_id, event_name, event_date, end_date, time_start, time_end, event_type, location, description, target_grade_level, target_section, status')
+            .neq('status', 'cancelled')
+            .order('event_date', { ascending: true })
+            .limit(10);
+
+        if (error) { console.error('fetchAllEvents:', error); return []; }
+        return data || [];
+    } catch (err) {
+        console.error('fetchAllEvents error:', err);
+        return [];
+    }
+}
+
+const typeColors = {
+    assembly: '#8b5cf6', meeting: '#06b6d4', sports: '#f59e0b',
+    ceremony: '#ec4899', exam: '#ef4444', holiday: '#22c55e', other: '#6b7280',
+};
+
+const statusBadgeStyles = {
+    upcoming:  { bg: '#e0f2fe', text: '#0369a1', icon: 'fa-calendar-day', label: 'Upcoming' },
+    ongoing:   { bg: '#dcfce7', text: '#166534', icon: 'fa-circle-play', label: 'Ongoing' },
+    completed: { bg: '#f1f5f9', text: '#475569', icon: 'fa-check-circle', label: 'Completed' },
+};
+
+// ── Original renderEvent (kept for compatibility) ──
+function renderEvent(ev) {
+    const eventDate = new Date(ev.event_date + 'T00:00:00');
+    const isToday = ev.event_date === todayISO;
+    const dateLabel = isToday ? 'Today' : eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    const color = typeColors[ev.event_type?.toLowerCase()] || '#6b7280';
+
+    // Show status badge if not upcoming
+    let statusBadge = '';
+    if (ev.status === 'ongoing') {
+        statusBadge = `<span style="background:#dcfce7; color:#166534; font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600; margin-left:8px;"><i class="fa-solid fa-circle-play"></i> Ongoing</span>`;
+    } else if (ev.status === 'completed') {
+        statusBadge = `<span style="background:#f1f5f9; color:#475569; font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600; margin-left:8px;"><i class="fa-solid fa-check-circle"></i> Done</span>`;
+    }
+
+    return `
+        <div class="card event-card">
+            <div class="event-header">
+                <span class="event-type" style="background:${color}20; color:${color}">${ev.event_type || 'Event'}</span>
+                <span class="event-date">${dateLabel}</span>
+            </div>
+            <div class="event-name">${ev.event_name || 'Untitled Event'}${statusBadge}</div>
+            <div class="event-meta">
+                ${ev.location ? `<span><i class="fa-solid fa-location-dot"></i> ${ev.location}</span>` : ''}
+            </div>
+            ${ev.description ? `<div class="event-desc">${ev.description}</div>` : ''}
+        </div>`;
+}
+
+// ── Ongoing event with attendance count ──
+function renderOngoingEventCard(ev, presentCount) {
+    const color = typeColors[ev.event_type?.toLowerCase()] || '#6b7280';
+    const timeLabel = ev.time_start
+        ? `${formatTime(ev.time_start)} – ${formatTime(ev.time_end)}`
+        : 'All day';
+
+    return `
+        <div class="card event-card" style="border-left:4px solid #22c55e;">
+            <div class="event-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="event-type" style="background:${color}20; color:${color}">${ev.event_type || 'Event'}</span>
+                <span style="background:#dcfce7; color:#166534; font-size:12px; padding:2px 8px; border-radius:4px; font-weight:600;">
+                    <i class="fa-solid fa-circle-play"></i> LIVE
+                </span>
+            </div>
+            <div class="event-name" style="font-size:18px; font-weight:700;">${ev.event_name || 'Untitled Event'}</div>
+            <div class="event-meta" style="margin-bottom:12px;">
+                <span><i class="fa-solid fa-clock"></i> ${timeLabel}</span>
+                ${ev.location ? `<span style="margin-left:12px;"><i class="fa-solid fa-location-dot"></i> ${ev.location}</span>` : ''}
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:#f0fdf4; border-radius:8px;">
+                <span style="color:#166534; font-size:14px; font-weight:600;">
+                    <i class="fa-solid fa-users"></i> Attendance
+                </span>
+                <span style="font-size:24px; font-weight:800; color:#16a34a;">${presentCount} <span style="font-size:13px; font-weight:500; color:#6b7280;">present</span></span>
+            </div>
+        </div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// EXISTING RENDERERS
+// ══════════════════════════════════════════════════════════
 
 function renderAttendanceStats(stats) {
     if (!stats) {
@@ -163,8 +257,7 @@ function renderAttendanceStats(stats) {
         </div>`;
     }
 
-    const totalPeople = stats.studentCount + stats.teacherCount;
-    const pctPresent = totalPeople > 0 ? Math.round((stats.present / totalPeople) * 100) : 0;
+    const pctPresent = stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : 0;
 
     return `
         <div class="card stat-card">
@@ -175,15 +268,11 @@ function renderAttendanceStats(stats) {
             <div class="stat-value">${stats.present}</div>
             <div class="stat-label">Present today (${pctPresent}%)</div>
             <div class="stat-breakdown">
-                <span class="bd-item"><i class="fa-solid fa-check" style="color:#22c55e"></i> ${stats.present} Present</span>
+                <span class="bd-item"><i class="fa-solid fa-check" style="color:#22c55e"></i> ${stats.present} On-time</span>
                 <span class="bd-item"><i class="fa-solid fa-clock" style="color:#f59e0b"></i> ${stats.late} Late</span>
-                <span class="bd-item"><i class="fa-solid fa-xmark" style="color:#ef4444"></i> ${stats.absent} Absent</span>
-                <span class="bd-item"><i class="fa-solid fa-notes-medical" style="color:#3b82f6"></i> ${stats.excused} Excused</span>
             </div>
         </div>`;
 }
-
-// ── Render: People Count Card ────────────────────────────
 
 function renderPeopleCounts(counts) {
     return `
@@ -202,38 +291,24 @@ function renderPeopleCounts(counts) {
         </div>`;
 }
 
-// ── Render: Recent Recognition Card ──────────────────────
-
 function renderRecentRecord(rec) {
     const student = rec.students;
-    const teacher = rec.teachers;
-    const person = student || teacher;
-    const role = student ? 'Student' : (teacher ? 'Teacher' : 'Unknown');
-    const name = person ? `${person.first_name || ''} ${person.last_name || ''}`.trim() : 'Unknown';
-    const idNum = student ? student.lrn : (teacher ? teacher.employee_id : '');
+    const name = student ? `${student.first_name || ''} ${student.last_name || ''}`.trim() : 'Unknown';
+    const idNum = student ? student.stud_id : '';
     const sectionInfo = student?.sections ? `${student.sections.grade_level || ''} - ${student.sections.section_name || ''}` : '';
 
-    const statusColors = {
-        present:  '#22c55e',
-        late:     '#f59e0b',
-        absent:   '#ef4444',
-        excused:  '#3b82f6'
-    };
-    const statusIcon = {
-        present:  'fa-check',
-        late:     'fa-clock',
-        absent:   'fa-xmark',
-        excused:  'fa-notes-medical'
-    };
-    const color = statusColors[rec.status] || '#6b7280';
-    const icon  = statusIcon[rec.status] || 'fa-circle';
+    const statusColors = { on_time: '#22c55e', late: '#f59e0b' };
+    const statusIcon   = { on_time: 'fa-check', late: 'fa-clock' };
+    const statusLabel  = rec.time_in_status === 'late' ? 'Late' : 'Present';
+    const color = statusColors[rec.time_in_status] || '#6b7280';
+    const icon  = statusIcon[rec.time_in_status] || 'fa-circle';
 
     return `
         <div class="card record-card">
             <div class="record-header">
-                <span class="record-role ${role.toLowerCase()}">${role}</span>
+                <span class="record-role student">Student</span>
                 <span class="record-status" style="color:${color}">
-                    <i class="fa-solid ${icon}"></i> ${rec.status ? rec.status.charAt(0).toUpperCase() + rec.status.slice(1) : '—'}
+                    <i class="fa-solid ${icon}"></i> ${statusLabel}
                 </span>
             </div>
             <div class="record-name">${name || 'Unknown'}</div>
@@ -250,80 +325,44 @@ function renderRecentRecord(rec) {
         </div>`;
 }
 
-// ── Render: Event Card ──────────────────────────────────
-
-function renderEvent(ev) {
-    const eventDate = new Date(ev.event_date);
-    const isToday = ev.event_date === todayISO;
-    const dateLabel = isToday ? 'Today' : eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-    const typeColors = {
-        assembly:   '#8b5cf6',
-        meeting:    '#06b6d4',
-        sports:     '#f59e0b',
-        ceremony:   '#ec4899',
-        exam:       '#ef4444',
-        holiday:    '#22c55e',
-        other:      '#6b7280'
-    };
-    const color = typeColors[ev.event_type?.toLowerCase()] || '#6b7280';
-
-    return `
-        <div class="card event-card">
-            <div class="event-header">
-                <span class="event-type" style="background:${color}20; color:${color}">${ev.event_type || 'Event'}</span>
-                <span class="event-date">${dateLabel}</span>
-            </div>
-            <div class="event-name">${ev.event_name || 'Untitled Event'}</div>
-            <div class="event-meta">
-                ${ev.location ? `<span><i class="fa-solid fa-location-dot"></i> ${ev.location}</span>` : ''}
-            </div>
-            ${ev.description ? `<div class="event-desc">${ev.description}</div>` : ''}
-        </div>`;
-}
-
-// ── Main Load ────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// MAIN LOAD
+// ══════════════════════════════════════════════════════════
 
 async function loadPage() {
     const icon = document.getElementById('refreshIcon');
     if (icon) icon.classList.add('fa-spin');
 
-    const [attendanceStats, peopleCounts, recentRecords, upcomingEvents] = await Promise.all([
+    const [attendanceStats, peopleCounts, recentRecords, ongoingEvents, allEvents] = await Promise.all([
         fetchTodayAttendance(),
         fetchPeopleCounts(),
         fetchRecentAttendance(8),
-        fetchUpcomingEvents()
+        fetchOngoingEvents(),
+        fetchAllEvents()
     ]);
 
-    // Update hero stats
+    // ── Hero stats ──
     const totalPresent = attendanceStats?.present || 0;
     const totalLate    = attendanceStats?.late || 0;
-    const totalAbsent  = attendanceStats?.absent || 0;
-    const totalExcused = attendanceStats?.excused || 0;
 
-    const statPresent  = document.getElementById('statPresent');
-    const statLate     = document.getElementById('statLate');
-    const statAbsent   = document.getElementById('statAbsent');
-    const statExcused  = document.getElementById('statExcused');
-
+    const statPresent = document.getElementById('statPresent');
+    const statLate    = document.getElementById('statLate');
     if (statPresent) statPresent.textContent = totalPresent;
     if (statLate)    statLate.textContent    = totalLate;
-    if (statAbsent)  statAbsent.textContent  = totalAbsent;
-    if (statExcused) statExcused.textContent = totalExcused;
 
-    // Update badges
-    const badgeRecent = document.getElementById('recentBadge');
-    const badgeEvents = document.getElementById('eventsBadge');
+    // ── Badges ──
+    const badgeRecent   = document.getElementById('recentBadge');
+    const badgeEvents   = document.getElementById('eventsBadge');
     if (badgeRecent) badgeRecent.textContent = recentRecords.length;
-    if (badgeEvents)  badgeEvents.textContent  = upcomingEvents.length;
+    if (badgeEvents)   badgeEvents.textContent = allEvents.length;
 
-    // Render stats grid
+    // ── Stats grid ──
     const statsGrid = document.getElementById('statsGrid');
     if (statsGrid) {
         statsGrid.innerHTML = renderAttendanceStats(attendanceStats) + renderPeopleCounts(peopleCounts);
     }
 
-    // Render recent records
+    // ── Recent records ──
     const recentGrid = document.getElementById('recentGrid');
     if (recentGrid) {
         recentGrid.innerHTML = recentRecords.length
@@ -335,19 +374,39 @@ async function loadPage() {
                </div>`;
     }
 
-    // Render events
+    // ── ONGOING EVENTS (with live attendance) ──
+    // Check if the page has an ongoing events section
+    const ongoingSection = document.getElementById('ongoingEventsSection');
+    const ongoingGrid    = document.getElementById('ongoingEventsGrid');
+    if (ongoingSection && ongoingGrid) {
+        if (ongoingEvents.length > 0) {
+            ongoingSection.style.display = '';
+            const cards = await Promise.all(
+                ongoingEvents.map(async ev => {
+                    const count = await fetchEventAttendanceCount(ev.event_id);
+                    return renderOngoingEventCard(ev, count);
+                })
+            );
+            ongoingGrid.innerHTML = cards.join('');
+        } else {
+            ongoingSection.style.display = 'none';
+        }
+    }
+
+    // ── ALL EVENTS (Upcoming + Ongoing + Completed) ──
+    // This uses your ORIGINAL eventsGrid ID from the first version
     const eventsGrid = document.getElementById('eventsGrid');
     if (eventsGrid) {
-        eventsGrid.innerHTML = upcomingEvents.length
-            ? upcomingEvents.map(renderEvent).join('')
+        eventsGrid.innerHTML = allEvents.length
+            ? allEvents.map(renderEvent).join('')
             : `<div class="empty">
                    <i class="fa-solid fa-calendar-xmark"></i>
-                   <h3>No Upcoming Events</h3>
-                   <p>No events are scheduled for today or the near future.</p>
+                   <h3>No Events</h3>
+                   <p>No upcoming, ongoing, or completed events to display.</p>
                </div>`;
     }
 
-    // Refresh label
+    // ── Refresh label ──
     const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     const refreshLabel = document.getElementById('refreshLabel');
     if (refreshLabel) refreshLabel.textContent = `Last updated ${now} · auto-refreshes every 30s`;

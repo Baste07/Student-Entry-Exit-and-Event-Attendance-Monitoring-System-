@@ -19,10 +19,12 @@ function setupEventListeners() {
 
 function switchTab(tabName) {
     const isSetActive = tabName === 'setActive';
-    document.getElementById('tabSetActive').classList.toggle('active', isSetActive);
-    document.getElementById('tabCreateNew').classList.toggle('active', !isSetActive);
-    document.getElementById('panelSetActive').style.display = isSetActive ? '' : 'none';
-    document.getElementById('panelCreate').style.display = isSetActive ? 'none' : '';
+    document.getElementById('tabSetActive')?.classList.toggle('active', isSetActive);
+    document.getElementById('tabCreateNew')?.classList.toggle('active', !isSetActive);
+    const panelSetActive = document.getElementById('panelSetActive');
+    const panelCreate = document.getElementById('panelCreate');
+    if (panelSetActive) panelSetActive.style.display = isSetActive ? '' : 'none';
+    if (panelCreate) panelCreate.style.display = isSetActive ? 'none' : '';
 }
 
 function renderSchoolYearsSkeleton() {
@@ -34,7 +36,11 @@ function renderSchoolYearsSkeleton() {
     const banner = document.getElementById('activeSchoolYearBanner');
     if (banner) {
         banner.style.display = 'flex';
-        banner.innerHTML = '<span class="banner-badge">LOADING</span><span class="skeleton-block skeleton-line" style="max-width: 240px;"></span>';
+        // Don't overwrite innerHTML if the label element exists — just show loading state
+        const label = document.getElementById('activeSchoolYearLabel');
+        if (label) {
+            label.innerHTML = '<span class="skeleton-block skeleton-line" style="max-width: 240px;"></span>';
+        }
     }
 }
 
@@ -61,10 +67,12 @@ async function loadSchoolYears() {
         const label = document.getElementById('activeSchoolYearLabel');
 
         if (active) {
-            label.textContent = `${active.name}  ·  ${formatDate(active.start_date)} \u2192 ${formatDate(active.end_date)}`;
-            banner.style.display = 'flex';
+            if (label) {
+                label.textContent = `${active.name}  ·  ${formatDate(active.start_date)} \u2192 ${formatDate(active.end_date)}`;
+            }
+            if (banner) banner.style.display = 'flex';
         } else {
-            banner.style.display = 'none';
+            if (banner) banner.style.display = 'none';
         }
 
         populateExistingSchoolYearsDropdown();
@@ -118,23 +126,30 @@ function renderDetailsCard(schoolYearId) {
         return;
     }
 
-    document.getElementById('syDetailStart').textContent = formatDate(chosen.start_date);
-    document.getElementById('syDetailEnd').textContent = formatDate(chosen.end_date);
-
+    const startEl = document.getElementById('syDetailStart');
+    const endEl = document.getElementById('syDetailEnd');
     const statusEl = document.getElementById('syDetailStatus');
-    statusEl.textContent = chosen.is_active ? 'Active' : 'Inactive';
-    statusEl.className = `status-badge ${chosen.is_active ? 'active' : 'inactive'}`;
 
-    card.style.display = 'block';
-    activateBtn.disabled = !!chosen.is_active;
-    inactivateBtn.disabled = !chosen.is_active;
+    if (startEl) startEl.textContent = formatDate(chosen.start_date);
+    if (endEl) endEl.textContent = formatDate(chosen.end_date);
+
+    if (statusEl) {
+        statusEl.textContent = chosen.is_active ? 'Active' : 'Inactive';
+        statusEl.className = `status-badge ${chosen.is_active ? 'active' : 'inactive'}`;
+    }
+
+    if (card) card.style.display = 'block';
+    if (activateBtn) activateBtn.disabled = !!chosen.is_active;
+    if (inactivateBtn) inactivateBtn.disabled = !chosen.is_active;
 }
 
 function hideDetailsCard() {
     const card = document.getElementById('syDetailsCard');
     if (card) card.style.display = 'none';
-    document.getElementById('setActiveSchoolYearBtn').disabled = true;
-    document.getElementById('inactivateSchoolYearBtn').disabled = true;
+    const activateBtn = document.getElementById('setActiveSchoolYearBtn');
+    const inactivateBtn = document.getElementById('inactivateSchoolYearBtn');
+    if (activateBtn) activateBtn.disabled = true;
+    if (inactivateBtn) inactivateBtn.disabled = true;
 }
 
 async function handleSetActiveClick() {
@@ -153,19 +168,21 @@ async function handleSetActiveClick() {
     }
 
     try {
-        activateBtn.disabled = true;
-        activateBtn.textContent = 'Activating...';
+        if (activateBtn) {
+            activateBtn.disabled = true;
+            activateBtn.textContent = 'Activating...';
+        }
 
         await activateSchoolYear(selectedId);
         showAlert(`School year "${chosen.name}" is now active.`, 'success');
         await loadSchoolYears();
-        select.value = selectedId;
+        if (select) select.value = selectedId;
         renderDetailsCard(selectedId);
     } catch (error) {
         console.error('Error activating school year:', error);
         showAlert('Error activating school year: ' + error.message, 'danger');
     } finally {
-        activateBtn.textContent = 'Activate School Year';
+        if (activateBtn) activateBtn.textContent = 'Activate School Year';
     }
 }
 
@@ -185,8 +202,10 @@ async function handleInactivateClick() {
     }
 
     try {
-        inactivateBtn.disabled = true;
-        inactivateBtn.textContent = 'Inactivating...';
+        if (inactivateBtn) {
+            inactivateBtn.disabled = true;
+            inactivateBtn.textContent = 'Inactivating...';
+        }
 
         const { error } = await supabaseClient
             .from('school_years')
@@ -197,13 +216,13 @@ async function handleInactivateClick() {
 
         showAlert(`School year "${chosen.name}" has been inactivated.`, 'success');
         await loadSchoolYears();
-        select.value = selectedId;
+        if (select) select.value = selectedId;
         renderDetailsCard(selectedId);
     } catch (error) {
         console.error('Error inactivating school year:', error);
         showAlert('Error inactivating school year: ' + error.message, 'danger');
     } finally {
-        inactivateBtn.textContent = 'Inactivate School Year';
+        if (inactivateBtn) inactivateBtn.textContent = 'Inactivate School Year';
     }
 }
 
@@ -272,11 +291,14 @@ async function createSchoolYear() {
             showAlert(`School year "${name}" saved.`, 'success');
         }
 
-        input.value = '';
+        if (input) input.value = '';
         await loadSchoolYears();
         switchTab('setActive');
-        document.getElementById('existingSchoolYearSelect').value = inserted.id;
-        renderDetailsCard(inserted.id);
+        const select = document.getElementById('existingSchoolYearSelect');
+        if (select) {
+            select.value = inserted.id;
+            renderDetailsCard(inserted.id);
+        }
     } catch (error) {
         console.error('Error creating school year:', error);
         showAlert('Error creating school year: ' + error.message, 'danger');
@@ -311,6 +333,8 @@ function showAlert(message, type = 'info') {
     alertDiv.setAttribute('role', 'alert');
     alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
     const mainContent = document.querySelector('.main-content');
-    mainContent.insertBefore(alertDiv, mainContent.firstChild);
+    if (mainContent) {
+        mainContent.insertBefore(alertDiv, mainContent.firstChild);
+    }
     setTimeout(() => alertDiv.remove(), 5000);
 }

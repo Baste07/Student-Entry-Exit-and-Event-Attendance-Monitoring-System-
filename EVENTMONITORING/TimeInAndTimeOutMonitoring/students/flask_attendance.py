@@ -104,6 +104,10 @@ ANTI_SPOOF_FAIL_CLOSED = os.getenv("ANTI_SPOOF_FAIL_CLOSED", "1") == "1"
 ANTI_SPOOF_CACHE_TTL_SECONDS = float(os.getenv("ANTI_SPOOF_CACHE_TTL_SECONDS", "1.2"))
 ANTI_SPOOF_DEVICE_ID = int(os.getenv("ANTI_SPOOF_DEVICE_ID", "0"))
 
+CAMERA_OWNER_FILE = os.path.join(script_dir, "camera_owner.json")
+CAMERA_OWNER_STALE_SECONDS = float(os.getenv("CAMERA_OWNER_STALE_SECONDS", "90"))
+ENGINE_CAMERA_OWNER = "attendance"
+
 if not SUPABASE_URL or not SUPABASE_KEY:
     print(f"CRITICAL ERROR: Could not load credentials from {env_path}")
     sys.exit(1)
@@ -157,6 +161,62 @@ anti_spoof_state = {
     "last_error": None,
 }
 anti_spoof_cache = {}
+
+EVENT_LATE_GRACE_MINUTES = 15
+
+camera_owner_lock = threading.Lock()
+
+
+def _read_camera_owner_state():
+    try:
+        if not os.path.exists(CAMERA_OWNER_FILE):
+            return {"owner": None, "updated_at": 0}
+        with open(CAMERA_OWNER_FILE, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        owner = str(data.get("owner") or "").strip().lower()
+        updated_at = float(data.get("updated_at") or 0)
+        if owner not in {"attendance", "registration"}:
+            owner = None
+        return {"owner": owner, "updated_at": updated_at}
+    except Exception:
+        return {"owner": None, "updated_at": 0}
+
+
+def _write_camera_owner_state(owner):
+    owner = str(owner or "").strip().lower()
+    payload = {"owner": owner if owner in {"attendance", "registration"} else None, "updated_at": time.time()}
+    tmp = CAMERA_OWNER_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh)
+    os.replace(tmp, CAMERA_OWNER_FILE)
+    return payload
+
+
+def _is_owner_stale(updated_at):
+    return (time.time() - float(updated_at or 0)) > CAMERA_OWNER_STALE_SECONDS
+
+
+def _set_camera_owner(owner):
+    with camera_owner_lock:
+        return _write_camera_owner_state(owner)
+
+
+def _claim_camera_owner(force=False):
+    with camera_owner_lock:
+        state = _read_camera_owner_state()
+        owner = state.get("owner")
+        if force or owner in (None, ENGINE_CAMERA_OWNER) or _is_owner_stale(state.get("updated_at")):
+            return _write_camera_owner_state(ENGINE_CAMERA_OWNER), True
+        return state, False
+
+
+def _camera_owner_now():
+    state = _read_camera_owner_state()
+    return state.get("owner")
+
+
+def _has_camera_owner():
+    return _camera_owner_now() == ENGINE_CAMERA_OWNER
 
 # Module-level face DB globals (must exist before any function uses them)
 known_encodings    = []
@@ -321,6 +381,9 @@ def _set_engine_boot_state(**updates):
 
 _init_anti_spoof()
 
+# Claim camera ownership only if it is currently unowned/stale.
+_claim_camera_owner(force=False)
+
 # Last rebuild summary visible via /engine_status
 last_rebuild_summary = None
 current_face_fingerprint = None
@@ -337,6 +400,35 @@ def _to_json_safe(value):
     if isinstance(value, (str, int, float, bool)):
         return value
     return str(value)
+
+def _parse_event_start_datetime(event_row):
+    event_date = event_row.get("event_date")
+    time_start = event_row.get("time_start")
+    if not event_date or not time_start:
+        return None
+
+    if isinstance(event_date, datetime.date):
+        event_date_value = event_date
+    else:
+        event_date_value = datetime.date.fromisoformat(str(event_date))
+
+    if isinstance(time_start, datetime.time):
+        event_time_value = time_start
+    else:
+        event_time_value = datetime.time.fromisoformat(str(time_start))
+
+    return datetime.datetime.combine(event_date_value, event_time_value)
+
+def _event_late_minutes(event_row, scan_time):
+    event_start = _parse_event_start_datetime(event_row)
+    if not event_start or not scan_time:
+        return 0
+
+    grace_cutoff = event_start + datetime.timedelta(minutes=EVENT_LATE_GRACE_MINUTES)
+    if scan_time <= grace_cutoff:
+        return 0
+
+    return int((scan_time - event_start).total_seconds() // 60)
 
 def _list_face_images_for_folder(cloud_folder):
     last_error = None
@@ -1014,6 +1106,7 @@ def _record_event_attendance(student_id, meta):
             return
 
         now = datetime.datetime.now(datetime.timezone.utc)
+        now_local = datetime.datetime.now()
         ongoing   = [e for e in events if e.get("status") == "ongoing"]
         completed = [e for e in events if e.get("status") == "completed"]
         upcoming  = [e for e in events if e.get("status") == "upcoming"]
@@ -1024,6 +1117,8 @@ def _record_event_attendance(student_id, meta):
         if ongoing:
             ev    = ongoing[0]
             ev_id = ev["event_id"]
+            late_minutes = _event_late_minutes(ev, now_local)
+            attendance_remarks = f"Late by {late_minutes} min" if late_minutes > 0 else "On time"
 
             att_res = supabase.table("event_attendance")\
                 .select("*")\
@@ -1037,6 +1132,7 @@ def _record_event_attendance(student_id, meta):
                     "event_id": ev_id,
                     "student_id": student_id,
                     "time_in": now.isoformat(),
+                    "remarks": attendance_remarks,
                     "verified_by_facial_recognition": True,
                 }).execute()
                 _push({
@@ -1047,7 +1143,9 @@ def _record_event_attendance(student_id, meta):
                     "grade": meta.get("grade_level", ""),
                     "section": meta.get("section_name", ""),
                     "stud_id": meta.get("stud_id", ""),
-                    "event_name": ev.get("event_name", "")
+                    "event_name": ev.get("event_name", ""),
+                    "late_minutes": late_minutes,
+                    "attendance_status": "late" if late_minutes > 0 else "on-time",
                 })
                 return
 
@@ -1111,7 +1209,7 @@ def _record_event_attendance(student_id, meta):
                 "message": "NO TIME IN FOUND",
                 "name": meta["name"],
                 "type": "error",
-                "reason": "You did not time in for any completed event."
+                "reason": "You cannot time out because no valid time-in exists for any completed event."
             })
             return
 
@@ -1123,7 +1221,7 @@ def _record_event_attendance(student_id, meta):
             _push({
                 "message": "EVENT NOT STARTED",
                 "name": meta["name"],
-                "type": "error",
+                "type": "errfaor",
                 "event_name": ev.get("event_name", ""),
                 "reason": f"Event '{ev.get('event_name')}' hasn't started yet."
             })
@@ -1328,18 +1426,88 @@ except Exception:
 _cam_index = _find_camera_index(preferred_range=(1, 4), fallback_index=0, cli_index=CLI_CAMERA_INDEX)
 if _cam_index is None:
     _cam_index = 0
-camera = cv2.VideoCapture(_cam_index)
-camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-camera.set(cv2.CAP_PROP_FPS, 30)
+camera = None
+camera_runtime_lock = threading.Lock()
+
+
+def _open_attendance_camera():
+    if os.name == "nt" and hasattr(cv2, "CAP_DSHOW"):
+        return cv2.VideoCapture(_cam_index, cv2.CAP_DSHOW)
+    return cv2.VideoCapture(_cam_index)
+
+
+def _ensure_attendance_camera_open():
+    global camera
+    if not _has_camera_owner():
+        return False
+    with camera_runtime_lock:
+        if camera is not None and camera.isOpened():
+            return True
+        cam = _open_attendance_camera()
+        try:
+            cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            cam.set(cv2.CAP_PROP_FPS, 30)
+        except Exception:
+            pass
+        if cam is None or not cam.isOpened():
+            try:
+                if cam is not None:
+                    cam.release()
+            except Exception:
+                pass
+            return False
+        camera = cam
+        return True
+
+
+def _release_attendance_camera():
+    global camera, latest_frame
+    with camera_runtime_lock:
+        try:
+            if camera is not None and camera.isOpened():
+                camera.release()
+        except Exception:
+            pass
+        camera = None
+    with frame_lock:
+        latest_frame = None
+
+
+def _camera_wait_frame(message):
+    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    cv2.rectangle(frame, (0, 0), (640, 480), (16, 20, 28), -1)
+    cv2.putText(frame, "Camera is assigned to another engine", (42, 215),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.62, (210, 220, 235), 2)
+    cv2.putText(frame, message, (42, 248),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.56, (120, 190, 255), 2)
+    ret, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+    if not ret:
+        return b""
+    return (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buf.tobytes() + b'\r\n')
 
 def generate_frames():
     global latest_frame
     while True:
+        if not _has_camera_owner():
+            _release_attendance_camera()
+            owner = _camera_owner_now() or "none"
+            yield _camera_wait_frame(f"Current owner: {owner}. Click switch to continue.")
+            time.sleep(0.08)
+            continue
+
+        if not _ensure_attendance_camera_open():
+            yield _camera_wait_frame("Unable to open camera. Check camera permissions/hardware.")
+            time.sleep(0.12)
+            continue
+
         ok, frame = camera.read()
         if not ok:
-            break
+            _release_attendance_camera()
+            yield _camera_wait_frame("Camera read failed. Retrying...")
+            time.sleep(0.1)
+            continue
         with frame_lock:
             latest_frame = frame.copy()
         x1, y1, x2, y2 = get_guide_bounds(frame.shape)
@@ -1397,8 +1565,11 @@ def video_feed():
 def engine_status():
     with engine_boot_lock:
         payload = dict(engine_boot_state)
+    owner_state = _read_camera_owner_state()
     payload["face_db_ready"] = face_db_ready.is_set()
     payload["engine_online"] = True
+    payload["camera_owner"] = owner_state.get("owner")
+    payload["camera_owned_by_this_engine"] = owner_state.get("owner") == ENGINE_CAMERA_OWNER
     payload["anti_spoof"] = {
         "enabled": anti_spoof_state.get("enabled"),
         "available": anti_spoof_state.get("available"),
@@ -1414,6 +1585,43 @@ def engine_status():
     except Exception:
         payload["last_rebuild_summary"] = None
     return jsonify(payload)
+
+
+@app.route('/camera_control', methods=['GET', 'POST'])
+def camera_control():
+    if request.method == 'GET':
+        state = _read_camera_owner_state()
+        return jsonify({
+            "success": True,
+            "owner": state.get("owner"),
+            "updated_at": state.get("updated_at"),
+            "engine": ENGINE_CAMERA_OWNER,
+            "owns_camera": state.get("owner") == ENGINE_CAMERA_OWNER,
+        })
+
+    data = request.get_json(silent=True) or {}
+    target_owner = str(data.get("owner") or "").strip().lower()
+    force = bool(data.get("force", True))
+    if target_owner not in {"attendance", "registration"}:
+        return jsonify({"success": False, "message": "owner must be attendance or registration"}), 400
+
+    if target_owner == ENGINE_CAMERA_OWNER:
+        state, changed = _claim_camera_owner(force=force)
+    else:
+        state = _set_camera_owner(target_owner)
+        changed = True
+        _release_attendance_camera()
+        with result_lock:
+            recognition_result.update({"locations": [], "labels": [], "colors": []})
+
+    return jsonify({
+        "success": True,
+        "owner": state.get("owner"),
+        "updated_at": state.get("updated_at"),
+        "engine": ENGINE_CAMERA_OWNER,
+        "owns_camera": state.get("owner") == ENGINE_CAMERA_OWNER,
+        "changed": bool(changed),
+    })
 
 
 @app.route('/trigger_rebuild', methods=['POST'])
@@ -1495,9 +1703,8 @@ def face_auto_sync_worker():
 def shutdown():
     print("--- Shutdown request received: Cleaning up ---")
     try:
-        if camera.isOpened():
-            camera.release()
-            print("✓ Camera hardware released")
+        _release_attendance_camera()
+        print("✓ Camera hardware released")
         thread_pool.shutdown(wait=False)
         print("✓ Terminating process...")
         os.kill(os.getpid(), signal.SIGTERM)
