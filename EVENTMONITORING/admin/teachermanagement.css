@@ -4,7 +4,7 @@
    ============================================ */
 
 :root {
-    font-size: 125%;
+    font-size: 100%;
     --blue-dark:    #0b4e78;
     --blue-mid:     #176aa4;
     --blue-sidebar: #0a3f61;
@@ -175,7 +175,7 @@
     border-radius: 0.75rem;
     padding: 2rem;
     text-align: center;
-    background: rgba(15, 68, 35, 0.02);
+    background: rgba(23, 106, 164, 0.04);
     cursor: pointer;
     transition: all 0.3s ease;
 }
@@ -723,7 +723,7 @@
 }
 
 .stat-card.green {
-    border-top: 4px solid #10b981;
+    border-top: 4px solid var(--blue-btn);
 }
 
 .stat-card.blue {
@@ -893,37 +893,55 @@
 
 /* ==================== BADGES ==================== */
 .badge {
-    display: inline-block;
-    padding: 0.35rem 0.8rem;
-    border-radius: 99px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.42rem 0.8rem;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 700;
     letter-spacing: 0.02em;
+    border: 1px solid transparent;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45);
+}
+
+.badge::before {
+    content: '';
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.85;
 }
 
 .badge-active {
-    background: #d1fae5;
-    color: #065f46;
+    background: #dcfce7;
+    color: #166534;
+    border-color: #bbf7d0;
 }
 
 .badge-inactive {
-    background: #f1f5f9;
-    color: #64748b;
+    background: #eef5fb;
+    color: #4b6b87;
+    border-color: #dbe8f4;
 }
 
 .badge-suspended {
-    background: #fee2e2;
-    color: #991b1b;
+    background: #fdf4e6;
+    color: #b45309;
+    border-color: #f7d9b5;
 }
 
 .badge-faculty {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #ebf3ff;
+    color: #1d4ed8;
+    border-color: #cfe0ff;
 }
 
 .badge-admin {
-    background: #ede9fe;
-    color: #5b21b6;
+    background: #eaf4ff;
+    color: #0f5fa8;
+    border-color: #cfe5ff;
 }
 
 /* ==================== ACTION BUTTONS ==================== */

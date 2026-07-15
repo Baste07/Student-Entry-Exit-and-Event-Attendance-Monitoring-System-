@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
+    <title>Reports | Entry-Exit Module</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+    <link rel="stylesheet" href="../resc/css/reports.css">
+
+    <!-- jsPDF for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-file-lines"></i> Reports</h1>
+                    <p>Generate and export entry-exit attendance summaries</p>
+                </div>
+            </div>
+            <hr>
+
+            <!-- Report Generator -->
+            <div class="controls-card">
+                <div class="controls-header">
+                    <h2><i class="fa-solid fa-sliders-h"></i> Report Parameters</h2>
+                </div>
+                <div class="table-controls">
+                    <div class="control-group">
+                        <label><i class="fa-solid fa-file-chart-column"></i> Report Type</label>
+                        <select id="reportType">
+                            <option value="daily">Daily Summary</option>
+                            <option value="weekly">Weekly Summary</option>
+                            <option value="student">Per-Student Summary</option>
+                            <option value="grade">Per-Grade Summary</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fa-regular fa-calendar"></i> Date From</label>
+                        <input type="date" id="reportFrom">
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fa-regular fa-calendar"></i> Date To</label>
+                        <input type="date" id="reportTo">
+                    </div>
+                    <div class="control-group" style="display:flex;align-items:flex-end;gap:8px;">
+                        <button class="btn-generate" onclick="generateReport()">
+                            <i class="fa-solid fa-chart-bar"></i> Generate
+                        </button>
+                        <button class="btn-export-pdf" onclick="exportPDF()">
+                            <i class="fa-solid fa-file-pdf"></i> PDF
+                        </button>
+                        <button class="btn-export-csv" onclick="exportCSV()">
+                            <i class="fa-solid fa-file-csv"></i> CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="panel" id="chartPanel" style="display:none;">
+                <div class="panel-title">
+                    <i class="fa-solid fa-chart-bar"></i>
+                    <span id="chartTitle">Entry-Exit Activity</span>
+                </div>
+                <div style="position:relative;height:280px;">
+                    <canvas id="reportChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Summary Table -->
+            <div class="panel" id="tablePanel" style="display:none;">
+                <div class="panel-title">
+                    <i class="fa-solid fa-table"></i>
+                    <span id="tableTitle">Report Data</span>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="reportTable">
+                        <thead id="reportTableHead"></thead>
+                        <tbody id="reportTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="emptyState" class="empty-state">
+                <i class="fa-solid fa-chart-bar"></i>
+                <p>Select a report type and date range, then click Generate.</p>
+            </div>
+
+        </div>
+    </main>
+
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+    <script src="../resc/js/reports.js"></script>
+    <script>
+        loadHeader();
+        loadSidebar('reports');
+    </script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 /* Matches Teacher Management page format exactly */
 
 :root {
-    font-size: 125%;
+    font-size: 100%;
     --blue-dark:    #0b4e78;
     --blue-mid:     #176aa4;
     --blue-sidebar: #0a3f61;
@@ -750,11 +750,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    background: #f8fafc;
-    border: 1px solid var(--border);
     border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    min-width: 220px;
 }
 
 .search-box svg {

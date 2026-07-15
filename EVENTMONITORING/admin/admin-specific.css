@@ -4,7 +4,7 @@
    ------------------------------------------- */
 
 :root {
-    font-size: 125%;
+    font-size: 100%;
     --blue-dark:    #0b4e78;
     --blue-mid:     #176aa4;
     --blue-sidebar: #0a3f61;
@@ -24,7 +24,7 @@
 }
 
 html {
-    font-size: 125%;
+    font-size: 100%;
 }
 
 /* Override global defaults for admin pages */
@@ -419,6 +419,48 @@ body {
 
 .stat-card.orange .stat-sub {
     color: #ea580c;
+}
+
+/* Skeleton Loading */
+.skeleton-row td {
+    padding: 0.8rem 1rem;
+}
+
+.skeleton-block {
+    position: relative;
+    overflow: hidden;
+    display: block;
+    width: 100%;
+    min-height: 0.95rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #e6eef4 25%, #f5f8fb 37%, #e6eef4 63%);
+    background-size: 400% 100%;
+    animation: skeletonShimmer 1.2s ease-in-out infinite;
+}
+
+.skeleton-line {
+    height: 0.95rem;
+}
+
+.skeleton-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.skeleton-card .skeleton-block:first-child {
+    width: 60%;
+    height: 0.9rem;
+}
+
+.skeleton-card .skeleton-block:last-child {
+    width: 40%;
+    height: 1.3rem;
+}
+
+@keyframes skeletonShimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
 }
 
 /* Animations */

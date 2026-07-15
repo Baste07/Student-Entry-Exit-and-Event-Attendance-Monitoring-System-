@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
+    <title>Students | Entry-Exit Module</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+    <link rel="stylesheet" href="../resc/css/students.css">
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-users"></i> Students</h1>
+                    <p>Manage student records and face recognition enrollment status</p>
+                </div>
+                <div class="stats-badges">
+                    <span class="stat-badge"><i class="fa-solid fa-users"></i> <span id="badgeTotal">0</span> Total</span>
+                    <span class="stat-badge registered"><i class="fa-solid fa-face-smile"></i> <span id="badgeFaceReg">0</span> Face Enrolled</span>
+                    <span class="stat-badge pending"><i class="fa-solid fa-circle-exclamation"></i> <span id="badgePending">0</span> Pending</span>
+                </div>
+                <button class="btn-add" onclick="openFaceRegModal()">
+                    <i class="fa-solid fa-camera"></i> Register Face
+                </button>
+            </div>
+            <hr>
+
+            <!-- Filters -->
+            <div class="controls-card">
+                <div class="controls-header">
+                    <h2><i class="fa-solid fa-sliders-h"></i> Filters &amp; Search</h2>
+                </div>
+                <div class="table-controls">
+                    <div class="control-group">
+                        <label><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                        <input type="text" id="searchInput" placeholder="Search by name or student ID">
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fa-solid fa-graduation-cap"></i> Grade Level</label>
+                        <select id="gradeFilter">
+                            <option value="">All Grades</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fa-solid fa-face-smile"></i> Face Status</label>
+                        <select id="faceFilter">
+                            <option value="">All</option>
+                            <option value="enrolled">Enrolled</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                    </div>
+                    <div class="control-group" style="display:flex;align-items:flex-end;">
+                        <button id="clearFilters" class="btn btn-clear">
+                            <i class="fa-solid fa-eraser"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Grade</th>
+                            <th>Section</th>
+                            <th>Face Status</th>
+                            <th>Last Entry</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentsTableBody">
+                        <tr>
+                            <td colspan="7" class="loading-cell">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading students...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="pagination"></div>
+
+        </div>
+    </main>
+
+    <!-- Face Reg Modal (iframe to gate scanner) -->
+    <div id="faceRegModal" class="modal">
+        <div class="modal-content modal-md">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-camera"></i> Register Student Face</h2>
+                <button class="close-modal" onclick="closeFaceRegModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:24px;">
+                <p style="margin-bottom:16px;color:#6a8092;font-size:14px;">
+                    To enroll a student's face, open the Gate Scanner page and use the Registration mode.
+                </p>
+                <a href="../../TimeInAndTimeOutMonitoring/students/accountRegistration.html" target="_blank" class="btn-primary">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Gate Registration
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Logs Modal -->
+    <div id="logsModal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 id="logsModalTitle"><i class="fa-solid fa-clock-rotate-left"></i> Student Logs</h2>
+                <button class="close-modal" onclick="closeModal('logsModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Method</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentLogsBody">
+                        <tr><td colspan="4" class="loading-cell"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+    <script src="../resc/js/students.js"></script>
+    <script>
+        loadHeader();
+        loadSidebar('students');
+    </script>
+</body>
+</html>

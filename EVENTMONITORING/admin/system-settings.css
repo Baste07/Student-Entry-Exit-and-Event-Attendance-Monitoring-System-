@@ -1,5 +1,5 @@
 :root {
-    font-size: 125%;
+    font-size: 100%;
     --blue-dark:    #0b4e78;
     --blue-mid:     #176aa4;
     --blue-sidebar: #0a3f61;
@@ -205,7 +205,7 @@
 
 .form-control:focus {
     border-color: var(--green-btn);
-    box-shadow: 0 0 0 3px rgba(26, 107, 54, 0.1);
+    box-shadow: 0 0 0 3px rgba(23, 106, 164, 0.12);
     outline: none;
 }
 
@@ -253,7 +253,7 @@ textarea.form-control { resize: vertical; font-family: inherit; }
     transition: all 0.2s ease;
 }
 
-.feature-item:hover { background-color: #e8eceb; border-color: var(--green-btn); }
+.feature-item:hover { background-color: #eef5fb; border-color: var(--green-btn); }
 
 .feature-info { flex: 1; }
 .feature-info label { display: block; font-weight: 500; color: var(--text-main); margin-bottom: 0.25rem; cursor: pointer; }
@@ -273,7 +273,7 @@ textarea.form-control { resize: vertical; font-family: inherit; }
 }
 
 .form-check-input:checked { background-color: var(--green-btn); border-color: var(--green-btn); }
-.form-check-input:focus   { box-shadow: 0 0 0 0.25rem rgba(26,107,54,0.25); border-color: var(--green-btn); }
+.form-check-input:focus   { box-shadow: 0 0 0 0.25rem rgba(23,106,164,0.2); border-color: var(--green-btn); }
 
 /* ── File upload ── */
 .file-upload-group { display: flex; flex-direction: column; gap: 0.5rem; }

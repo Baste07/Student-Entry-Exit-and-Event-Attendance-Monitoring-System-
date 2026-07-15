@@ -25,7 +25,22 @@ function switchTab(tabName) {
     document.getElementById('panelCreate').style.display = isSetActive ? 'none' : '';
 }
 
+function renderSchoolYearsSkeleton() {
+    const select = document.getElementById('existingSchoolYearSelect');
+    if (select) {
+        select.innerHTML = '<option value="" disabled selected>Loading school years...</option>';
+    }
+
+    const banner = document.getElementById('activeSchoolYearBanner');
+    if (banner) {
+        banner.style.display = 'flex';
+        banner.innerHTML = '<span class="banner-badge">LOADING</span><span class="skeleton-block skeleton-line" style="max-width: 240px;"></span>';
+    }
+}
+
 async function loadSchoolYears() {
+    renderSchoolYearsSkeleton();
+
     try {
         if (!supabaseClient) {
             console.error('Supabase client not initialized');
