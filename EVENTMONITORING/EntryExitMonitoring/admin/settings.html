@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
+    <title>Settings | Entry-Exit Module</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+    <link rel="stylesheet" href="../resc/css/settings.css">
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-gear"></i> Settings</h1>
+                    <p>Configure gate scanner behavior and system preferences</p>
+                </div>
+            </div>
+            <hr>
+
+            <!-- Gate Timing -->
+            <div class="settings-section">
+                <div class="section-label">
+                    <i class="fa-solid fa-clock"></i> Gate Hours
+                </div>
+                <div class="settings-card">
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <strong>Gate Open Time</strong>
+                            <span>Time when the gate scanner starts accepting entries</span>
+                        </div>
+                        <input type="time" id="gateOpen" class="setting-input">
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <strong>Gate Close Time</strong>
+                            <span>Time when the gate scanner stops accepting scans</span>
+                        </div>
+                        <input type="time" id="gateClose" class="setting-input">
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <strong>Late Arrival Threshold</strong>
+                            <span>Students entering after this time are marked as Late</span>
+                        </div>
+                        <input type="time" id="lateThreshold" class="setting-input">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scanner Behavior -->
+            <div class="settings-section">
+                <div class="section-label">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Scanner Behavior
+                </div>
+                <div class="settings-card">
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <strong>Preferred Scan Method</strong>
+                            <span>Default recognition method when the gate opens</span>
+                        </div>
+                        <select id="scanMethod" class="setting-input">
+                            <option value="face">Face Recognition</option>
+                            <option value="qr">QR Code</option>
+                            <option value="both">Both (Face + QR)</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <strong>Anti-Spoof Check</strong>
+                            <span>Require liveness detection to prevent photo spoofing</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="antiSpoof" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <strong>Auto Exit Detection</strong>
+                            <span>Automatically log exit when same student scans again after entry</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="autoExit" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <strong>Cooldown Period (seconds)</strong>
+                            <span>Minimum seconds between scans for the same student</span>
+                        </div>
+                        <input type="number" id="cooldown" class="setting-input" min="1" max="300" value="10" style="width:100px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notifications -->
+            <div class="settings-section">
+                <div class="section-label">
+                    <i class="fa-solid fa-bell"></i> Notifications
+                </div>
+                <div class="settings-card">
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <strong>Guardian SMS Notification</strong>
+                            <span>Send SMS to guardian when student enters or exits</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="smsEnabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <strong>Notify on Entry Only</strong>
+                            <span>Only send notification on gate entry (not exit)</span>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="notifyEntryOnly">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="save-row">
+                <button class="btn-save" onclick="saveSettings()">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Settings
+                </button>
+                <button class="btn-reset" onclick="resetSettings()">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Defaults
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+    <script src="../resc/js/settings.js"></script>
+    <script>
+        loadHeader();
+        loadSidebar('settings');
+    </script>
+</body>
+</html>

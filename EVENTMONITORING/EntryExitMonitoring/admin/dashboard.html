@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
+    <title>Dashboard | Entry-Exit Module</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+    <link rel="stylesheet" href="../resc/css/dashboard.css">
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-chart-pie"></i> Dashboard</h1>
+                    <p>Real-time overview of student gate entry and exit activity</p>
+                </div>
+            </div>
+            <hr>
+
+            <!-- Stat Cards -->
+            <div class="stat-cards">
+                <div class="stat-card anim anim-1">
+                    <div class="stat-label">
+                        Total Students
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div class="stat-value" id="statTotalStudents">—</div>
+                    <div class="stat-sub">Enrolled in system</div>
+                </div>
+                <div class="stat-card anim anim-2">
+                    <div class="stat-label">
+                        Entered Today
+                        <i class="fa-solid fa-door-open"></i>
+                    </div>
+                    <div class="stat-value" id="statEnteredToday">—</div>
+                    <div class="stat-sub">Gate entries today</div>
+                </div>
+                <div class="stat-card anim anim-3">
+                    <div class="stat-label">
+                        Currently Inside
+                        <i class="fa-solid fa-building-user"></i>
+                    </div>
+                    <div class="stat-value" id="statInsideCampus">—</div>
+                    <div class="stat-sub">On campus now</div>
+                </div>
+                <div class="stat-card anim anim-4">
+                    <div class="stat-label">
+                        Exited Today
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </div>
+                    <div class="stat-value" id="statExitedToday">—</div>
+                    <div class="stat-sub">Gate exits today</div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="panel anim anim-5">
+                <div class="panel-title">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    Recent Entry/Exit Activity
+                </div>
+                <table class="data-table" id="recentLogsTable">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Student ID</th>
+                            <th>Grade & Section</th>
+                            <th>Type</th>
+                            <th>Method</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentLogsBody">
+                        <tr>
+                            <td colspan="6" class="loading-cell">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+    <script src="../resc/js/dashboard.js"></script>
+    <script>
+        loadHeader();
+        loadSidebar('dashboard');
+    </script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
+    <title>Entry-Exit Logs | Entry-Exit Module</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+    <link rel="stylesheet" href="../resc/css/entry-exitLogs.css">
+</head>
+<body>
+
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="container">
+
+            <div class="page-header">
+                <div class="header-titles">
+                    <h1><i class="fa-solid fa-right-left"></i> Entry-Exit Logs</h1>
+                    <p>View and filter all student gate entry and exit records</p>
+                </div>
+                <div class="stats-badges">
+                    <span class="stat-badge"><i class="fa-solid fa-list"></i> <span id="badgeTotal">0</span> Records</span>
+                    <span class="stat-badge entry"><i class="fa-solid fa-door-open"></i> <span id="badgeEntries">0</span> Entries</span>
+                    <span class="stat-badge exit"><i class="fa-solid fa-right-from-bracket"></i> <span id="badgeExits">0</span> Exits</span>
+                </div>
+                <button class="btn-add" onclick="exportCSV()">
+                    <i class="fa-solid fa-file-csv"></i> Export CSV
+                </button>
+            </div>
+            <hr>
+
+            <!-- Filters -->
+            <div class="controls-card">
+                <div class="controls-header">
+                    <h2><i class="fa-solid fa-sliders-h"></i> Filters &amp; Search</h2>
+                </div>
+                <div class="table-controls">
+                    <div class="control-group">
+                        <label><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+                        <input type="text" id="searchInput" placeholder="Search by name or student ID">
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fa-solid fa-right-left"></i> Log Type</label>
+                        <select id="typeFilter">
+                            <option value="">All Types</option>
+                            <option value="entry">Entry</option>
+                            <option value="exit">Exit</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fa-solid fa-wand-magic-sparkles"></i> Method</label>
+                        <select id="methodFilter">
+                            <option value="">All Methods</option>
+                            <option value="face">Face Recognition</option>
+                            <option value="qr">QR Code</option>
+                            <option value="manual">Manual</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fa-regular fa-calendar"></i> Date From</label>
+                        <input type="date" id="dateFrom">
+                    </div>
+                    <div class="control-group">
+                        <label><i class="fa-regular fa-calendar"></i> Date To</label>
+                        <input type="date" id="dateTo">
+                    </div>
+                    <div class="control-group" style="display:flex;align-items:flex-end;">
+                        <button id="clearFilters" class="btn btn-clear">
+                            <i class="fa-solid fa-eraser"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Grade</th>
+                            <th>Section</th>
+                            <th>Type</th>
+                            <th>Method</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTableBody">
+                        <tr>
+                            <td colspan="8" class="loading-cell">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading logs...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="pagination"></div>
+
+        </div>
+    </main>
+
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Done!</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+    <script src="../resc/js/entryExitLogs.js"></script>
+    <script>
+        loadHeader();
+        loadSidebar('entry-exitLogs');
+    </script>
+</body>
+</html>
