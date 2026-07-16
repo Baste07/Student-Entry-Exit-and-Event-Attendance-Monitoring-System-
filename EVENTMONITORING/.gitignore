@@ -71,4 +71,4 @@ TimeInAndTimeOutMonitoring/students/START_ATTENDANCE.bat
 TimeInAndTimeOutMonitoring/students/START_REGISTRATION.bat
 TimeInAndTimeOutMonitoring/students/START_SILENT.bat
 TimeInAndTimeOutMonitoring/students/trigger_attendance.php
-TimeInAndTimeOutMonitoring/students/trigger_registration.phps
+TimeInAndTimeOutMonitoring/students/trigger_registration.php
