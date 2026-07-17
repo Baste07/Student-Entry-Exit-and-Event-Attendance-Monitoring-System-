@@ -990,3 +990,24 @@ nav a.active {
 .sync-box.warn .sync-btn-close:hover {
     background: #92400e;
 }
+
+/* ── Email Toast Variant ─────────────────────── */
+#toast.email-success {
+    background: linear-gradient(135deg, #0b4e78 0%, #14532d 100%);
+    color: #fff;
+    border: 1.5px solid #22c55e;
+}
+
+#toast.email-fail {
+    background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+    color: #fff;
+    border: 1.5px solid #f87171;
+}
+
+#toast.email-success::before {
+    content: "📧 ";
+}
+
+#toast.email-fail::before {
+    content: "⚠️ ";
+}

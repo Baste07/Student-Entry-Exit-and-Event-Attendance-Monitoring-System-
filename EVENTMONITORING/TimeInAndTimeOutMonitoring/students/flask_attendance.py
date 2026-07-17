@@ -15,7 +15,9 @@ env_path = os.path.join(script_dir, '.env')
 load_dotenv(env_path, override=True)
 
 # 4. Standard Imports (Cleaned up, no duplicates)
+
 import io, signal, warnings, datetime, queue, threading, json, time, hashlib
+import urllib.request          # ← ADD THIS
 import numpy as np
 import cv2
 import face_recognition
@@ -390,6 +392,32 @@ current_face_fingerprint = None
 
 thread_pool = ThreadPoolExecutor(max_workers=3)
 
+
+# ═════════════════════════════════════════════════════════════
+# EMAIL STATUS TRACKING
+# ═════════════════════════════════════════════════════════════
+email_status_lock = threading.Lock()
+email_status_log = []  # List of recent email send attempts
+MAX_EMAIL_LOG = 50
+
+def _log_email_status(student_id, event_id, email_type, success, message, details=None):
+    """Log email send result for UI display."""
+    entry = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "student_id": str(student_id),
+        "event_id": str(event_id),
+        "type": email_type,  # "time_in" or "time_out"
+        "success": bool(success),
+        "message": str(message),
+        "details": details or {},
+    }
+    with email_status_lock:
+        email_status_log.insert(0, entry)
+        if len(email_status_log) > MAX_EMAIL_LOG:
+            email_status_log.pop()
+    status_emoji = "✓" if success else "✗"
+    print(f"  {status_emoji} Email {email_type} | {message}")
+
 def _hash_payload(obj) -> str:
     payload = json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -429,6 +457,104 @@ def _event_late_minutes(event_row, scan_time):
         return 0
 
     return int((scan_time - event_start).total_seconds() // 60)
+
+def _send_attendance_email(student_id, event_id, timestamp_iso, meta, event_row,
+                           email_type="time_in", time_in_recorded=None, duration_minutes=0):
+    """Fire-and-forget email notification to the student via PHP endpoint."""
+    payload = {
+        "student_id": str(student_id),
+        "event_id": str(event_id),
+        "type": email_type,
+        "timestamp": timestamp_iso,
+        "email": meta.get("email"),
+        "student_name": meta.get("name"),
+        "stud_id": meta.get("stud_id"),
+        "grade_level": meta.get("grade_level"),
+        "section_name": meta.get("section_name"),
+        "event_name": event_row.get("event_name"),
+        "event_date": str(event_row.get("event_date")),
+        "time_start": str(event_row.get("time_start")),
+        "time_end": str(event_row.get("time_end")),
+        "location": event_row.get("location"),
+        "description": event_row.get("description"),
+    }
+
+    if email_type == "time_in":
+        late = meta.get("late_minutes", 0)
+        payload["late_minutes"] = late
+        payload["status"] = "late" if late > 0 else "on-time"
+    elif email_type == "time_out":
+        payload["time_in_recorded"] = time_in_recorded
+        payload["duration_minutes"] = duration_minutes
+
+    # ── Validate we have an email ──
+    student_email = meta.get("email")
+    if not student_email:
+        _log_email_status(
+            student_id, event_id, email_type,
+            success=False,
+            message="No email on file for student",
+            details={"student_name": meta.get("name")}
+        )
+        return
+
+    try:
+        req = urllib.request.Request(
+            "http://localhost/CAPSTONEFINAL/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/send_event_attendance_email.php",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        response = urllib.request.urlopen(req, timeout=8)
+        response_body = response.read().decode("utf-8")
+        
+        # Parse PHP response
+        try:
+            resp_json = json.loads(response_body)
+            if resp_json.get("success"):
+                _log_email_status(
+                    student_id, event_id, email_type,
+                    success=True,
+                    message=resp_json.get("message", "Email sent"),
+                    details={
+                        "student_name": meta.get("name"),
+                        "event_name": event_row.get("event_name"),
+                        "to_email": student_email,
+                    }
+                )
+            else:
+                _log_email_status(
+                    student_id, event_id, email_type,
+                    success=False,
+                    message=resp_json.get("message", "Unknown error from PHP"),
+                    details={
+                        "student_name": meta.get("name"),
+                        "diagnostic": resp_json.get("diagnostic"),
+                    }
+                )
+        except json.JSONDecodeError:
+            _log_email_status(
+                student_id, event_id, email_type,
+                success=False,
+                message="Invalid JSON response from PHP",
+                details={"raw_response": response_body[:200]}
+            )
+
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8") if e.fp else ""
+        _log_email_status(
+            student_id, event_id, email_type,
+            success=False,
+            message=f"HTTP {e.code}: {e.reason}",
+            details={"response": error_body[:200]}
+        )
+    except Exception as e:
+        _log_email_status(
+            student_id, event_id, email_type,
+            success=False,
+            message=str(e),
+            details={"error_type": type(e).__name__}
+        )
 
 def _list_face_images_for_folder(cloud_folder):
     last_error = None
@@ -664,7 +790,7 @@ def _fetch_student_details(student_ids):
         return {}
     try:
         res = supabase.table("students")\
-            .select("student_id, section_id, stud_id")\
+            .select("student_id, section_id, stud_id, email")\
             .in_("student_id", student_ids)\
             .execute()
         students = res.data or []
@@ -688,8 +814,10 @@ def _fetch_student_details(student_ids):
                 "stud_id": s.get("stud_id"),
                 "grade_level": sec_info.get("grade_level"),
                 "section_name": sec_info.get("section_name"),
+                "email": s.get("email"),  # ← ADD THIS
             }
         return mapping
+        
     except Exception as e:
         print(f"⚠ Failed to fetch student details: {e}")
         return {}
@@ -930,6 +1058,7 @@ def load_all_faces(force_rebuild=False):
                     "stud_id":     details.get("stud_id"),
                     "grade_level": details.get("grade_level"),
                     "section_name":details.get("section_name"),
+                    "email":       details.get("email"),  # ← ADD THIS
                 }
             else:
                 mid  = row.get("middle_name") or ""
@@ -1135,6 +1264,14 @@ def _record_event_attendance(student_id, meta):
                     "remarks": attendance_remarks,
                     "verified_by_facial_recognition": True,
                 }).execute()
+
+                    # ── SEND TIME-IN EMAIL ──
+                meta["late_minutes"] = late_minutes
+                thread_pool.submit(
+                    _send_attendance_email,
+                    student_id, ev_id, now.isoformat(), meta, ev,
+                    email_type="time_in"
+                )
                 _push({
                     "message": f"TIME IN {meta['name']}",
                     "name": meta["name"],
@@ -1193,6 +1330,24 @@ def _record_event_attendance(student_id, meta):
                         "time_out": now.isoformat(),
                         "verified_by_facial_recognition": True,
                     }).eq("attendance_id", row["attendance_id"]).execute()
+
+                       # ── SEND TIME-OUT EMAIL ──
+                    time_in_iso = row.get("time_in", "")
+                    duration = 0
+                    if time_in_iso:
+                        try:
+                            t_in = datetime.datetime.fromisoformat(time_in_iso.replace("Z", "+00:00"))
+                            duration = int((now - t_in).total_seconds() // 60)
+                        except Exception:
+                            pass
+
+                    thread_pool.submit(
+                        _send_attendance_email,
+                        student_id, ev_id, now.isoformat(), meta, ev,
+                        email_type="time_out",
+                        time_in_recorded=time_in_iso,
+                        duration_minutes=duration
+                    )
                     _push({
                         "message": f"TIME OUT {meta['name']}",
                         "name": meta["name"],
@@ -1812,6 +1967,28 @@ def ongoing_events():
         return jsonify({"success": True, "events": res.data or []})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
+    
+
+@app.route('/email_status', methods=['GET'])
+def email_status():
+    """Return recent email send status log for UI display."""
+    limit = request.args.get('limit', 20, type=int)
+    with email_status_lock:
+        logs = list(email_status_log[:limit])
+    return jsonify({
+        "success": True,
+        "count": len(logs),
+        "logs": logs,
+    })
+
+@app.route('/email_status/latest', methods=['GET'])
+def email_status_latest():
+    """Return only the most recent email status entry."""
+    with email_status_lock:
+        latest = email_status_log[0] if email_status_log else None
+    if latest:
+        return jsonify({"success": True, "log": latest})
+    return jsonify({"success": False, "message": "No email activity yet"})
 
 if __name__ == '__main__':
     threading.Thread(target=load_all_faces, kwargs={"force_rebuild": FORCE_FACE_CACHE_REBUILD}, daemon=True).start()
