@@ -173,6 +173,50 @@ function updateSessionButtonState() {
     renderTileStates();
 }
 
+
+// ══════════════════════════════════════════════════
+// EMAIL STATUS TOAST
+// ══════════════════════════════════════════════════
+
+let _lastEmailTimestamp = null;
+
+async function checkEmailStatus() {
+    if (!isEngineOnline) return;
+    try {
+        const res = await fetch('http://127.0.0.1:5000/email_status/latest');
+        const data = await res.json();
+        if (!data.success || !data.log) return;
+
+        const log = data.log;
+        // Only show toast for new entries we haven't shown yet
+        if (log.timestamp === _lastEmailTimestamp) return;
+        _lastEmailTimestamp = log.timestamp;
+
+        const studentName = log.details?.student_name || 'Student';
+        const eventName = log.details?.event_name || 'Event';
+        const typeLabel = log.type === 'time_out' ? 'Time-Out' : 'Time-In';
+
+        if (log.success) {
+            showToast(
+                `📧 Email sent! ${studentName} — ${typeLabel} confirmation for "${eventName}"`,
+                'green',
+                4000
+            );
+        } else {
+            showToast(
+                `📧 Email failed for ${studentName}: ${log.message}`,
+                'red',
+                5000
+            );
+        }
+    } catch (_) {
+        // Silently fail — email status is non-critical
+    }
+}
+
+// Poll email status every 3 seconds
+setInterval(checkEmailStatus, 3000);
+
 // Set initial state
 renderStripStatus();
 renderTileStates();
@@ -532,11 +576,13 @@ function handleRecognitionEvent(d) {
     if (d.type === 'time_in') {
         showGreeting(name, message, false, details);
         showToast(`${name} timed in · ${details.event_name || 'Event'}`, 'green', 3000);
+        // Email toast will appear via polling shortly
         return;
     }
     if (d.type === 'time_out') {
         showGreeting(name, message, false, details);
         showToast(`${name} timed out · ${details.event_name || 'Event'}`, 'green', 3000);
+        // Email toast will appear via polling shortly
         return;
     }
     if (d.type === 'already_recorded') {
