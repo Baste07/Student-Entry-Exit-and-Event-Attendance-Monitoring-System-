@@ -7,6 +7,8 @@ let duplicateRowsModal = null;
 let editStudentModal = null;
 let viewGuardiansModal = null;
 let addGuardianModal = null;
+let deleteStudentModal = null;   // ADD THIS
+let pendingDeleteStudentId = null; // ADD THIS
 let duplicateRowsInFileCount = 0;
 let duplicateRowsInDatabaseCount = 0;
 let duplicateRowsInFile = [];
@@ -120,8 +122,12 @@ function setupEventListeners() {
     const addGuardianModalElement = document.getElementById('addGuardianModal');
     if (addGuardianModalElement && window.bootstrap) {
         addGuardianModal = new bootstrap.Modal(addGuardianModalElement);
-    }
 
+        // ADD THIS
+const deleteStudentModalElement = document.getElementById('deleteStudentModal');
+if (deleteStudentModalElement) deleteStudentModal = new bootstrap.Modal(deleteStudentModalElement);
+    }
+    document.getElementById('confirmDeleteStudentBtn')?.addEventListener('click', confirmDeleteStudent);
     document.getElementById('addGuardianForm')?.addEventListener('submit', submitAddGuardianForm);
     document.getElementById('modalGuardianPhone')?.addEventListener('blur', handleModalGuardianPhoneLookup);
 
@@ -1411,21 +1417,49 @@ async function submitEditStudentForm(event) {
         }
     }
 }
-
-async function deleteStudentRow(studId) {
+function deleteStudentRow(studId) {
     const student = allStudents.find(s => String(s.stud_id) === String(studId));
     const displayName = student
         ? (student.last_name ? (student.last_name + ', ' + [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' ')) : [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' '))
         : studId;
 
-    if (!confirm(`Delete student ${displayName} (${studId})? This action cannot be undone.`)) {
+    if (!deleteStudentModal) {
+        showImportAlert('Delete confirmation modal is not available right now.', 'danger');
         return;
     }
 
+    pendingDeleteStudentId = studId;
+    document.getElementById('deleteStudentName').textContent = displayName;
+    document.getElementById('deleteStudentStudId').textContent = studId;
+    deleteStudentModal.show();
+}
+
+async function confirmDeleteStudent() {
+    const studId = pendingDeleteStudentId;
+    if (!studId) return;
+
+    const student = allStudents.find(s => String(s.stud_id) === String(studId));
+    const studentUuid = student?.student_id;
+    const confirmBtn = document.getElementById('confirmDeleteStudentBtn');
+
     try {
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Deleting...';
+        }
+
+        if (studentUuid) {
+            // Delete child records first (FK constraints require this order)
+            await supabaseClient.from('sms_notifications').delete().eq('student_id', studentUuid);
+            await supabaseClient.from('daily_attendance').delete().eq('student_id', studentUuid);
+            await supabaseClient.from('event_attendance').delete().eq('student_id', studentUuid);
+            await supabaseClient.from('event_participants').delete().eq('student_id', studentUuid);
+            await supabaseClient.from('student_guardians').delete().eq('student_id', studentUuid);
+        }
+
         let query = supabaseClient.from('students').delete();
-        if (student?.student_id) {
-            query = query.eq('student_id', student.student_id);
+        if (studentUuid) {
+            query = query.eq('student_id', studentUuid);
         } else {
             query = query.eq('stud_id', studId);
         }
@@ -1433,11 +1467,18 @@ async function deleteStudentRow(studId) {
         const { error } = await query;
         if (error) throw error;
 
-        showImportAlert(`Student ${studId} deleted successfully.`, 'success');
+        showImportAlert(`Student ${studId} and all linked records deleted successfully.`, 'success');
+        deleteStudentModal?.hide();
         await loadAllStudentsTable();
     } catch (error) {
         console.error('Error deleting student:', error);
         showImportAlert(`Failed to delete student: ${error.message}`, 'danger');
+    } finally {
+        pendingDeleteStudentId = null;
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Delete Student';
+        }
     }
 }
 

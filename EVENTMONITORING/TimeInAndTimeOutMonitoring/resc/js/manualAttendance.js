@@ -496,11 +496,11 @@ async function lookupById(id, autoConfirm = false) {
         const role = getSelectedRole();
 
         if (role === 'student') {
-            const { data: student } = await supabaseClient
-                .from('students')
-                .select('student_id, stud_id, first_name, middle_name, last_name, status, section_id')
-                .eq('stud_id', id)
-                .maybeSingle();
+           const { data: student } = await supabaseClient
+    .from('students')
+    .select('student_id, stud_id, first_name, middle_name, last_name, status, section_id, email, sections:section_id(grade_level, section_name)')
+    .eq('stud_id', id)
+    .maybeSingle();
 
             if (student) {
                 const result = await getStudentEventStatus(student);
@@ -554,7 +554,7 @@ async function getStudentEventStatus(student) {
     // 2. Pull those events: ongoing, completed, upcoming
     const { data: events } = await supabaseClient
         .from('events')
-        .select('event_id, event_name, status, event_date, time_start, time_end, location')
+        .select('event_id, event_name, status, event_date, time_start, time_end, location, description')
         .in('event_id', eventIds)
         .in('status', ['ongoing', 'completed', 'upcoming'])
         .order('event_date', { ascending: false })
@@ -594,6 +594,7 @@ async function getStudentEventStatus(student) {
                 event_date: ev.event_date,
                 event_time_start: format12HourTime(ev.time_start),
                 event_time_end: format12HourTime(ev.time_end),
+                event: ev,  // ← ADD THIS LINE
                 is_late: lateMinutes > 0,
                 late_minutes: lateMinutes,
                 message: lateMinutes > 0 ? `You are LATE by ${lateMinutes} min. Ready to record TIME IN.` : 'Ready to record TIME IN.'
@@ -603,6 +604,7 @@ async function getStudentEventStatus(student) {
                 success: true,
                 action: 'ALREADY_TIMED_IN',
                 event_id: evId,
+                _event: ev,           
                 event_name: ev.event_name,
                 message: 'You have already timed in for this event.'
             };
@@ -736,7 +738,7 @@ async function doConfirm() {
         if (d.role === 'teacher') {
             res = { success: true, message: d.message || 'Greeting displayed.' };
         } else {
-            res = await confirmStudentEvent(d.action, d.event_id, d.person.student_id, d.attendance_id, d.is_late, d.late_minutes);
+           res = await confirmStudentEvent(d);
         }
 
         showToast(res.message || 'Done', res.success ? 's' : 'e');
@@ -768,7 +770,61 @@ function getManualAttendanceClock() {
     return { now, nowStore: now.toISOString(), nowLocalTime: now.toTimeString().slice(0, 8) };
 }
 
-async function confirmStudentEvent(action, eventId, studentId, attendanceId, isLate, lateMinutes) {
+function sendManualAttendanceEmail(action, eventRow, student, timestampIso, extra = {}) {
+    const email = String(student?.email || '').trim();
+    if (!email) return; // no email on file — skip silently, same as facial recognition engine
+
+    const fullName = [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ');
+    const gradeLevel = student?.sections?.grade_level || '';
+    const sectionName = student?.sections?.section_name || '';
+
+    const payload = {
+        studentId: String(student.student_id || ''),
+        eventId: String(eventRow?.event_id || ''),
+        type: action === 'OUT' ? 'time_out' : 'time_in',
+        timestamp: timestampIso,
+        email,
+        studentName: fullName,
+        stud_id: student.stud_id || '',
+        gradeLevel,
+        sectionName,
+        eventName: eventRow?.event_name || '',
+        eventDate: eventRow?.event_date || '',
+        eventTimeStart: eventRow?.time_start || '',
+        eventTimeEnd: eventRow?.time_end || '',
+        eventLocation: eventRow?.location || '',
+        eventDescription: eventRow?.description || '',
+        ...extra,
+    };
+
+    fetch('send_event_attendance_email.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
+        .then(res => res.json().catch(() => ({})))
+        .then(result => {
+            if (result && result.success === false) {
+                console.warn('Manual attendance email not sent:', result.message);
+            }
+        })
+        .catch(err => console.warn('Manual attendance email request failed:', err));
+}
+async function confirmStudentEvent(payload) {
+    const { action, event_id: eventId, person, is_late: isLate, late_minutes: lateMinutes, _event: eventRow } = payload;
+    // Build a fallback event row from the flat fields if _event is missing
+    const effectiveEventRow = eventRow || {
+        event_id: eventId,
+        event_name: payload.event_name,
+        event_date: payload.event_date,
+        time_start: payload.event_time_start,
+        time_end: payload.event_time_end,
+        location: payload.event_location,
+        description: payload.description || ''
+    };
+    let attendanceId = payload.attendance_id;
+    const studentId = person.student_id;
+
     if (['NOT_REGISTERED', 'NO_ACTIVE_EVENT', 'EVENT_NOT_STARTED', 'ALREADY_TIMED_IN', 'ATTENDANCE_COMPLETE', 'NO_TIME_IN_FOUND', 'TEACHER_GREETING'].includes(action)) {
         return { success: true, message: 'No action needed.' };
     }
@@ -789,6 +845,11 @@ async function confirmStudentEvent(action, eventId, studentId, attendanceId, isL
             created_at: nowStore
         });
         if (error) return { success: false, message: error.message || 'Unable to save TIME IN.' };
+
+        sendManualAttendanceEmail('IN', effectiveEventRow, person, nowStore, {
+            lateMinutes: isLate ? (lateMinutes || 0) : 0,
+        });
+
         return { success: true, message: `Time IN recorded ✅ — ${isLate ? `⚠ LATE by ${lateMinutes || 0} min` : 'On Time'}` };
     }
 
@@ -804,7 +865,7 @@ async function confirmStudentEvent(action, eventId, studentId, attendanceId, isL
             attendanceId = rows.attendance_id;
         }
 
-        let outTs = nowStore;
+        let timeInRecorded = '';
         let durationMinutes = 0;
         try {
             const { data: attRow } = await supabaseClient
@@ -812,6 +873,7 @@ async function confirmStudentEvent(action, eventId, studentId, attendanceId, isL
                 .select('time_in')
                 .eq('attendance_id', attendanceId)
                 .single();
+            timeInRecorded = attRow.time_in;
             const inTs = new Date(attRow.time_in);
             const outDate = new Date(nowStore);
             if (!isNaN(inTs.getTime()) && outDate >= inTs) {
@@ -820,9 +882,15 @@ async function confirmStudentEvent(action, eventId, studentId, attendanceId, isL
         } catch (_) {}
 
         const { error } = await supabaseClient.from('event_attendance')
-            .update({ time_out: outTs, updated_at: nowStore })
+            .update({ time_out: nowStore, updated_at: nowStore })
             .eq('attendance_id', attendanceId);
         if (error) return { success: false, message: error.message || 'Unable to save TIME OUT.' };
+
+        sendManualAttendanceEmail('OUT', effectiveEventRow, person, nowStore, {
+            timeInRecorded,
+            durationMinutes,
+        });
+
         return { success: true, message: 'Time OUT recorded ✅' };
     }
 
