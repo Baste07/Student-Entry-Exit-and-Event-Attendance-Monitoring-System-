@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Attendance | Time In & Time Out Monitoring System</title>
+<title>Manual Attendance | Event Attendance Monitoring System</title>
 <link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,35 +16,35 @@
     <div class="lp-grid"></div>
     <div class="lp-top">
         <div class="bl">
-            <img src="../resc/assets/plp_logo.png" alt="PLP">
-            <div class="ld"></div>
-            <img src="../resc/assets/ccs_logo.png" alt="CCS" onerror="this.style.display='none';this.previousElementSibling.style.display='none'">
+            <img src="../resc/assets/ElTresEresCenciaEscuelaLogo.png" alt="PLP">
+            
+           
         </div>
         <div class="bn">
             <small>Attendee Portal</small>
-            Lab Attendance System
+            Event Attendance System
         </div>
     </div>
     <div class="lp-center">
         <div class="lbadge"><i class="fa-solid fa-pencil"></i> Manual Entry</div>
         <h1>Attendance<br><span>Manual Mode</span></h1>
-        <p>Use this when facial recognition is unavailable. Enter your ID to record your attendance for today's session.</p>
+        <p>Use this when facial recognition is unavailable. Enter your ID to record your attendance for today's event.</p>
         <div class="feats">
             <div class="fi">
                 <div class="fd"><i class="fa-solid fa-id-card"></i></div>
-                <div class="ft"><strong>Students &amp; Professors</strong><br>Enter your ID number below</div>
+                <div class="ft"><strong>Students &amp; Teachers</strong><br>Enter your ID number below</div>
             </div>
             <div class="fi">
                 <div class="fd"><i class="fa-solid fa-clock-rotate-left"></i></div>
-                <div class="ft"><strong>Time In &amp; Out</strong><br>Attendance tracked per session</div>
+                <div class="ft"><strong>Time In &amp; Out</strong><br>Attendance tracked per event</div>
             </div>
             <div class="fi">
                 <div class="fd"><i class="fa-solid fa-shield-halved"></i></div>
-                <div class="ft"><strong>Session Rules</strong><br>Mirrors facial recognition logic</div>
+                <div class="ft"><strong>Event Rules</strong><br>Mirrors facial recognition logic</div>
             </div>
         </div>
     </div>
-    <div class="lp-bot">&copy; <span id="footerYear"></span> Laboratory Management System &middot; All rights reserved</div>
+    <div class="lp-bot">&copy; <span id="footerYear"></span> Event Management System &middot; All rights reserved</div>
 </div>
 
 <div class="rp">
@@ -88,15 +88,15 @@
             Student
         </label>
         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; text-transform: none; font-weight: 500;">
-            <input type="radio" name="role_select" value="professor" style="accent-color: #2f8fce; width: 18px; height: 18px;"> 
-            Professor
+            <input type="radio" name="role_select" value="teacher" style="accent-color: #2f8fce; width: 18px; height: 18px;"> 
+            Teacher
         </label>
     </div>
 
     <label id="id_label"><i class="fa-solid fa-id-card"></i> Student ID Number</label>
     <div class="iw">
         <input type="text" id="id_input"
-               placeholder="e.g. 23-00269"
+               placeholder="e.g. K-001 or 5-123 or 10-1234"
                autocomplete="off" 
                spellcheck="false">
         <i class="fa-solid fa-barcode fi-icon"></i>
@@ -150,37 +150,6 @@
             </div>
         </div>
 
-    </div>
-</div>
-
-<div class="lab-modal-overlay" id="labModalOverlay" onclick="if(event.target===this)closeLabModal()">
-    <div class="lab-modal">
-        <div class="lab-modal-bar"></div>
-        <div class="lab-modal-top">
-            <div>
-                <div class="lab-modal-tag"><i class="fa-solid fa-user-shield"></i> Super Admin Setup</div>
-                <h3>Assign this terminal to a laboratory</h3>
-                <p>Select the room that this PC should use for manual attendance. The assignment is saved locally on this machine.</p>
-            </div>
-            <div class="lab-modal-state" id="labModalState">Loading...</div>
-        </div>
-
-        <div class="lab-modal-row">
-            <select id="labModalSelect" class="lab-modal-select" disabled>
-                <option value="">Loading laboratories...</option>
-            </select>
-            <button class="lab-modal-save" id="labModalSaveBtn" type="button">
-                <i class="fa-solid fa-floppy-disk"></i> Save Assignment
-            </button>
-        </div>
-
-        <div class="lab-modal-note" id="labModalNote">
-            Fetching available laboratories...
-        </div>
-
-        <button class="lab-modal-close" type="button" onclick="closeLabModal()">
-            <i class="fa-solid fa-xmark"></i> Skip for now
-        </button>
     </div>
 </div>
 
