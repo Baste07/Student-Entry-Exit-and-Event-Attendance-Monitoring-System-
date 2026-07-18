@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entry-Exit Scanner | Gate Module</title>
+<link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../resc/css/entryExitScanner.css">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+    <a href="homepage.html" class="brand">
+        <div class="brand-logos">
+            <img src="../resc/assets/El Tres Eres Cencia Escuela.jpg" alt="School Logo" class="school-logo">
+        </div>
+        <div class="brand-text">
+            <span class="sys-label">Monitoring System</span>
+            <h1>Entry-Exit Scanner</h1>
+        </div>
+    </a>
+    <div class="header-clock">
+        <i class="fa-regular fa-clock"></i>
+        <span id="gateClock">Loading time...</span>
+    </div>
+    <nav>
+        <a href="../admin/dashboard.html"><i class="fa-solid fa-shield-halved"></i> Admin</a>
+    </nav>
+</header>
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+    <div class="header-icon"><i class="fa-solid fa-door-open"></i></div>
+    <h1>Entry-Exit Scanner</h1>
+    <p>Facial recognition &amp; QR code gate access scanner</p>
+</div>
+
+<!-- CARD -->
+<div class="card">
+    <div class="card-strip">
+        <div class="strip-dots">
+            <div class="s-dot r"></div>
+            <div class="s-dot y"></div>
+            <div class="s-dot g"></div>
+        </div>
+        <span class="strip-label">Gate Module</span>
+        <div class="strip-status" id="stripStatus">Offline</div>
+    </div>
+
+    <div class="card-body">
+
+        <!-- Status tiles -->
+        <div class="tiles">
+            <div class="tile">
+                <div class="tile-label">Mode</div>
+                <div class="tile-value" id="tileMode"><i class="fa-solid fa-face-smile"></i> Face Recognition</div>
+            </div>
+            <div class="tile">
+                <div class="tile-label">Engine</div>
+                <div class="tile-value"><i class="fa-solid fa-circle-dot"></i> <span id="engineState">Offline</span></div>
+            </div>
+            <div class="tile">
+                <div class="tile-label">Scanner</div>
+                <div class="tile-value"><i class="fa-solid fa-wifi"></i> <span id="scannerState">Idle</span></div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Mode tabs -->
+        <div class="mode-tabs">
+            <button class="mode-tab active" id="tabFace" onclick="switchMode('face')">
+                <i class="fa-solid fa-face-smile"></i> Face Recognition
+            </button>
+            <button class="mode-tab" id="tabQR" onclick="switchMode('qr')">
+                <i class="fa-solid fa-qrcode"></i> QR Code
+            </button>
+        </div>
+
+        <!-- Engine status pill (face mode only) -->
+        <div style="text-align:center; margin-bottom:12px;">
+            <span class="engine-pill offline" id="enginePill">
+                <i class="fa-solid fa-circle"></i> Face Engine Offline
+            </span>
+        </div>
+
+        <!-- Face mode -->
+        <div id="faceMode">
+            <div id="faceStreamOff" class="stream-off">
+                <i class="fa-solid fa-video-slash"></i>
+                <span>Click Start Scanner to connect to face engine</span>
+            </div>
+            <img id="faceStream" src="" alt="Face Recognition Stream" style="display:none;">
+            <div class="scan-status idle" id="faceStatus">
+                <i class="fa-solid fa-circle-info"></i> Start the scanner to begin
+            </div>
+        </div>
+
+        <!-- QR mode -->
+        <div id="qrMode" style="display:none;">
+            <div id="qrReader"></div>
+            <div class="scan-status idle" id="qrStatus">
+                <i class="fa-solid fa-qrcode"></i> QR scanner not started
+            </div>
+        </div>
+
+        <!-- Result strip -->
+        <div class="result-strip" id="resultStrip">
+            <div class="result-avatar"><i class="fa-solid fa-user-graduate"></i></div>
+            <div class="result-info">
+                <strong id="resultName">—</strong>
+                <span id="resultMeta">—</span>
+                <div class="result-badges" id="resultBadges"></div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Controls -->
+        <div class="btn-wrap">
+            <button class="btn btn-start" id="btnStart" onclick="startScanner()">
+                <i class="fa-solid fa-play"></i> Start Scanner
+            </button>
+            <button class="btn btn-stop" id="btnStop" onclick="stopScanner()" style="display:none;">
+                <i class="fa-solid fa-stop"></i> Stop
+            </button>
+            <button class="btn btn-manual" onclick="openManual()">
+                <i class="fa-solid fa-keyboard"></i> Manual Entry
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- MANUAL MODAL -->
+<div class="modal-backdrop" id="manualModal">
+    <div class="modal-box">
+        <div class="cred-bar"></div>
+        <div class="modal-icon"><i class="fa-solid fa-keyboard"></i></div>
+        <h3>Manual Log Entry</h3>
+        <p>Enter the student ID to log their entry or exit manually.</p>
+        <div class="cred-fg">
+            <label><i class="fa-solid fa-id-card"></i> Student ID</label>
+            <input type="text" class="modal-input" id="manualStudId"
+                   placeholder="e.g. 2024-00001"
+                   onkeydown="if(event.key==='Enter') submitManual()">
+        </div>
+        <div class="cred-fg">
+            <label><i class="fa-solid fa-door-open"></i> Log Type</label>
+            <select class="modal-input" id="manualType">
+                <option value="entry">Entry</option>
+                <option value="exit">Exit</option>
+            </select>
+        </div>
+        <hr class="cred-divider">
+        <div class="cred-btns">
+            <button class="cred-btn-cancel" onclick="closeManual()">
+                <i class="fa-solid fa-xmark"></i> Cancel
+            </button>
+            <button class="cred-btn-submit" onclick="submitManual()">
+                <i class="fa-solid fa-check"></i> Log Entry
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../config/.env.js"></script>
+<script src="../../config/config.js"></script>
+<script src="../resc/js/entryExitScanner.js"></script>
+<script>
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeManual(); });
+</script>
+
+</body>
+</html>
