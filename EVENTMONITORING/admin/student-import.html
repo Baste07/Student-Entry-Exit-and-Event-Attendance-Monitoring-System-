@@ -22,9 +22,8 @@
     <!-- Page Header -->
     <div class="page-header anim anim-1" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
         <div>
-    <!-- TO THIS -->
-    <h1>Student Import</h1>
-    <p>Bulk import student accounts via Excel or CSV file</p>
+            <h1>Student Import</h1>
+            <p>Bulk import student accounts via Excel or CSV file</p>
         </div>
         <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
             <button type="button" class="btn-download-template" id="addSingleStudentBtn">
@@ -45,44 +44,44 @@
         <p class="step-desc">Choose the section these students belong to, then upload your filled Excel or CSV template.</p>
 
         <div class="row g-4 mt-1">
-                    <div class="col-md-5">
-    <div class="mb-3">
-        <label for="gradeLevelSelect" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                <polyline points="9 22 9 12 15 12 15 22"></polyline>
-            </svg> 
-            Grade Level <span class="text-danger ms-1">*</span>
-        </label>
-        <select class="form-select" id="gradeLevelSelect">
-            <option value="" disabled selected>Loading grade levels...</option>
-        </select>
-    </div>
+            <div class="col-md-5">
+                <div class="mb-3">
+                    <label for="gradeLevelSelect" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg> 
+                        Grade Level <span class="text-danger ms-1">*</span>
+                    </label>
+                    <select class="form-select" id="gradeLevelSelect">
+                        <option value="" disabled selected>Loading grade levels...</option>
+                    </select>
+                </div>
 
-    <div class="mb-3">
-        <label for="departmentSelect" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                <polyline points="9 22 9 12 15 12 15 22"></polyline>
-            </svg> 
-            Section <span class="text-danger ms-1">*</span>
-        </label>
-        <select class="form-select" id="departmentSelect" disabled>
-            <option value="" disabled selected>Select grade level first...</option>
-        </select>
-    </div>
+                <div class="mb-3">
+                    <label for="departmentSelect" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg> 
+                        Section <span class="text-danger ms-1">*</span>
+                    </label>
+                    <select class="form-select" id="departmentSelect" disabled>
+                        <option value="" disabled selected>Select grade level first...</option>
+                    </select>
+                </div>
 
-    <div>
-        <label for="activeSchoolYearDisplay" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-            </svg> 
-            Active School Year
-        </label>
-        <input type="text" class="form-control" id="activeSchoolYearDisplay" readonly placeholder="Loading..." style="background-color: #f8fafc; color: #64748b; font-weight: 500; border: 1px solid #e2e8f0; cursor: not-allowed;">
-    </div>
-</div>
+                <div>
+                    <label for="activeSchoolYearDisplay" class="form-label text-sm fw-semibold text-success" style="display:flex; align-items:center;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg> 
+                        Active School Year
+                    </label>
+                    <input type="text" class="form-control" id="activeSchoolYearDisplay" readonly placeholder="Loading..." style="background-color: #f8fafc; color: #64748b; font-weight: 500; border: 1px solid #e2e8f0; cursor: not-allowed;">
+                </div>
+            </div>
 
             <div class="col-md-7">
                 <label class="form-label-custom">
@@ -161,6 +160,7 @@
                         <th>Gender</th>
                         <th>Section</th>
                         <th>Email (Optional)</th>
+                        <th>Guardians</th>
                         <th>Status</th>
                     </tr>
                 </thead>
@@ -232,10 +232,19 @@
                 </ul>
             </div>
             <div class="info-col">
+                <h4>Guardian Columns (Required)</h4>
+                <ul>
+                    <li><strong>Guardian1_Phone … Guardian1_Address</strong> — At least 1 guardian is required</li>
+                    <li><strong>Guardian2_Phone … Guardian2_Address</strong> — Optional second guardian</li>
+                    <li>Relationship values: <code>mother</code>, <code>father</code>, <code>legal_guardian</code>, <code>other</code></li>
+                    <li>If phone number already exists, the existing guardian is linked instead of duplicated</li>
+                </ul>
+            </div>
+            <div class="info-col">
                 <h4>Notes</h4>
-                <ul><label for="singleStudentId" class="form-label">Student ID <span class="text-danger">*
+                <ul>
                     <li>Section is taken from Step 1 selection for all imported rows</li>
-                   <li>Student IDs that already exist in the database are <strong>skipped</strong></li>
+                    <li>Student IDs that already exist in the database are <strong>skipped</strong></li>
                     <li>Do not delete the header row</li>
                     <li>Remove sample data before importing</li>
                 </ul>
@@ -290,25 +299,25 @@
 
         <div class="students-table-wrap">
             <table class="students-table">
-    <thead>
-        <tr>
-            <th>Student ID</th>
-            <th>Name</th>
-            <th>Grade Level</th>
-            <th>Section</th>
-            <th>Birth Date</th>
-            <th>Gender</th>
-            <th>Guardian</th>
-            <th>Status</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody id="allStudentsTableBody">
-        <tr>
-            <td colspan="9" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
-        </tr>
-    </tbody>
-</table>
+                <thead>
+                    <tr>
+                        <th>Student ID</th>
+                        <th>Name</th>
+                        <th>Grade Level</th>
+                        <th>Section</th>
+                        <th>Birth Date</th>
+                        <th>Gender</th>
+                        <th>Guardian</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="allStudentsTableBody">
+                    <tr>
+                        <td colspan="9" style="text-align:center;padding:1rem;color:var(--text-muted);">Loading students...</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -342,7 +351,6 @@
     </div>
 </div>
 
-
 <div class="modal fade" id="singleStudentModal" tabindex="-1" aria-labelledby="singleStudentModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content" style="position:relative;">
@@ -375,7 +383,7 @@
 
                         <!-- Student Information -->
                         <h6 class="fw-semibold mb-3" style="color:var(--text-main);">Student Information</h6>
-                                            <div class="row g-3">
+                        <div class="row g-3">
                             <div class="col-md-4">
                                 <label for="singleGradeLevel" class="form-label">Grade Level <span class="text-danger">*</span></label>
                                 <select id="singleGradeLevel" class="form-select" required>
@@ -647,28 +655,10 @@
                                 <option value="other">other</option>
                             </select>
                         </div>
-
-
                         <div class="col-md-4">
-    <label for="editSection" class="form-label">Gender</label>
-    <select id="editSection" class="form-select">
-        <option value="">Select gender...</option>
-        <option value="male">male</option>
-        <option value="female">female</option>
-        <option value="other">other</option>
-    </select>
-</div>
-<div class="col-md-4">
-    <label for="editEmail" class="form-label">Email</label>
-    <input type="email" id="editEmail" class="form-control" placeholder="Optional">
-</div>
-<div class="col-md-4">
-    <label for="editStatus" class="form-label">Status</label>
-    <select id="editStatus" class="form-select">
-        <option value="active">active</option>
-        <option value="inactive">inactive</option>
-    </select>
-</div>
+                            <label for="editEmail" class="form-label">Email</label>
+                            <input type="email" id="editEmail" class="form-control" placeholder="Optional">
+                        </div>
                         <div class="col-md-4">
                             <label for="editStatus" class="form-label">Status</label>
                             <select id="editStatus" class="form-select">
@@ -686,7 +676,6 @@
         </div>
     </div>
 </div>
-
 
 <div class="modal fade" id="viewGuardiansModal" tabindex="-1" aria-labelledby="viewGuardiansModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -782,6 +771,35 @@
                     <button type="submit" class="btn btn-success" id="addGuardianSubmitBtn">Save Guardian</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="deleteStudentModal" tabindex="-1" aria-labelledby="deleteStudentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteStudentModalLabel">Delete Student</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex;gap:.75rem;align-items:flex-start;">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#dc3545" stroke-width="2" style="flex-shrink:0;">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <div>
+                        <p style="margin:0 0 .5rem 0;">Are you sure you want to delete <strong id="deleteStudentName">this student</strong> (<span id="deleteStudentStudId">-</span>)?</p>
+                        <p style="margin:0;color:#dc3545;font-weight:600;">All records linked to this student — guardian links, attendance logs, event participation, and SMS notifications — will also be permanently deleted.</p>
+                        <p style="margin:.5rem 0 0 0;color:var(--text-muted);font-size:0.85rem;">This action cannot be undone.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteStudentBtn">Delete Student</button>
+            </div>
         </div>
     </div>
 </div>

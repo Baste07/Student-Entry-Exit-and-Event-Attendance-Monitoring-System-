@@ -173,6 +173,50 @@ function updateSessionButtonState() {
     renderTileStates();
 }
 
+
+// ══════════════════════════════════════════════════
+// EMAIL STATUS TOAST
+// ══════════════════════════════════════════════════
+
+let _lastEmailTimestamp = null;
+
+async function checkEmailStatus() {
+    if (!isEngineOnline) return;
+    try {
+        const res = await fetch('http://127.0.0.1:5000/email_status/latest');
+        const data = await res.json();
+        if (!data.success || !data.log) return;
+
+        const log = data.log;
+        // Only show toast for new entries we haven't shown yet
+        if (log.timestamp === _lastEmailTimestamp) return;
+        _lastEmailTimestamp = log.timestamp;
+
+        const studentName = log.details?.student_name || 'Student';
+        const eventName = log.details?.event_name || 'Event';
+        const typeLabel = log.type === 'time_out' ? 'Time-Out' : 'Time-In';
+
+        if (log.success) {
+            showToast(
+                `📧 Email sent! ${studentName} — ${typeLabel} confirmation for "${eventName}"`,
+                'green',
+                4000
+            );
+        } else {
+            showToast(
+                `📧 Email failed for ${studentName}: ${log.message}`,
+                'red',
+                5000
+            );
+        }
+    } catch (_) {
+        // Silently fail — email status is non-critical
+    }
+}
+
+// Poll email status every 3 seconds
+setInterval(checkEmailStatus, 3000);
+
 // Set initial state
 renderStripStatus();
 renderTileStates();
@@ -264,21 +308,28 @@ setInterval(async () => {
                 }
 
                 // When finishing rebuild, show summary toast if available
-                if (_prevFaceDbPhase === 'rebuilding' && newPhase === 'ready') {
-                    try {
-                        const last = status.last_rebuild_summary || null;
-                        if (last && last.timestamp && last.timestamp !== _prevRebuildSummaryTs) {
-                            _prevRebuildSummaryTs = last.timestamp;
-                            const a = last.added || 0;
-                            const u = last.updated || 0;
-                            const r = last.removed || 0;
-                            const t = Math.round((last.duration_ms || 0));
-                            showToast(`Background sync complete: +${a} added · ~${u} updated · -${r} removed · ${t}ms`, 'bg-success', 6000);
-                        } else {
-                            showToast('Background sync complete — database validated', 'bg-success', 4000);
-                        }
-                    } catch (e) {}
-                }
+              // When finishing rebuild, show summary toast if available
+if (_prevFaceDbPhase === 'rebuilding' && newPhase === 'ready') {
+    try {
+        const last = status.last_rebuild_summary || null;
+        if (last && last.timestamp && last.timestamp !== _prevRebuildSummaryTs) {
+            _prevRebuildSummaryTs = last.timestamp;
+            const a = last.added || 0;
+            const u = last.updated || 0;
+            const r = last.removed || 0;
+            const t = Math.round((last.duration_ms || 0));
+showSyncSummaryModal
+            if (a > 0 || u > 0 || r > 0) {
+                // Real changes — show the modal, it deserves attention
+                showSyncSummaryModal(last);
+            } else {
+                // No-op sync — quiet toast only, don't interrupt
+                showToast('Background sync complete — no changes', 'green', 3000);
+            }
+        }
+        // If no last summary or already shown, say nothing at all
+    } catch (e) {}
+}
 
                 currentFaceDbPhase = newPhase;
                 _prevFaceDbPhase = currentFaceDbPhase;
@@ -395,6 +446,71 @@ async function waitForFlask(retries = 60, delayMs = 1000) {
     throw new Error('Engine did not respond. Check Task Manager for pythonw.exe');
 }
 
+
+// ══════════════════════════════════════════════════
+// CAMERA OWNERSHIP SWITCH
+// ══════════════════════════════════════════════════
+const switchCameraBtn = document.getElementById('switchCameraBtn');
+const REG_ENGINE_BASE = 'http://127.0.0.1:5001';
+const ATT_ENGINE_BASE = 'http://127.0.0.1:5000';
+
+// Calls BOTH engines' /camera_control so whichever one currently holds the
+// camera device gets an explicit release call, regardless of call order.
+// Success is judged by whether ANY response confirms owner === targetOwner —
+// never by a single response's self-relative "owns_camera" field, since that
+// field is only meaningful for the engine that answered it.
+async function switchCameraOwner(targetOwner) {
+    const endpoints = [ATT_ENGINE_BASE, REG_ENGINE_BASE].map(base => `${base}/camera_control`);
+    let sawConfirmedOwner = false;
+
+    for (const url of endpoints) {
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ owner: targetOwner, force: true })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.success && data.owner === targetOwner) {
+                    sawConfirmedOwner = true;
+                }
+            }
+        } catch (_) {}
+    }
+
+    return { success: sawConfirmedOwner, owner: sawConfirmedOwner ? targetOwner : null };
+}
+
+if (switchCameraBtn) {
+    switchCameraBtn.addEventListener('click', async () => {
+        switchCameraBtn.disabled = true;
+        switchCameraBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Switching...';
+
+        try {
+            const result = await switchCameraOwner('attendance');
+            if (result && result.success) {
+                setOutput('success', 'fa-solid fa-camera', 'Camera switched to Attendance engine.');
+                showToast('Camera is now assigned to Attendance', 'green', 3000);
+
+                // If a session is already live, refresh the stream so it reconnects
+                // now that this engine actually owns the camera.
+                if (stopBtn.style.display !== 'none') {
+                    videoStream.src = `${ATT_ENGINE_BASE}/video_feed?t=${Date.now()}`;
+                }
+            } else {
+                setOutput('error', 'fa-solid fa-triangle-exclamation', 'Failed to switch camera owner.');
+                showToast('Camera switch failed', 'red', 3000);
+            }
+        } catch (err) {
+            setOutput('error', 'fa-solid fa-triangle-exclamation', 'Camera switch request failed.');
+        } finally {
+            switchCameraBtn.disabled = false;
+            switchCameraBtn.innerHTML = '<i class="fa-solid fa-repeat"></i> Use Camera for Attendance';
+        }
+    });
+}
+
 // ══════════════════════════════════════════════════
 // SESSION START / STOP
 // ══════════════════════════════════════════════════
@@ -460,11 +576,13 @@ function handleRecognitionEvent(d) {
     if (d.type === 'time_in') {
         showGreeting(name, message, false, details);
         showToast(`${name} timed in · ${details.event_name || 'Event'}`, 'green', 3000);
+        // Email toast will appear via polling shortly
         return;
     }
     if (d.type === 'time_out') {
         showGreeting(name, message, false, details);
         showToast(`${name} timed out · ${details.event_name || 'Event'}`, 'green', 3000);
+        // Email toast will appear via polling shortly
         return;
     }
     if (d.type === 'already_recorded') {
@@ -482,6 +600,60 @@ function handleRecognitionEvent(d) {
     showGreeting(name, message, false, details);
 }
 
+
+
+// ══════════════════════════════════════════════════
+// SYNC SUMMARY MODAL
+// ══════════════════════════════════════════════════
+let syncModalTimer = null;
+
+function showSyncSummaryModal(summary) {
+    const added   = summary.added || 0;
+    const updated = summary.updated || 0;
+    const removed = summary.removed || 0;
+    const isRemovalOnly = removed > 0 && added === 0 && updated === 0;
+
+    document.getElementById('syncAdded').textContent   = added;
+    document.getElementById('syncUpdated').textContent = updated;
+    document.getElementById('syncRemoved').textContent = removed;
+
+    const ms = Math.round(summary.duration_ms || 0);
+    document.getElementById('syncDuration').textContent = ms ? `Completed in ${ms}ms` : '';
+
+    const box      = document.getElementById('syncBox');
+    const icon     = document.getElementById('syncIcon');
+    const title    = document.getElementById('syncTitle');
+    const subtext  = document.getElementById('syncSubtext');
+    const closeBtn = document.getElementById('syncCloseBtn');
+
+    if (isRemovalOnly) {
+        box.classList.add('warn');
+        icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+        title.textContent = 'Facial Data Removed';
+        subtext.textContent = 'Files were deleted from storage for one or more people. Recognition may fail for them until re-registered.';
+        closeBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Understood';
+    } else {
+        box.classList.remove('warn');
+        icon.innerHTML = '<i class="fa-solid fa-rotate"></i>';
+        title.textContent = 'Facial Data Synced';
+        subtext.textContent = 'Changes were detected and applied in the background.';
+        closeBtn.innerHTML = '<i class="fa-solid fa-check"></i> Got it';
+    }
+
+    document.getElementById('syncOverlay').classList.add('on');
+
+    clearTimeout(syncModalTimer);
+    // Give warning-state longer on screen since it needs attention
+    syncModalTimer = setTimeout(dismissSyncModal, isRemovalOnly ? 12000 : 8000);
+}
+
+
+function dismissSyncModal() {
+    clearTimeout(syncModalTimer);
+    document.getElementById('syncOverlay').classList.remove('on');
+    document.getElementById('syncBox').classList.remove('warn'); // reset for next time
+}
+
 if (window.EventSource) {
     const src = new EventSource('http://127.0.0.1:5000/attendee_stream');
     src.onmessage = (e) => {
@@ -494,3 +666,6 @@ if (window.EventSource) {
         console.log('SSE connection lost, will retry...');
     };
 }
+
+
+

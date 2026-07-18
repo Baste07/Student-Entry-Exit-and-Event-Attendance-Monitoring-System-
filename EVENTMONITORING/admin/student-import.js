@@ -7,6 +7,8 @@ let duplicateRowsModal = null;
 let editStudentModal = null;
 let viewGuardiansModal = null;
 let addGuardianModal = null;
+let deleteStudentModal = null;   // ADD THIS
+let pendingDeleteStudentId = null; // ADD THIS
 let duplicateRowsInFileCount = 0;
 let duplicateRowsInDatabaseCount = 0;
 let duplicateRowsInFile = [];
@@ -53,7 +55,7 @@ async function loadDepartments() {
             showAlert('No active school year set. Please set one in System Settings before importing.', 'warning');
 
             if (syDisplay) syDisplay.value = 'No Active School Year';
-                      document.getElementById('departmentSelect').innerHTML = '<option value="" disabled selected>No Active School Year</option>';
+            document.getElementById('departmentSelect').innerHTML = '<option value="" disabled selected>No Active School Year</option>';
             const gradeSelect = document.getElementById('gradeLevelSelect');
             if (gradeSelect) gradeSelect.innerHTML = '<option value="" disabled selected>No Active School Year</option>';
             return;
@@ -73,9 +75,8 @@ async function loadDepartments() {
         if (error) throw error;
         departmentsCache = depts || [];
 
-               populateGradeLevelSelects();
+        populateGradeLevelSelects();
 
-        // Keep section dropdowns disabled until a grade level is chosen
         const deptSelect = document.getElementById('departmentSelect');
         if (deptSelect) {
             deptSelect.innerHTML = '<option value="" disabled selected>Select grade level first...</option>';
@@ -96,7 +97,6 @@ async function loadDepartments() {
     }
 }
 
-// ========== AUTO-GENERATE STUDENT ID ==========
 async function generateNextStudId(gradeLevel) {
     const prefix = gradeLevel === 'Kinder' ? 'K' : gradeLevel.replace('Grade ', '');
 
@@ -118,13 +118,16 @@ async function generateNextStudId(gradeLevel) {
 
     return `${prefix}-${String(nextNum).padStart(4, '0')}`;
 }
-
 function setupEventListeners() {
     const addGuardianModalElement = document.getElementById('addGuardianModal');
     if (addGuardianModalElement && window.bootstrap) {
         addGuardianModal = new bootstrap.Modal(addGuardianModalElement);
-    }
 
+        // ADD THIS
+const deleteStudentModalElement = document.getElementById('deleteStudentModal');
+if (deleteStudentModalElement) deleteStudentModal = new bootstrap.Modal(deleteStudentModalElement);
+    }
+    document.getElementById('confirmDeleteStudentBtn')?.addEventListener('click', confirmDeleteStudent);
     document.getElementById('addGuardianForm')?.addEventListener('submit', submitAddGuardianForm);
     document.getElementById('modalGuardianPhone')?.addEventListener('blur', handleModalGuardianPhoneLookup);
 
@@ -171,26 +174,29 @@ function setupEventListeners() {
         downloadStudentTemplate();
     });
 
-       const gradeLevelSelect = document.getElementById('gradeLevelSelect');
+    const gradeLevelSelect = document.getElementById('gradeLevelSelect');
     gradeLevelSelect?.addEventListener('change', () => {
         const gradeLevel = gradeLevelSelect.value;
         filterSectionsByGradeLevel(gradeLevel, 'departmentSelect');
-        // Clear section selection when grade changes
         selectedDepartmentId = null;
         selectedDepartmentName = '';
         checkReadyToParse();
     });
 
-       const singleGradeLevel = document.getElementById('singleGradeLevel');
+    // ── FIX: Listen for section selection to enable Parse & Preview ──
+    deptSelect?.addEventListener('change', () => {
+        selectedDepartmentId = deptSelect.value;
+        const selectedOption = deptSelect.options[deptSelect.selectedIndex];
+        selectedDepartmentName = selectedOption ? selectedOption.text : '';
+        checkReadyToParse();
+    });
+
+    const singleGradeLevel = document.getElementById('singleGradeLevel');
     singleGradeLevel?.addEventListener('change', () => {
         const gradeLevel = singleGradeLevel.value;
-
-        // 1. Cascade sections
         filterSectionsByGradeLevel(gradeLevel, 'singleDepartment');
-
-        // 2. Auto-generate Student ID (K-####, 1-####, 10-####, etc.)
         updateSingleStudentId();
-    }); 
+    });
 
     dropZone.addEventListener('click', (e) => {
         if (e.target.closest('.file-remove')) return;
@@ -281,8 +287,6 @@ function setupEventListeners() {
     backToStudentBtn?.addEventListener('click', goBackToStudentStep);
 
     const singleIdInput = document.getElementById('singleStudentId');
-    // Student ID is now auto-generated, no manual input needed
-    // But keep this for any custom overrides if needed later
 
     const singleGenderInput = document.getElementById('singleSection');
     singleGenderInput?.addEventListener('change', (e) => {
@@ -486,6 +490,24 @@ async function parseFile() {
                 birthDate: String(r[5] || '').trim(),
                 gender: String(r[6] || '').trim(),
                 email: String(r[7] || '').trim(),
+                // Guardian 1
+                g1Phone: String(r[9] || '').trim(),
+                g1Relationship: String(r[10] || '').trim().toLowerCase(),
+                g1FirstName: String(r[11] || '').trim(),
+                g1LastName: String(r[12] || '').trim(),
+                g1MiddleName: String(r[13] || '').trim(),
+                g1AltPhone: String(r[14] || '').trim(),
+                g1Email: String(r[15] || '').trim(),
+                g1Address: String(r[16] || '').trim(),
+                // Guardian 2
+                g2Phone: String(r[17] || '').trim(),
+                g2Relationship: String(r[18] || '').trim().toLowerCase(),
+                g2FirstName: String(r[19] || '').trim(),
+                g2LastName: String(r[20] || '').trim(),
+                g2MiddleName: String(r[21] || '').trim(),
+                g2AltPhone: String(r[22] || '').trim(),
+                g2Email: String(r[23] || '').trim(),
+                g2Address: String(r[24] || '').trim(),
             }));
         }
 
@@ -525,6 +547,22 @@ function parseCSV(text) {
             birthDate: cols[5] || '',
             gender: cols[6] || '',
             email: cols[7] || '',
+            g1Phone: cols[9] || '',
+            g1Relationship: (cols[10] || '').toLowerCase(),
+            g1FirstName: cols[11] || '',
+            g1LastName: cols[12] || '',
+            g1MiddleName: cols[13] || '',
+            g1AltPhone: cols[14] || '',
+            g1Email: cols[15] || '',
+            g1Address: cols[16] || '',
+            g2Phone: cols[17] || '',
+            g2Relationship: (cols[18] || '').toLowerCase(),
+            g2FirstName: cols[19] || '',
+            g2LastName: cols[20] || '',
+            g2MiddleName: cols[21] || '',
+            g2AltPhone: cols[22] || '',
+            g2Email: cols[23] || '',
+            g2Address: cols[24] || '',
         };
     });
 }
@@ -555,6 +593,33 @@ function validateRow(row, index) {
     const email = String(row.email || '').trim();
     if (email && !EMAIL_LIKE_PATTERN.test(email)) {
         warnings.push('Email may not be deliverable; QR email can be skipped');
+    }
+
+    // ── Guardian 1 validation (REQUIRED) ──
+    const hasG1 = row.g1Phone || row.g1FirstName || row.g1LastName || row.g1Relationship;
+    if (!hasG1) {
+        errors.push('At least 1 guardian is required (Guardian 1 fields)');
+    } else {
+        if (!row.g1Phone) errors.push('Guardian 1 Phone is required');
+        if (!row.g1FirstName) errors.push('Guardian 1 First Name is required');
+        if (!row.g1LastName) errors.push('Guardian 1 Last Name is required');
+        if (!row.g1Relationship) errors.push('Guardian 1 Relationship is required');
+        if (row.g1Relationship && !['mother', 'father', 'legal_guardian', 'other'].includes(row.g1Relationship)) {
+            errors.push('Guardian 1 Relationship must be mother, father, legal_guardian, or other');
+        }
+        if (!row.g1Address) warnings.push('Guardian 1 Address is recommended');
+    }
+
+    // ── Guardian 2 validation (optional) ──
+    const hasG2 = row.g2Phone || row.g2FirstName || row.g2LastName || row.g2Relationship;
+    if (hasG2) {
+        if (!row.g2Phone) errors.push('Guardian 2 Phone is required');
+        if (!row.g2FirstName) errors.push('Guardian 2 First Name is required');
+        if (!row.g2LastName) errors.push('Guardian 2 Last Name is required');
+        if (!row.g2Relationship) errors.push('Guardian 2 Relationship is required');
+        if (row.g2Relationship && !['mother', 'father', 'legal_guardian', 'other'].includes(row.g2Relationship)) {
+            errors.push('Guardian 2 Relationship must be mother, father, legal_guardian, or other');
+        }
     }
 
     const status = errors.length > 0 ? 'error'
@@ -614,7 +679,7 @@ function renderPreview() {
     if (parsedRows.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="10" style="text-align:center;padding:1.5rem;color:var(--text-muted);">
+                <td colspan="12" style="text-align:center;padding:1.5rem;color:var(--text-muted);">
                     No new students available for import. Check the Duplicated card for skipped rows.
                 </td>
             </tr>
@@ -647,6 +712,11 @@ function renderPreview() {
             ? `<td>${escapeHtml(val)}</td>`
             : `<td class="cell-empty">—</td>`;
 
+        const guardianCount = (row.g1Phone ? 1 : 0) + (row.g2Phone ? 1 : 0);
+        const guardianCell = guardianCount > 0
+            ? `<span style="font-size:0.75rem;color:#059669;font-weight:500;">${guardianCount} Guardian${guardianCount > 1 ? 's' : ''}</span>`
+            : `<span style="font-size:0.75rem;color:var(--text-muted);">—</span>`;
+
         return `
             <tr class="${rowClass}">
                 <td style="color:var(--text-muted);font-size:0.8rem;">${row.rowIndex}</td>
@@ -659,6 +729,7 @@ function renderPreview() {
                 ${cell(row.gender)}
                 ${cell(row.section)}
                 <td style="font-size:0.82rem;">${escapeHtml(row.email)}${warnNote}</td>
+                <td style="text-align:center;">${guardianCell}</td>
                 <td>${statusBadge}</td>
             </tr>
         `;
@@ -690,21 +761,25 @@ async function startImport() {
     const total = validRows.length;
 
     addLog(log, 'info', `Starting import of ${total} student(s) into ${selectedDepartmentName}...`);
+
     const studIds = validRows.map(r => r.studId);
     const { data: existing } = await supabaseClient
         .from('students')
-        .select('stud_id')
+        .select('stud_id, student_id')
         .in('stud_id', studIds);
+
     const existingIds = new Set((existing || []).map(e => e.stud_id));
+    const existingStudentMap = new Map((existing || []).map(e => [e.stud_id, e.student_id]));
 
     for (let i = 0; i < validRows.length; i++) {
         const row = validRows[i];
         const isUpdate = existingIds.has(row.studId);
+        let studentUuid;
 
         try {
             const studentData = {
-                 stud_id: row.studId,
-                 first_name: row.firstName,
+                stud_id: row.studId,
+                first_name: row.firstName,
                 middle_name: row.middleName || null,
                 last_name: row.lastName,
                 suffix: row.suffix || null,
@@ -712,10 +787,10 @@ async function startImport() {
                 gender: row.gender || null,
                 section_id: selectedDepartmentId,
                 school_year_id: activeSchoolYear.id,
-                email: row.email || null,  // <-- ADDED
+                email: row.email || null,
                 status: 'active',
                 updated_at: new Date().toISOString(),
-                };
+            };
 
             let error;
 
@@ -725,8 +800,10 @@ async function startImport() {
                     .update(studentData)
                     .eq('stud_id', row.studId);
                 error = res.error;
+                studentUuid = existingStudentMap.get(row.studId);
             } else {
-                studentData.student_id = crypto.randomUUID();
+                studentUuid = crypto.randomUUID();
+                studentData.student_id = studentUuid;
                 studentData.created_at = new Date().toISOString();
                 const res = await supabaseClient
                     .from('students')
@@ -739,6 +816,44 @@ async function startImport() {
             success++;
             const label = isUpdate ? 'Updated' : 'Imported';
             addLog(log, 'ok', `[Row ${row.rowIndex}] ${label}: ${row.firstName} ${row.lastName} (${row.studId})`);
+
+            // ── Link Guardian 1 (Primary) ──
+            if (studentUuid && row.g1Phone && row.g1FirstName && row.g1LastName && row.g1Relationship) {
+                try {
+                    await upsertAndLinkGuardian(studentUuid, {
+                        first_name: row.g1FirstName,
+                        middle_name: row.g1MiddleName || null,
+                        last_name: row.g1LastName,
+                        relationship: row.g1Relationship,
+                        phone_number: row.g1Phone,
+                        alternate_phone_number: row.g1AltPhone || null,
+                        email: row.g1Email || null,
+                        address: row.g1Address || null,
+                    }, true);
+                    addLog(log, 'ok', `[Row ${row.rowIndex}] Linked Guardian 1: ${row.g1FirstName} ${row.g1LastName}`);
+                } catch (gErr) {
+                    addLog(log, 'warning', `[Row ${row.rowIndex}] Failed to link Guardian 1: ${gErr.message}`);
+                }
+            }
+
+            // ── Link Guardian 2 ──
+            if (studentUuid && row.g2Phone && row.g2FirstName && row.g2LastName && row.g2Relationship) {
+                try {
+                    await upsertAndLinkGuardian(studentUuid, {
+                        first_name: row.g2FirstName,
+                        middle_name: row.g2MiddleName || null,
+                        last_name: row.g2LastName,
+                        relationship: row.g2Relationship,
+                        phone_number: row.g2Phone,
+                        alternate_phone_number: row.g2AltPhone || null,
+                        email: row.g2Email || null,
+                        address: row.g2Address || null,
+                    }, false);
+                    addLog(log, 'ok', `[Row ${row.rowIndex}] Linked Guardian 2: ${row.g2FirstName} ${row.g2LastName}`);
+                } catch (gErr) {
+                    addLog(log, 'warning', `[Row ${row.rowIndex}] Failed to link Guardian 2: ${gErr.message}`);
+                }
+            }
 
             const emailResult = await sendStudentQrEmail({
                 studId: row.studId,
@@ -1223,8 +1338,8 @@ function openEditStudentModal(studId) {
     document.getElementById('editSuffix').value = student.suffix || '';
     document.getElementById('editYearLevel').value = student.birth_date || '';
     document.getElementById('editSection').value = (student.gender || '').toLowerCase();
-   document.getElementById('editEmail').value = student.email || '';
-document.getElementById('editStatus').value = student.status || 'inactive';
+    document.getElementById('editEmail').value = student.email || '';
+    document.getElementById('editStatus').value = student.status || 'inactive';
 
     editStudentModal.show();
 }
@@ -1242,7 +1357,7 @@ async function submitEditStudentForm(event) {
     const suffix = String(document.getElementById('editSuffix')?.value || '').trim();
     const birthDate = String(document.getElementById('editYearLevel')?.value || '').trim();
     const gender = String(document.getElementById('editSection')?.value || '').trim().toLowerCase();
-    const email = String(document.getElementById('editEmail')?.value || '').trim();  // <-- ADD THIS LINE
+    const email = String(document.getElementById('editEmail')?.value || '').trim();
     const status = String(document.getElementById('editStatus')?.value || 'inactive').trim();
 
     if (!sectionId || !firstName || !lastName) {
@@ -1261,17 +1376,17 @@ async function submitEditStudentForm(event) {
     }
 
     const updatePayload = {
-    first_name: firstName,
-    middle_name: middleName || null,
-    last_name: lastName,
-    suffix: suffix || null,
-    birth_date: birthDate || null,
-    gender: gender || null,
-    section_id: sectionId,
-    email: email || null,  // <-- ADDED (you'll need to capture email from the edit form)
-    status,
-    updated_at: new Date().toISOString(),
-};
+        first_name: firstName,
+        middle_name: middleName || null,
+        last_name: lastName,
+        suffix: suffix || null,
+        birth_date: birthDate || null,
+        gender: gender || null,
+        section_id: sectionId,
+        email: email || null,
+        status,
+        updated_at: new Date().toISOString(),
+    };
 
     try {
         if (saveBtn) {
@@ -1302,21 +1417,49 @@ async function submitEditStudentForm(event) {
         }
     }
 }
-
-async function deleteStudentRow(studId) {
+function deleteStudentRow(studId) {
     const student = allStudents.find(s => String(s.stud_id) === String(studId));
     const displayName = student
         ? (student.last_name ? (student.last_name + ', ' + [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' ')) : [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' '))
         : studId;
 
-    if (!confirm(`Delete student ${displayName} (${studId})? This action cannot be undone.`)) {
+    if (!deleteStudentModal) {
+        showImportAlert('Delete confirmation modal is not available right now.', 'danger');
         return;
     }
 
+    pendingDeleteStudentId = studId;
+    document.getElementById('deleteStudentName').textContent = displayName;
+    document.getElementById('deleteStudentStudId').textContent = studId;
+    deleteStudentModal.show();
+}
+
+async function confirmDeleteStudent() {
+    const studId = pendingDeleteStudentId;
+    if (!studId) return;
+
+    const student = allStudents.find(s => String(s.stud_id) === String(studId));
+    const studentUuid = student?.student_id;
+    const confirmBtn = document.getElementById('confirmDeleteStudentBtn');
+
     try {
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Deleting...';
+        }
+
+        if (studentUuid) {
+            // Delete child records first (FK constraints require this order)
+            await supabaseClient.from('sms_notifications').delete().eq('student_id', studentUuid);
+            await supabaseClient.from('daily_attendance').delete().eq('student_id', studentUuid);
+            await supabaseClient.from('event_attendance').delete().eq('student_id', studentUuid);
+            await supabaseClient.from('event_participants').delete().eq('student_id', studentUuid);
+            await supabaseClient.from('student_guardians').delete().eq('student_id', studentUuid);
+        }
+
         let query = supabaseClient.from('students').delete();
-        if (student?.student_id) {
-            query = query.eq('student_id', student.student_id);
+        if (studentUuid) {
+            query = query.eq('student_id', studentUuid);
         } else {
             query = query.eq('stud_id', studId);
         }
@@ -1324,11 +1467,18 @@ async function deleteStudentRow(studId) {
         const { error } = await query;
         if (error) throw error;
 
-        showImportAlert(`Student ${studId} deleted successfully.`, 'success');
+        showImportAlert(`Student ${studId} and all linked records deleted successfully.`, 'success');
+        deleteStudentModal?.hide();
         await loadAllStudentsTable();
     } catch (error) {
         console.error('Error deleting student:', error);
         showImportAlert(`Failed to delete student: ${error.message}`, 'danger');
+    } finally {
+        pendingDeleteStudentId = null;
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Delete Student';
+        }
     }
 }
 
@@ -1368,7 +1518,6 @@ function populateGradeLevelSelects() {
 
     const uniqueGrades = [...new Set(departmentsCache.map(d => d.grade_level).filter(Boolean))];
 
-    // Logical order: Kinder → Grade 1 → Grade 10
     const gradeOrder = ['Kinder', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'];
     const sortedGrades = uniqueGrades.sort((a, b) => gradeOrder.indexOf(a) - gradeOrder.indexOf(b));
 
@@ -1409,17 +1558,15 @@ async function openSingleStudentModal() {
         syDisplay.value = activeSchoolYear && activeSchoolYear.name ? activeSchoolYear.name : 'No Active School Year';
     }
 
-       const singleGradeLevel = document.getElementById('singleGradeLevel');
-    const deptSelect       = document.getElementById('singleDepartment');
+    const singleGradeLevel = document.getElementById('singleGradeLevel');
+    const deptSelect = document.getElementById('singleDepartment');
 
-    // Reset first
     if (singleGradeLevel) singleGradeLevel.value = '';
     if (deptSelect) {
         deptSelect.innerHTML = '<option value="" disabled selected>Select grade level first...</option>';
         deptSelect.disabled = true;
     }
 
-    // If a section was already chosen on the Import page, restore Grade + Section
     if (selectedDepartmentId && singleGradeLevel && deptSelect) {
         const section = departmentsCache.find(
             d => String(d.section_id) === String(selectedDepartmentId)
@@ -1431,7 +1578,6 @@ async function openSingleStudentModal() {
         }
     }
 
-    // Generate the ID from the now-selected grade level
     await updateSingleStudentId();
 
     document.getElementById('singleFirstName').value = '';
@@ -1459,18 +1605,18 @@ async function openSingleStudentModal() {
     if (guardian2Section) guardian2Section.style.display = 'none';
     if (addGuardian2Container) addGuardian2Container.style.display = 'block';
 
-    // Listen for section changes to regenerate Student ID
     deptSelect?.removeEventListener('change', updateSingleStudentId);
     deptSelect?.addEventListener('change', updateSingleStudentId);
 
     singleStudentModal.show();
 }
+
 async function updateSingleStudentId() {
     const gradeSelect = document.getElementById('singleGradeLevel');
     const studIdInput = document.getElementById('singleStudentId');
     if (!gradeSelect || !studIdInput) return;
 
-    const gradeLevel = gradeSelect.value;          // "Kinder", "Grade 1", "Grade 10", etc.
+    const gradeLevel = gradeSelect.value;
     if (!gradeLevel) {
         studIdInput.value = '';
         return;
@@ -1478,7 +1624,7 @@ async function updateSingleStudentId() {
 
     try {
         const nextId = await generateNextStudId(gradeLevel);
-        studIdInput.value = nextId;               // e.g. K-0003, 1-0042, 10-0001
+        studIdInput.value = nextId;
     } catch (err) {
         console.error('Failed to generate Student ID:', err);
         studIdInput.value = '';
@@ -1670,6 +1816,7 @@ function clearGuardian2Form() {
         statusEl.className = '';
     }
 }
+
 async function submitSingleStudentForm(event) {
     event.preventDefault();
 
@@ -1685,7 +1832,6 @@ async function submitSingleStudentForm(event) {
     const email = String(document.getElementById('singleEmail')?.value || '').trim();
     const address = String(document.getElementById('singleAddress')?.value || '').trim();
 
-    // ── VALIDATION ──
     if (!activeSchoolYear || !activeSchoolYear.id) {
         showImportAlert('No active school year found. Please set one in System Settings first.', 'danger');
         return;
@@ -1707,7 +1853,6 @@ async function submitSingleStudentForm(event) {
         return;
     }
 
-    // ── COLLECT GUARDIAN 1 DATA ──
     const g1Phone = String(document.getElementById('guardian1Phone')?.value || '').trim();
     const g1Relationship = String(document.getElementById('guardian1Relationship')?.value || '').trim();
     const g1FirstName = String(document.getElementById('guardian1FirstName')?.value || '').trim();
@@ -1725,7 +1870,6 @@ async function submitSingleStudentForm(event) {
         return;
     }
 
-    // ── COLLECT GUARDIAN 2 DATA ──
     const g2Phone = String(document.getElementById('guardian2Phone')?.value || '').trim();
     const g2Relationship = String(document.getElementById('guardian2Relationship')?.value || '').trim();
     const g2FirstName = String(document.getElementById('guardian2FirstName')?.value || '').trim();
@@ -1743,7 +1887,6 @@ async function submitSingleStudentForm(event) {
         return;
     }
 
-    // ── VALIDATE RELATIONSHIP VALUES ──
     const validRelationships = ['mother', 'father', 'legal_guardian', 'other'];
     if (hasGuardian1 && !validRelationships.includes(g1Relationship)) {
         showImportAlert('Guardian 1 relationship must be Mother, Father, Legal Guardian, or Other.', 'warning');
@@ -1759,7 +1902,6 @@ async function submitSingleStudentForm(event) {
 
         if (!supabaseClient) throw new Error('Database connection not available. Please refresh the page and try again.');
 
-        // ── CHECK FOR DUPLICATE STUDENT ID ──
         const { data: existingStudent, error: existingError } = await supabaseClient
             .from('students')
             .select('stud_id')
@@ -1774,29 +1916,27 @@ async function submitSingleStudentForm(event) {
 
         const studentUuid = crypto.randomUUID();
 
-        // ── INSERT STUDENT ──
-       const payload = {
-    student_id: studentUuid,
-    stud_id: studId,
-    first_name: firstName,
-    middle_name: middleName || null,
-    last_name: lastName,
-    suffix: suffix || null,
-    birth_date: birthDate || null,
-    gender: gender || null,
-    section_id: sectionId,
-    school_year_id: activeSchoolYear.id,
-    email: email || null,  // <-- ADDED
-    status: 'active',
-    address: address || null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-};
+        const payload = {
+            student_id: studentUuid,
+            stud_id: studId,
+            first_name: firstName,
+            middle_name: middleName || null,
+            last_name: lastName,
+            suffix: suffix || null,
+            birth_date: birthDate || null,
+            gender: gender || null,
+            section_id: sectionId,
+            school_year_id: activeSchoolYear.id,
+            email: email || null,
+            status: 'active',
+            address: address || null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
 
         const { error: insertError } = await supabaseClient.from('students').insert(payload);
         if (insertError) throw insertError;
 
-        // ── INSERT / LINK GUARDIAN 1 ──
         if (hasGuardian1) {
             try {
                 await upsertAndLinkGuardian(studentUuid, {
@@ -1808,14 +1948,13 @@ async function submitSingleStudentForm(event) {
                     alternate_phone_number: g1AltPhone || null,
                     email: g1Email || null,
                     address: g1Address,
-                }, true);  // is_primary_contact = true
+                }, true);
             } catch (g1Err) {
                 console.error('Failed to link Guardian 1:', g1Err);
                 showImportAlert(`Student saved, but failed to link Guardian 1: ${g1Err.message}`, 'warning');
             }
         }
 
-        // ── INSERT / LINK GUARDIAN 2 ──
         if (hasGuardian2) {
             try {
                 await upsertAndLinkGuardian(studentUuid, {
@@ -1827,7 +1966,7 @@ async function submitSingleStudentForm(event) {
                     alternate_phone_number: g2AltPhone || null,
                     email: g2Email || null,
                     address: g2Address,
-                }, false);  // is_primary_contact = false
+                }, false);
             } catch (g2Err) {
                 console.error('Failed to link Guardian 2:', g2Err);
                 showImportAlert(`Student saved, but failed to link Guardian 2: ${g2Err.message}`, 'warning');
@@ -1840,7 +1979,6 @@ async function submitSingleStudentForm(event) {
         singleStudentModal?.hide();
         await loadAllStudentsTable();
 
-        // ── SEND QR EMAIL ──
         if (email) {
             const selectedSection = departmentsCache.find(s => String(s.section_id) === String(sectionId));
             const sectionLabel = selectedSection ? `${selectedSection.grade_level} - ${selectedSection.section_name}` : '';
@@ -2049,7 +2187,23 @@ function downloadStudentTemplate() {
         'Birth Date',
         'Gender',
         'Email',
-        'School Year'
+        'School Year',
+        'Guardian1_Phone',
+        'Guardian1_Relationship',
+        'Guardian1_FirstName',
+        'Guardian1_LastName',
+        'Guardian1_MiddleName',
+        'Guardian1_AltPhone',
+        'Guardian1_Email',
+        'Guardian1_Address',
+        'Guardian2_Phone',
+        'Guardian2_Relationship',
+        'Guardian2_FirstName',
+        'Guardian2_LastName',
+        'Guardian2_MiddleName',
+        'Guardian2_AltPhone',
+        'Guardian2_Email',
+        'Guardian2_Address'
     ];
 
     const schoolYearSample = (activeSchoolYear && activeSchoolYear.name)
@@ -2065,7 +2219,23 @@ function downloadStudentTemplate() {
         '2012-06-14',
         'male',
         'delacruz_juan@plpasig.edu.ph',
-        schoolYearSample
+        schoolYearSample,
+        '09171234567',
+        'mother',
+        'Maria',
+        'Dela Cruz',
+        'Santos',
+        '',
+        'maria.dc@email.com',
+        '123 Main St, Pasig City',
+        '09179876543',
+        'father',
+        'Jose',
+        'Dela Cruz',
+        '',
+        '',
+        'jose.dc@email.com',
+        '123 Main St, Pasig City'
     ];
 
     if (window.XLSX) {
