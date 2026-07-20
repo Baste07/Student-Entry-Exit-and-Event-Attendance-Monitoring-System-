@@ -44,6 +44,105 @@ function getCurrentTime() {
 }
 
 // ────────────────────────────────────────────
+// DYNAMIC STATUS COMPUTATION (mirrors events.js)
+// ────────────────────────────────────────────
+// Supabase's `events.status` column is the single source of truth for the
+// whole app. Any page that reads events should also push status transitions
+// back to the DB — otherwise events stay stuck on stale statuses (e.g.
+// "upcoming" long after they've actually started) whenever the admin
+// Events page isn't open.
+
+function getManilaNow() {
+    const now = new Date();
+    return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+}
+
+function computeEventStatus(event) {
+    if (event.status === 'cancelled') return 'cancelled';
+
+    const now = getManilaNow();
+    const todayStr = now.toLocaleDateString('en-CA');
+    const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
+
+    const startDate = event.event_date;
+    const endDate = event.end_date || event.event_date;
+    const startTime = event.time_start;
+    const endTime = event.time_end;
+
+    if (endDate < todayStr) return 'completed';
+
+    if (endDate === todayStr) {
+        if (endTime && currentTime >= endTime) return 'completed';
+        if (startTime && currentTime < startTime) return 'upcoming';
+        return 'ongoing';
+    }
+
+    if (startDate > todayStr) return 'upcoming';
+
+    if (startDate === todayStr) {
+        if (startTime && currentTime < startTime) return 'upcoming';
+        return 'ongoing';
+    }
+
+    if (startDate < todayStr && endDate > todayStr) return 'ongoing';
+
+    return 'upcoming';
+}
+
+// Computes the correct status for each event and writes any changes back to
+// Supabase. Mutates the passed-in events in place so callers can immediately
+// use the corrected status for rendering, without waiting on the write.
+async function syncEventStatuses(events) {
+    const updates = [];
+
+    events.forEach(ev => {
+        if (ev.status === 'cancelled') return;
+        const computed = computeEventStatus(ev);
+        if (computed !== ev.status) {
+            updates.push({ event_id: ev.event_id, status: computed });
+            ev.status = computed;
+        }
+    });
+
+    if (updates.length === 0) return;
+
+    for (const upd of updates) {
+        try {
+            const { error } = await supabaseClient
+                .from('events')
+                .update({ status: upd.status, updated_at: new Date().toISOString() })
+                .eq('event_id', upd.event_id);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Dashboard status sync failed for', upd.event_id, err);
+            // Leave ev.status as the computed value for this render; the
+            // next load will retry the write.
+        }
+    }
+}
+
+// Fetches every non-cancelled event and syncs its status to Supabase before
+// returning, so every consumer downstream (stats + recent events) works off
+// up-to-date statuses.
+async function fetchAndSyncEvents() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('events')
+            .select('*')
+            .neq('status', 'cancelled');
+
+        if (error) throw error;
+
+        const events = data || [];
+        await syncEventStatuses(events);
+        return events;
+    } catch (error) {
+        console.error('fetchAndSyncEvents error:', error);
+        return [];
+    }
+}
+
+// ────────────────────────────────────────────
 // LOAD ALL DASHBOARD DATA
 // ────────────────────────────────────────────
 
@@ -54,10 +153,14 @@ async function loadDashboardData() {
     }
 
     try {
+        // Fetch + sync events once, reuse for both stats and recent events
+        // so we don't compute/write status twice per page load.
+        const events = await fetchAndSyncEvents();
+
         await Promise.all([
             loadAdminProfile(),
-            loadStatistics(),
-            loadRecentEvents()
+            loadStatistics(events),
+            loadRecentEvents(events)
         ]);
 
         console.log('✅ Dashboard loaded');
@@ -163,13 +266,14 @@ window.closeProfileModal = closeProfileModal;
 // LOAD STATISTICS
 // ────────────────────────────────────────────
 
-async function loadStatistics() {
+async function loadStatistics(events) {
     try {
-        // Active Events (upcoming or ongoing)
-        const { count: totalEvents } = await supabaseClient
-            .from('events')
-            .select('*', { count: 'exact', head: true })
-            .in('status', ['upcoming', 'scheduled', 'ongoing']);
+        // Active Events (upcoming or ongoing) — computed from the
+        // already-synced `events` list instead of a separate count query,
+        // so this reflects up-to-date statuses rather than stale DB rows.
+        const totalEvents = events.filter(e =>
+            ['upcoming', 'scheduled', 'ongoing'].includes(e.status)
+        ).length;
 
         // Active Students
         const { count: totalStudents } = await supabaseClient
@@ -204,31 +308,30 @@ async function loadStatistics() {
 // LOAD RECENT EVENTS
 // ────────────────────────────────────────────
 
-async function loadRecentEvents() {
+async function loadRecentEvents(events) {
     try {
         const today = formatDate();
 
-        const { data: events, error } = await supabaseClient
-            .from('events')
-            .select(`
-                *,
-                event_participants(count)
-            `)
-            .gte('event_date', today)
-            .in('status', ['upcoming', 'scheduled', 'ongoing'])
-            .order('event_date', { ascending: true })
-            .order('time_start', { ascending: true })
-            .limit(6);
+        const upcomingEvents = events
+            .filter(e =>
+                e.event_date >= today &&
+                ['upcoming', 'scheduled', 'ongoing'].includes(e.status)
+            )
+            .sort((a, b) => {
+                if (a.event_date !== b.event_date) return a.event_date < b.event_date ? -1 : 1;
+                const aTime = a.time_start || '';
+                const bTime = b.time_start || '';
+                return aTime < bTime ? -1 : aTime > bTime ? 1 : 0;
+            })
+            .slice(0, 6);
 
-        if (error) throw error;
-
-        if (!events || events.length === 0) {
+        if (upcomingEvents.length === 0) {
             document.getElementById('eventsGrid').innerHTML =
                 '<p class="no-schedules">No upcoming events found.</p>';
             return;
         }
 
-        const eventsWithAttendance = await Promise.all(events.map(async (event) => {
+        const eventsWithAttendance = await Promise.all(upcomingEvents.map(async (event) => {
             const { count: attendedCount } = await supabaseClient
                 .from('event_attendance')
                 .select('*', { count: 'exact', head: true })
@@ -240,9 +343,8 @@ async function loadRecentEvents() {
                 .select('*', { count: 'exact', head: true })
                 .eq('event_id', event.event_id);
 
-            const now = getCurrentTime();
-            const isOngoing = event.status === 'ongoing' || 
-                (event.event_date === today && event.time_start <= now && event.time_end >= now);
+            // event.status is already synced/up-to-date at this point.
+            const isOngoing = event.status === 'ongoing';
 
             return {
                 ...event,

@@ -645,6 +645,33 @@ def _build_remote_face_fingerprint(students_rows, teachers_rows):
     return _hash_payload(manifest), manifest
 
 # ─────────────────────────────────────────────
+# pgvector helpers
+# ─────────────────────────────────────────────
+def _vector_to_pg_literal(vec):
+    return "[" + ",".join(f"{x:.8f}" for x in np.asarray(vec, dtype=np.float32)) + "]"
+
+def _parse_pg_vector(raw):
+    if raw is None:
+        return None
+    if isinstance(raw, list):
+        return np.array(raw, dtype=np.float32)
+    s = str(raw).strip().strip("[]")
+    if not s:
+        return None
+    return np.array([float(x) for x in s.split(",")], dtype=np.float32)
+
+def _upsert_face_embedding(role, person_id, embedding, fingerprint):
+    table = "students" if role == "student" else "teachers"
+    id_col = "student_id" if role == "student" else "teacher_id"
+    try:
+        supabase.table(table).update({
+            "face_embedding": _vector_to_pg_literal(embedding),
+            "face_embedding_fingerprint": fingerprint,
+        }).eq(id_col, person_id).execute()
+    except Exception as e:
+        print(f"⚠ Failed to upsert pgvector embedding for {role}_{person_id}: {e}")
+
+# ─────────────────────────────────────────────
 # Cache load / save
 # ─────────────────────────────────────────────
 def _load_face_cache_from_disk():
@@ -713,7 +740,7 @@ def _activate_face_db(encodings, meta):
 
 def _fetch_face_rows():
     students_result = supabase.table("students")\
-        .select("student_id, stud_id, first_name, middle_name, last_name, facial_dataset_path, section_id")\
+.select("student_id, stud_id, first_name, middle_name, last_name, facial_dataset_path, section_id, face_embedding, face_embedding_fingerprint")\
         .not_.is_("facial_dataset_path", "null")\
         .neq("facial_dataset_path", "")\
         .execute()
@@ -722,7 +749,7 @@ def _fetch_face_rows():
     teachers_data = []
     try:
         teachers_result = supabase.table("teachers")\
-            .select("teacher_id, employee_id, first_name, middle_name, last_name, facial_dataset_path")\
+           .select("teacher_id, employee_id, first_name, middle_name, last_name, facial_dataset_path, face_embedding, face_embedding_fingerprint")\
             .not_.is_("facial_dataset_path", "null")\
             .neq("facial_dataset_path", "")\
             .execute()
@@ -883,6 +910,42 @@ def load_all_faces(force_rebuild=False):
         student_ids = [str(r["student_id"]) for r in students_rows if r.get("student_id")]
         global student_details_cache
         student_details_cache = _fetch_student_details(student_ids)
+
+        # If we had no usable local cache, seed working arrays from pgvector so we
+        # don't have to re-download every photo on a fresh machine.
+        if not cached:
+            for row in students_rows:
+                vec = _parse_pg_vector(row.get("face_embedding"))
+                fp_db = row.get("face_embedding_fingerprint")
+                if vec is not None and fp_db:
+                    mid = row.get("middle_name") or ""
+                    details = student_details_cache.get(str(row["student_id"]), {})
+                    working_encodings.append(vec)
+                    working_meta.append({
+                        "role": "student",
+                        "id": row["student_id"],
+                        "stud_id": details.get("stud_id"),
+                        "name": f"{row['first_name']} {mid} {row['last_name']}".strip(),
+                        "grade_level": details.get("grade_level"),
+                        "section_name": details.get("section_name"),
+                        "email": details.get("email"),
+                    })
+                    working_per_person[f"student_{row['student_id']}"] = fp_db
+            for row in teachers_rows:
+                vec = _parse_pg_vector(row.get("face_embedding"))
+                fp_db = row.get("face_embedding_fingerprint")
+                if vec is not None and fp_db:
+                    mid = row.get("middle_name") or ""
+                    working_encodings.append(vec)
+                    working_meta.append({
+                        "role": "teacher",
+                        "id": row["teacher_id"],
+                        "employee_id": row["employee_id"],
+                        "name": f"{row['first_name']} {mid} {row['last_name']}".strip(),
+                    })
+                    working_per_person[f"teacher_{row['teacher_id']}"] = fp_db
+            if working_meta:
+                print(f"✓ Seeded {len(working_meta)} encodings from pgvector (no local cache present)")
 
         # Build the facial-path fingerprint (used to detect only face dataset path changes)
         try:
@@ -1087,6 +1150,9 @@ def load_all_faces(force_rebuild=False):
                 working_meta.extend(new_metas)
                 working_per_person[person_key] = new_fp   # store new fingerprint
                 key_index = _build_key_index(working_meta)
+
+                avg_embedding = np.mean(np.array(new_encs, dtype=np.float32), axis=0)
+                _upsert_face_embedding(entry["role"], meta["id"], avg_embedding, new_fp)
 
                 if is_new:
                     added += 1

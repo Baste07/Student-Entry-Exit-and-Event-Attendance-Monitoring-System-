@@ -44,8 +44,7 @@
             <h1>School <span>Attendance</span><br>Dashboard</h1>
 
             <p class="hero-sub">
-                Real-time overview of student and teacher attendance —
-                present, late, absent, and excused counts.
+                Real-time school attendance monitoring and event schedule.
             </p>
 
             <div class="hero-clock">
@@ -53,25 +52,6 @@
                 <span id="liveClock">—</span>
                 &nbsp;·&nbsp;
                 <span id="liveDate">—</span>
-            </div>
-
-            <div class="hero-stats">
-                <div class="hero-chip">
-                    <div class="hero-chip-val green" id="statPresent">—</div>
-                    <div class="hero-chip-lbl">Present</div>
-                </div>
-                <div class="hero-chip">
-                    <div class="hero-chip-val orange" id="statLate">—</div>
-                    <div class="hero-chip-lbl">Late</div>
-                </div>
-                <div class="hero-chip">
-                    <div class="hero-chip-val red" id="statAbsent">—</div>
-                    <div class="hero-chip-lbl">Absent</div>
-                </div>
-                <div class="hero-chip">
-                    <div class="hero-chip-val blue" id="statExcused">—</div>
-                    <div class="hero-chip-lbl">Excused</div>
-                </div>
             </div>
         </div>
     </section>
@@ -83,31 +63,17 @@
             <span id="refreshLabel">Auto-refreshing every 30 seconds</span>
         </div>
 
-        <!-- Stats Overview -->
-        <div class="sec-block">
+        <!-- Ongoing Events -->
+        <div class="sec-block" id="ongoingEventsSection" style="display:none;">
             <div class="sec-head">
-                <i class="fa-solid fa-chart-pie" style="color:#22c55e;font-size:20px"></i>
-                <h2>Overview</h2>
+                <i class="fa-solid fa-circle-play" style="color:#22c55e;font-size:20px"></i>
+                <h2>Ongoing Events</h2>
+                <span class="cnt" id="ongoingEventsBadge">0</span>
             </div>
-            <div class="grid" id="statsGrid">
+            <div class="grid" id="ongoingEventsGrid">
                 <div class="spinner-wrap">
                     <i class="fa-solid fa-spinner fa-spin"></i>
-                    <span>Loading stats…</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recent Attendance -->
-        <div class="sec-block">
-            <div class="sec-head">
-                <i class="fa-solid fa-clock-rotate-left" style="color:#2d6a4f;font-size:20px"></i>
-                <h2>Recent Attendance</h2>
-                <span class="cnt" id="recentBadge">0</span>
-            </div>
-            <div class="grid" id="recentGrid">
-                <div class="spinner-wrap">
-                    <i class="fa-solid fa-spinner fa-spin"></i>
-                    <span>Loading records…</span>
+                    <span>Loading events…</span>
                 </div>
             </div>
         </div>
@@ -120,6 +86,21 @@
                 <span class="cnt" id="eventsBadge">0</span>
             </div>
             <div class="grid" id="eventsGrid">
+                <div class="spinner-wrap">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Loading events…</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Completed Events -->
+        <div class="sec-block" id="completedEventsSection">
+            <div class="sec-head">
+                <i class="fa-solid fa-check-circle" style="color:#475569;font-size:20px"></i>
+                <h2>Completed Events</h2>
+                <span class="cnt" id="completedEventsBadge">0</span>
+            </div>
+            <div class="grid" id="completedEventsGrid">
                 <div class="spinner-wrap">
                     <i class="fa-solid fa-spinner fa-spin"></i>
                     <span>Loading events…</span>
