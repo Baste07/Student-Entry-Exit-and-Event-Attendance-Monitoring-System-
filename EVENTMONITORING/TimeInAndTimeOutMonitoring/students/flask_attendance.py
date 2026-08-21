@@ -110,6 +110,10 @@ CAMERA_OWNER_FILE = os.path.join(script_dir, "camera_owner.json")
 CAMERA_OWNER_STALE_SECONDS = float(os.getenv("CAMERA_OWNER_STALE_SECONDS", "90"))
 ENGINE_CAMERA_OWNER = "attendance"
 
+# ── ADDED: where recognition/anti-spoof diagnostic snapshots get saved for the capstone paper ──
+SNAPSHOT_DIR = os.path.join(script_dir, "pipeline_snapshots")
+os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+
 if not SUPABASE_URL or not SUPABASE_KEY:
     print(f"CRITICAL ERROR: Could not load credentials from {env_path}")
     sys.exit(1)
@@ -360,6 +364,73 @@ def _run_anti_spoof(frame_bgr, bbox):
         if ANTI_SPOOF_FAIL_CLOSED:
             return {"allowed": False, "is_live": False, "score": None, "reason": "infer_error"}
         return {"allowed": True, "is_live": True, "score": None, "reason": "infer_error_allowed"}
+
+
+def _run_anti_spoof_diagnostic(frame_bgr, bbox):
+    """Same MiniFASNet flow as _run_anti_spoof, but also returns each
+    individual model's score, the 80x80 cropped patch, and per-model timing
+    -- everything the paper's Eq. (2) walkthrough needs to show its work.
+    Does NOT touch anti_spoof_cache (diagnostic-only, not used for gating)."""
+    diag = {
+        "available": anti_spoof_state.get("available"),
+        "per_model": [],       # [{"name":..., "score":..., "crop": np.ndarray, "ms":...}, ...]
+        "combined_score": None,
+        "is_live": None,
+        "threshold": ANTI_SPOOF_THRESHOLD,
+        "error": None,
+    }
+
+    if not anti_spoof_state.get("available"):
+        diag["error"] = anti_spoof_state.get("message", "unavailable")
+        return diag
+    if frame_bgr is None or bbox is None:
+        diag["error"] = "no_frame_or_bbox"
+        return diag
+
+    try:
+        top, right, bottom, left = bbox
+        x, y = max(0, int(left)), max(0, int(top))
+        w, h = max(1, int(right - left)), max(1, int(bottom - top))
+        image_bbox = [x, y, w, h]
+
+        with anti_spoof_lock:
+            predictor = anti_spoof_runtime.get("predictor")
+            cropper = anti_spoof_runtime.get("cropper")
+            model_paths = list(anti_spoof_runtime.get("model_paths") or [])
+        if predictor is None or cropper is None or not model_paths:
+            diag["error"] = "model_not_ready"
+            return diag
+
+        prediction_sum = np.zeros((1, 3), dtype=np.float32)
+        for model_path in model_paths:
+            model_name = os.path.basename(model_path)
+            h_input, w_input, _model_type, scale = parse_model_name(model_name)
+            param = {
+                "org_img": frame_bgr, "bbox": image_bbox, "scale": scale,
+                "out_w": w_input, "out_h": h_input, "crop": True,
+            }
+            t0 = time.time()
+            patch = cropper.crop(**param)
+            single_pred = predictor.predict(patch, model_path)
+            ms = (time.time() - t0) * 1000.0
+            live_score = float(single_pred[0][1])
+            diag["per_model"].append({
+                "name": model_name, "score": live_score, "crop": patch, "ms": ms,
+            })
+            prediction_sum += single_pred
+
+        model_count = len(diag["per_model"])
+        if model_count == 0:
+            diag["error"] = "no_models"
+            return diag
+
+        combined = float(prediction_sum[0][1] / float(model_count))
+        diag["combined_score"] = combined
+        diag["is_live"] = combined >= ANTI_SPOOF_THRESHOLD
+        return diag
+    except Exception as exc:
+        diag["error"] = str(exc)
+        return diag
 
 
 def _run_anti_spoof_cached(face_key, frame_bgr, bbox):
@@ -1467,6 +1538,7 @@ def _record_event_attendance(student_id, meta):
 
 def recognition_worker():
     global latest_frame
+    scan_count = 0  # ── ADDED: rolling scan counter, purely for analytics/log labeling ──
     while True:
         time.sleep(0.05)
         with frame_lock:
@@ -1483,16 +1555,51 @@ def recognition_worker():
             with result_lock:
                 recognition_result.update({"locations": [], "labels": [], "colors": []})
             continue
+
+        scan_count += 1
+        roi_h, roi_w = roi.shape[:2]
+
+        # ── ANALYTICS: OpenCV preprocessing — resize ──
+        t_resize0 = time.time()
         small = cv2.resize(roi, (0, 0), fx=0.25, fy=0.25)
-        rgb   = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
-        locs  = face_recognition.face_locations(rgb, model="hog")
+        resize_ms = (time.time() - t_resize0) * 1000.0
+        small_h, small_w = small.shape[:2]
+        print(f"[OPENCV-RESIZE] scan#{scan_count:05d}  roi={roi_w}x{roi_h}px -> scaled={small_w}x{small_h}px "
+              f"(scale=0.25x)  resize_time={resize_ms:.1f}ms")
+
+        # ── ANALYTICS: OpenCV preprocessing — color conversion ──
+        t_color0 = time.time()
+        rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
+        color_ms = (time.time() - t_color0) * 1000.0
+        print(f"[OPENCV-COLOR]  scan#{scan_count:05d}  channel_order: BGR (camera native) -> RGB "
+              f"(required by dlib/face_recognition)  convert_time={color_ms:.1f}ms")
+
+        # ── ANALYTICS: dlib HOG+SVM face detection (via face_recognition.face_locations) ──
+        t_det0 = time.time()
+        locs = face_recognition.face_locations(rgb, model="hog")
+        det_ms = (time.time() - t_det0) * 1000.0
         if not locs:
+            print(f"[HOG+SVM] scan#{scan_count:05d}  no face in ROI  scan_time={det_ms:.1f}ms")
             with result_lock:
                 recognition_result.update({"locations": [], "labels": [], "colors": []})
             continue
+        print(f"[HOG+SVM] scan#{scan_count:05d}  faces_found={len(locs)}  scan_time={det_ms:.1f}ms")
+        for i, (t, r, b, l) in enumerate(locs):
+            full_t, full_r, full_b, full_l = t * 4 + y1, r * 4 + x1, b * 4 + y1, l * 4 + x1
+            print(f"[OPENCV-UPSCALE] scan#{scan_count:05d}  face#{i+1}  "
+                  f"bbox_on_small=[x:{l}, y:{t}, w:{r-l}, h:{b-t}]  "
+                  f"mapped_to_full_frame=[x:{full_l}, y:{full_t}, w:{full_r-full_l}, h:{full_b-full_t}]  "
+                  f"(×4 scale-back)")
+
+        # ── ANALYTICS: 128-d face encoding generation (dlib ResNet, via face_recognition) ──
+        t_enc0 = time.time()
         encs = face_recognition.face_encodings(rgb, locs, num_jitters=1)
+        enc_ms = (time.time() - t_enc0) * 1000.0
+        print(f"[ENCODE]  scan#{scan_count:05d}  generated {len(encs)} x 128-d encoding(s)  "
+              f"encode_time={enc_ms:.1f}ms")
+
         new_locs, new_labels, new_colors = [], [], []
-        for (top, right, bottom, left), enc in zip(locs, encs):
+        for i, ((top, right, bottom, left), enc) in enumerate(zip(locs, encs)):
             top    = top    * 4 + y1
             right  = right  * 4 + x1
             bottom = bottom * 4 + y1
@@ -1501,27 +1608,48 @@ def recognition_worker():
                 enc_np    = known_encodings_np
                 meta_list = known_meta
             if enc_np is None or len(enc_np) == 0:
+                print(f"[MATCH]   scan#{scan_count:05d}  face#{i+1}  no registered faces in database "
+                      f"(known_encodings is empty)")
                 new_locs.append((top, right, bottom, left))
                 new_labels.append("No faces registered")
                 new_colors.append((0, 0, 255))
                 continue
+
+            # ── ANALYTICS: Euclidean-distance nearest-neighbor matching against in-memory cache ──
+            t_match0 = time.time()
             dists    = np.linalg.norm(enc_np - enc, axis=1)
             best_idx = int(np.argmin(dists))
             best_d   = float(dists[best_idx])
+            match_ms = (time.time() - t_match0) * 1000.0
+            candidate_name = meta_list[best_idx]["name"] if best_idx < len(meta_list) else "?"
+            print(f"[MATCH]   scan#{scan_count:05d}  face#{i+1}  compared against {len(enc_np)} known encoding(s)  "
+                  f"nearest='{candidate_name}'  distance={best_d:.4f} (must be <0.400)  "
+                  f"match_time={match_ms:.2f}ms")
+
             if best_d < 0.40: 
                 meta  = meta_list[best_idx]
                 key   = f"{meta['role']}_{meta['id']}"
                 last  = recently_seen.get(key)
                 label = meta["name"]
                 color = (0, 255, 0) if meta["role"] == "student" else (0, 255, 255)
+                print(f"[MATCH]   -> ACCEPTED: recognized as {meta['name']} (role={meta['role']})")
                 if not last or (datetime.datetime.now() - last).total_seconds() >= COOLDOWN_SECS:
+                    # ── ANALYTICS: MiniFASNet anti-spoof liveness check ──
+                    t_spoof0 = time.time()
                     anti_spoof = _run_anti_spoof_cached(key, frame, (top, right, bottom, left))
+                    spoof_ms = (time.time() - t_spoof0) * 1000.0
+                    score = anti_spoof.get("score")
+                    score_txt = f"{score:.4f}" if isinstance(score, (int, float)) else "n/a"
+                    print(f"[ANTI-SPOOF] scan#{scan_count:05d}  face#{i+1}  MiniFASNet liveness check  "
+                          f"score={score_txt}  threshold={ANTI_SPOOF_THRESHOLD:.2f}  "
+                          f"is_live={anti_spoof.get('is_live')}  reason={anti_spoof.get('reason')}  "
+                          f"check_time={spoof_ms:.1f}ms")
                     if not anti_spoof.get("allowed", True):
-                        score = anti_spoof.get("score")
-                        score_txt = f"{score:.2f}" if isinstance(score, (int, float)) else "n/a"
                         label = "Spoof blocked"
                         color = (0, 0, 255)
                         recently_seen[key] = datetime.datetime.now()
+                        print(f"[ANTI-SPOOF] -> BLOCKED: liveness check failed for {meta['name']}, "
+                              f"attendance NOT recorded")
                         _push({
                             "message": "SPOOF DETECTED",
                             "name": meta["name"],
@@ -1532,11 +1660,16 @@ def recognition_worker():
                         new_labels.append(label)
                         new_colors.append(color)
                         continue
+                    print(f"[ANTI-SPOOF] -> PASSED: live face confirmed, proceeding to attendance recording")
                     recently_seen[key] = datetime.datetime.now()
                     _handle_recognition(meta)
+                else:
+                    remaining_cd = COOLDOWN_SECS - (datetime.datetime.now() - last).total_seconds()
+                    print(f"[MATCH]   -> SKIPPED: cooldown active ({remaining_cd:.1f}s remaining) for {meta['name']}")
             else:
                 label = "Unknown"
                 color = (0, 0, 255)
+                print(f"[MATCH]   -> REJECTED: distance {best_d:.4f} exceeds threshold 0.400, labeled Unknown")
             new_locs.append((top, right, bottom, left))
             new_labels.append(label)
             new_colors.append(color)
