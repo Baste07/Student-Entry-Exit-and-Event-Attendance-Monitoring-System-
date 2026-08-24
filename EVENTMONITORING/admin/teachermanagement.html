@@ -119,7 +119,7 @@
                         <th>Suffix</th>
                         <th>Email</th>
                         <th>Phone</th>
-                        <th>Faculty</th>
+                        <th>Department</th>
                         <th>Status</th>
                     </tr>
                 </thead>
@@ -178,8 +178,8 @@
                     <li><strong>Employee ID</strong> — Unique employee identifier</li>
                     <li><strong>Last Name</strong> — Teacher's last name</li>
                     <li><strong>First Name</strong> — Teacher's first name</li>
-                    <li><strong>Email</strong> — Valid institutional email</li>
-                    <li><strong>Faculty</strong> — College or department name</li>
+                    <li><strong>Email</strong> — Valid school email</li>
+                    <li><strong>Department</strong> — Grade level or subject department</li>
                 </ul>
             </div>
             <div class="info-col">
@@ -245,7 +245,7 @@
                     <th>Name</th>
                     <th>Employee ID</th>
                     <th>Email</th>
-                    <th>Faculty</th>
+                    <th>Department</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -299,8 +299,8 @@
                         </div>
                         <div class="col-md-9">
                             <label for="teacherEmail" class="form-label">Email <span class="text-danger">*</span></label>
-                            <input type="email" id="teacherEmail" class="form-control" placeholder="name@plpasig.edu.ph" required>
-                            <div class="form-text">A valid institutional email address is required.</div>
+                            <input type="email" id="teacherEmail" class="form-control" placeholder="name@gmail.com" required>
+                            <div class="form-text">A valid school email address is required.</div>
                         </div>
                         
                         <div class="col-md-6">
@@ -308,9 +308,9 @@
                             <input type="text" id="teacherPhone" class="form-control" placeholder="e.g. 0917 123 4567">
                         </div>
                         <div class="col-md-6">
-                            <label for="teacherFaculty" class="form-label">Faculty <span class="text-danger">*</span></label>
-                            <input type="text" id="teacherFaculty" class="form-control" placeholder="e.g. College of Computer Studies" required>
-                            <div class="form-text">The faculty or college this teacher belongs to.</div>
+                            <label for="teacherFaculty" class="form-label">Department <span class="text-danger">*</span></label>
+                            <input type="text" id="teacherFaculty" class="form-control" placeholder="e.g. Elementary Department" required>
+                            <div class="form-text">The grade level or subject department this teacher belongs to.</div>
                         </div>
                         
                         <div class="col-12" id="teacherStatusField" style="display:none;">
