@@ -110,7 +110,7 @@
 
         <!-- Result strip -->
         <div class="result-strip" id="resultStrip">
-            <div class="result-avatar"><i class="fa-solid fa-user-graduate"></i></div>
+            <div class="result-avatar" id="resultAvatar"><i class="fa-solid fa-user-graduate"></i></div>
             <div class="result-info">
                 <strong id="resultName">—</strong>
                 <span id="resultMeta">—</span>
@@ -139,26 +139,52 @@
 <!-- TOAST -->
 <div id="toast"></div>
 
-<!-- MANUAL MODAL -->
+<!-- SPOOF OVERLAY — full-screen red alert -->
+<div class="overlay-backdrop" id="spoofOverlay">
+    <div class="overlay-box spoof-box">
+        <div class="overlay-icon spoof-icon">
+            <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div class="overlay-badge spoof-badge">SPOOF DETECTED</div>
+        <h2 class="overlay-name" id="spoofName">—</h2>
+        <p class="overlay-reason" id="spoofReason">Liveness check failed. Please face the camera directly.</p>
+        <div class="overlay-timer-bar">
+            <div class="overlay-timer-fill spoof-fill" id="spoofTimerFill"></div>
+        </div>
+        <span class="overlay-dismiss">Dismissing automatically...</span>
+    </div>
+</div>
+
+<!-- INFO OVERLAY — for NOT REGISTERED / NO ACTIVE EVENT / ALREADY TIMED IN etc. -->
+<div class="overlay-backdrop" id="infoOverlay">
+    <div class="overlay-box info-box">
+        <div class="overlay-icon info-icon" id="infoIcon">
+            <i class="fa-solid fa-circle-info"></i>
+        </div>
+        <div class="overlay-badge info-badge" id="infoBadge">INFO</div>
+        <h2 class="overlay-name" id="infoName">—</h2>
+        <p class="overlay-reason" id="infoReason">—</p>
+        <div class="overlay-timer-bar">
+            <div class="overlay-timer-fill info-fill" id="infoTimerFill"></div>
+        </div>
+        <span class="overlay-dismiss">Dismissing automatically...</span>
+    </div>
+</div>
+
+<!-- MANUAL MODAL — accepts Student ID or Employee ID (emp_no) -->
 <div class="modal-backdrop" id="manualModal">
     <div class="modal-box">
         <div class="cred-bar"></div>
         <div class="modal-icon"><i class="fa-solid fa-keyboard"></i></div>
         <h3>Manual Log Entry</h3>
-        <p>Enter the student ID to log their entry or exit manually.</p>
+        <p>Enter a Student ID or Employee Number to log entry or exit manually.</p>
         <div class="cred-fg">
-            <label><i class="fa-solid fa-id-card"></i> Student ID</label>
-            <input type="text" class="modal-input" id="manualStudId"
-                   placeholder="e.g. 2024-00001"
+            <label><i class="fa-solid fa-id-card"></i> ID Number</label>
+            <input type="text" class="modal-input" id="manualIdInput"
+                   placeholder="Student ID (e.g. 2024-00001) or Employee No."
                    onkeydown="if(event.key==='Enter') submitManual()">
         </div>
-        <div class="cred-fg">
-            <label><i class="fa-solid fa-door-open"></i> Log Type</label>
-            <select class="modal-input" id="manualType">
-                <option value="entry">Entry</option>
-                <option value="exit">Exit</option>
-            </select>
-        </div>
+        <div id="manualLookupResult" class="manual-lookup-result" style="display:none;"></div>
         <hr class="cred-divider">
         <div class="cred-btns">
             <button class="cred-btn-cancel" onclick="closeManual()">

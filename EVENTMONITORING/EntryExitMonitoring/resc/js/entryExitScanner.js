@@ -7,6 +7,7 @@ const FLASK_BASE          = 'http://127.0.0.1:5000';
 const ENGINE_STATUS_URL   = `${FLASK_BASE}/engine_status`;
 const VIDEO_FEED_URL      = `${FLASK_BASE}/video_feed`;
 const ATTENDEE_STREAM_URL = `${FLASK_BASE}/attendee_stream`;
+const OVERLAY_DISMISS_MS  = 5000; // auto-dismiss overlays after 5s
 
 /* ══════════════════════════════════════════════════
    STATE
@@ -19,6 +20,7 @@ let cooldownMap   = {};
 let COOLDOWN_MS   = 10000;
 let AUTO_EXIT     = true;
 let GATE_SETTINGS = {};
+let overlayTimer  = null; // shared dismiss timer
 
 /* ══════════════════════════════════════════════════
    CLOCK
@@ -97,11 +99,9 @@ function switchMode(mode) {
     document.getElementById('tabQR').classList.toggle('active',   mode === 'qr');
     document.getElementById('resultStrip').classList.remove('show');
 
-    // Engine pill only relevant in face mode
     const pill = document.getElementById('enginePill');
     if (pill) pill.style.display = mode === 'face' ? 'inline-flex' : 'none';
 
-    // Update mode tile
     const tileMode = document.getElementById('tileMode');
     if (tileMode) {
         tileMode.innerHTML = mode === 'face'
@@ -124,13 +124,11 @@ function startScanner() {
 }
 
 function stopScanner() {
-    // Stop face stream + SSE
     const stream = document.getElementById('faceStream');
     stream.src = ''; stream.style.display = 'none';
     document.getElementById('faceStreamOff').style.display = 'flex';
     if (sseSource) { sseSource.close(); sseSource = null; }
 
-    // Stop QR
     if (qrScanner) { qrScanner.stop().catch(() => {}); qrScanner = null; }
 
     setStatus('faceStatus', 'idle', '<i class="fa-solid fa-circle-info"></i> Scanner stopped');
@@ -144,7 +142,13 @@ function stopScanner() {
 }
 
 /* ══════════════════════════════════════════════════
-   FACE MODE — MJPEG stream + SSE from Flask :5000
+   FACE MODE — SSE from Flask :5000
+   Handles all SSE message types:
+     greeting_only → employee gate log
+     time_in / time_out → student gate log
+     spoof → spoof overlay + log to spoof_attempts
+     not_participant / error / already_recorded → info overlay
+     upcoming → info overlay (reminder)
 ══════════════════════════════════════════════════ */
 function startFaceMode() {
     if (!engineOnline) {
@@ -166,10 +170,50 @@ function startFaceMode() {
     sseSource.onmessage = async (event) => {
         try {
             const data = JSON.parse(event.data);
-            if (!data || !data.student_id) return;
-            if (isInCooldown(data.student_id)) return;
-            setCooldown(data.student_id);
-            await logEntryById(data.student_id, 'face', data);
+            if (!data || !data.type) return;
+
+            const cooldownKey = data.name || data.student_id || data.employee_id || 'unknown';
+            if (isInCooldown(cooldownKey)) return;
+
+            switch (data.type) {
+
+                // ── Employee recognized (liveness already passed in Flask) ──
+                case 'greeting_only': {
+                    setCooldown(cooldownKey);
+                    await logEmployeeEntry(data);
+                    break;
+                }
+
+                // ── Student recognized and event attendance recorded in Flask ──
+                // For gate entry/exit we also need to log to entry_exit_logs
+                case 'time_in':
+                case 'time_out': {
+                    if (!data.stud_id) break; // safety check
+                    setCooldown(cooldownKey);
+                    await logStudentGateEntry(data);
+                    break;
+                }
+
+                // ── Spoof detected ──
+                case 'spoof': {
+                    setCooldown(cooldownKey);
+                    await handleSpoofDetected(data);
+                    break;
+                }
+
+                // ── Info messages (not registered, no event, already recorded, upcoming) ──
+                case 'not_participant':
+                case 'error':
+                case 'already_recorded':
+                case 'upcoming': {
+                    setCooldown(cooldownKey);
+                    showInfoOverlay(data);
+                    break;
+                }
+
+                default:
+                    break;
+            }
         } catch (_) {}
     };
 
@@ -177,6 +221,162 @@ function startFaceMode() {
         setStatus('faceStatus', 'offline',
             '<i class="fa-solid fa-triangle-exclamation"></i> Lost connection to face engine');
     };
+}
+
+/* ══════════════════════════════════════════════════
+   LOG EMPLOYEE GATE ENTRY/EXIT (face recognition)
+   SSE greeting_only payload: { name, type, role }
+   We need to look up employee_id UUID by name match
+   from the Flask meta — Flask sends teacher_id as 'id'
+   but SSE greeting_only only has name/type/role.
+   We resolve UUID by fetching from employees table.
+══════════════════════════════════════════════════ */
+async function logEmployeeEntry(data) {
+    try {
+        const today   = new Date().toLocaleDateString('en-CA');
+        const isLate  = await checkIfLate();
+
+        // Parse name from greeting: "HELLO John Midname Doe" → "John Midname Doe"
+        const rawName = (data.name || '').replace(/^HELLO\s*/i, '').trim();
+
+        // Resolve employee UUID from name (first_name + last_name match)
+        // Flask builds name as: `${first_name} ${mid} ${last_name}`.strip()
+        // We split last token as last_name, rest as first/middle
+        const nameParts  = rawName.split(' ');
+        const lastName   = nameParts[nameParts.length - 1] || '';
+        const firstName  = nameParts[0] || '';
+
+        let employeeUUID = null;
+        let empNo        = '—';
+        let department   = '—';
+
+        try {
+            const { data: empRows } = await supabaseClient
+                .from('employees')
+                .select('employee_id, emp_no, first_name, last_name, department')
+                .ilike('last_name', `%${lastName}%`)
+                .ilike('first_name', `%${firstName}%`)
+                .limit(1);
+
+            if (empRows && empRows.length > 0) {
+                employeeUUID = empRows[0].employee_id;
+                empNo        = empRows[0].emp_no || '—';
+                department   = empRows[0].department || '—';
+            }
+        } catch (_) {}
+
+        // Determine entry/exit
+        const logType = employeeUUID
+            ? await determineLogTypeEmployee(employeeUUID, today)
+            : 'entry';
+
+        // Insert to entry_exit_logs
+        const { error } = await supabaseClient.from('entry_exit_logs').insert({
+            student_id:    null,
+            employee_id:   employeeUUID,
+            log_type:      logType,
+            scan_method:   'face',
+            log_date:      today,
+            log_timestamp: new Date().toISOString(),
+            is_late:       isLate && logType === 'entry'
+        });
+
+        if (error) {
+            console.warn('[entryExitScanner] employee log insert error:', error.message);
+            showToast(`${rawName} recognized (DB save pending)`, 'purple', 3000);
+        }
+
+        showResultEmployee(rawName, empNo, department, logType, isLate);
+        flashStatus('faceStatus', logType, isLate, rawName, true);
+
+    } catch (e) {
+        console.error('[entryExitScanner] logEmployeeEntry:', e);
+    }
+}
+
+/* ══════════════════════════════════════════════════
+   LOG STUDENT GATE ENTRY/EXIT (face recognition)
+   SSE time_in/time_out payload has stud_id (display ID)
+   We resolve the student UUID from students table
+══════════════════════════════════════════════════ */
+async function logStudentGateEntry(data) {
+    try {
+        const today  = new Date().toLocaleDateString('en-CA');
+        const isLate = await checkIfLate();
+
+        // Resolve student UUID from stud_id (display ID like "2024-00001")
+        let studentUUID = null;
+        try {
+            const { data: sRows } = await supabaseClient
+                .from('students')
+                .select('student_id')
+                .eq('stud_id', data.stud_id)
+                .limit(1);
+            if (sRows && sRows.length > 0) studentUUID = sRows[0].student_id;
+        } catch (_) {}
+
+        const logType = studentUUID
+            ? await determineLogType(studentUUID, today)
+            : 'entry';
+
+        const { error } = await supabaseClient.from('entry_exit_logs').insert({
+            student_id:    studentUUID,
+            employee_id:   null,
+            log_type:      logType,
+            scan_method:   'face',
+            log_date:      today,
+            log_timestamp: new Date().toISOString(),
+            is_late:       isLate && logType === 'entry'
+        });
+
+        if (error) console.warn('[entryExitScanner] student gate log error:', error.message);
+
+        const displayMeta = {
+            name:         data.name || '—',
+            stud_id:      data.stud_id || '—',
+            grade_level:  data.grade || data.grade_level || '—',
+            section_name: data.section || data.section_name || '—'
+        };
+
+        showResultStudent(displayMeta, logType, isLate);
+        flashStatus('faceStatus', logType, isLate, displayMeta.name, false);
+
+    } catch (e) {
+        console.error('[entryExitScanner] logStudentGateEntry:', e);
+    }
+}
+
+/* ══════════════════════════════════════════════════
+   SPOOF DETECTED — show overlay + log to spoof_attempts
+══════════════════════════════════════════════════ */
+async function handleSpoofDetected(data) {
+    // Show the spoof overlay
+    showSpoofOverlay(data.name || 'Unknown', data.reason || 'Liveness check failed.');
+
+    // Log to spoof_attempts table
+    try {
+        await supabaseClient.from('spoof_attempts').insert({
+            student_id:   null,  // unknown at spoof stage — name only
+            employee_id:  null,
+            source_module: 'entry_exit',
+            detected_name: data.name || 'Unknown',
+            reason:        data.reason || 'Liveness check failed',
+            detected_at:   new Date().toISOString()
+        });
+    } catch (e) {
+        // Silently fail — spoof_attempts table columns may differ; log and move on
+        console.warn('[entryExitScanner] spoof_attempts insert error:', e.message);
+    }
+
+    // Update status bar
+    setStatus('faceStatus', 'error',
+        '<i class="fa-solid fa-shield-halved"></i> Spoof Detected — ' + (data.name || 'Unknown'));
+    setTimeout(() => {
+        if (currentMode === 'face') {
+            setStatus('faceStatus', 'scanning',
+                '<i class="fa-solid fa-spinner fa-spin"></i> Scanning for face...');
+        }
+    }, OVERLAY_DISMISS_MS);
 }
 
 /* ══════════════════════════════════════════════════
@@ -206,47 +406,14 @@ function startQRMode() {
 }
 
 /* ══════════════════════════════════════════════════
-   LOGGING — by UUID (face recognition)
-══════════════════════════════════════════════════ */
-async function logEntryById(studentUUID, method, meta = {}) {
-    try {
-        const today   = new Date().toLocaleDateString('en-CA');
-        const logType = await determineLogType(studentUUID, today);
-        const isLate  = await checkIfLate();
-
-        const { error } = await supabaseClient.from('entry_exit_logs').insert({
-            student_id:    studentUUID,
-            log_type:      logType,
-            scan_method:   method,
-            log_date:      today,
-            log_timestamp: new Date().toISOString(),
-            is_late:       isLate && logType === 'entry'
-        });
-
-        if (error) throw error;
-
-        const displayMeta = (meta.name)
-            ? { name: meta.name, stud_id: meta.stud_id, grade_level: meta.grade_level, section_name: meta.section_name }
-            : await fetchStudentMeta(studentUUID);
-
-        showResult(displayMeta, logType, isLate);
-        flashStatus('faceStatus', logType, isLate, displayMeta.name || '');
-
-    } catch (e) {
-        console.error('[entryExitScanner] logEntryById:', e);
-        setStatus('faceStatus', 'error',
-            '<i class="fa-solid fa-triangle-exclamation"></i> Failed to log. Check connection.');
-    }
-}
-
-/* ══════════════════════════════════════════════════
-   LOGGING — by stud_id (QR or manual)
+   LOGGING — by stud_id string (QR scan)
+   Only students have QR codes (generated by Superadmin)
 ══════════════════════════════════════════════════ */
 async function logEntryByStudId(studId, method) {
     try {
         const { data: rows, error } = await supabaseClient
             .from('students')
-            .select('id, stud_id, first_name, last_name, grade_level, section_name')
+            .select('student_id, stud_id, first_name, last_name, grade_level, section_name')
             .eq('stud_id', studId)
             .limit(1);
 
@@ -260,11 +427,12 @@ async function logEntryByStudId(studId, method) {
 
         const student = rows[0];
         const today   = new Date().toLocaleDateString('en-CA');
-        const logType = await determineLogType(student.id, today);
+        const logType = await determineLogType(student.student_id, today);
         const isLate  = await checkIfLate();
 
         const { error: insErr } = await supabaseClient.from('entry_exit_logs').insert({
-            student_id:    student.id,
+            student_id:    student.student_id,
+            employee_id:   null,
             log_type:      logType,
             scan_method:   method,
             log_date:      today,
@@ -280,9 +448,9 @@ async function logEntryByStudId(studId, method) {
             grade_level:  student.grade_level,
             section_name: student.section_name
         };
-        showResult(displayMeta, logType, isLate);
+        showResultStudent(displayMeta, logType, isLate);
         const sid = currentMode === 'face' ? 'faceStatus' : 'qrStatus';
-        flashStatus(sid, logType, isLate, displayMeta.name);
+        flashStatus(sid, logType, isLate, displayMeta.name, false);
 
     } catch (e) {
         console.error('[entryExitScanner] logEntryByStudId:', e);
@@ -293,29 +461,288 @@ async function logEntryByStudId(studId, method) {
 }
 
 /* ══════════════════════════════════════════════════
-   MANUAL ENTRY
+   MANUAL ENTRY — accepts Student ID or Employee emp_no
 ══════════════════════════════════════════════════ */
-function openManual()  { document.getElementById('manualModal').classList.add('open'); }
-function closeManual() { document.getElementById('manualModal').classList.remove('open'); }
+function openManual() {
+    document.getElementById('manualModal').classList.add('open');
+    document.getElementById('manualIdInput').value = '';
+    document.getElementById('manualLookupResult').style.display = 'none';
+    document.getElementById('manualLookupResult').className = 'manual-lookup-result';
+    document.getElementById('manualLookupResult').innerHTML = '';
+    // Live lookup as user types
+    document.getElementById('manualIdInput').oninput = debounce(previewManualLookup, 420);
+}
+
+function closeManual() {
+    document.getElementById('manualModal').classList.remove('open');
+    document.getElementById('manualIdInput').oninput = null;
+}
+
+// Preview who will be logged before submitting
+async function previewManualLookup() {
+    const val = document.getElementById('manualIdInput').value.trim();
+    const box = document.getElementById('manualLookupResult');
+    if (!val) { box.style.display = 'none'; return; }
+
+    box.style.display = 'block';
+    box.className = 'manual-lookup-result';
+    box.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Looking up...';
+
+    const result = await resolveIdInput(val);
+    if (!result) {
+        box.className = 'manual-lookup-result not-found';
+        box.innerHTML = '<strong><i class="fa-solid fa-user-xmark"></i> Not found</strong><span>No student or employee matched this ID.</span>';
+        return;
+    }
+
+    if (result.type === 'student') {
+        box.className = 'manual-lookup-result found-student';
+        box.innerHTML = `<strong><i class="fa-solid fa-user-graduate"></i> ${result.last_name}, ${result.first_name}</strong>
+                         <span>Student · ${result.stud_id} · Grade ${result.grade_level || '—'}</span>`;
+    } else {
+        box.className = 'manual-lookup-result found-employee';
+        box.innerHTML = `<strong><i class="fa-solid fa-user-tie"></i> ${result.last_name}, ${result.first_name}</strong>
+                         <span>Employee · ${result.emp_no || '—'} · ${result.department || '—'}</span>`;
+    }
+}
 
 async function submitManual() {
-    const studId = document.getElementById('manualStudId').value.trim();
-    if (!studId) return;
+    const val = document.getElementById('manualIdInput').value.trim();
+    if (!val) return;
     closeManual();
-    await logEntryByStudId(studId, 'manual');
-    document.getElementById('manualStudId').value = '';
+
+    const result = await resolveIdInput(val);
+    if (!result) {
+        setStatus('faceStatus', 'error',
+            `<i class="fa-solid fa-user-xmark"></i> ID not found: ${val}`);
+        showToast('ID not found', 'red', 2500);
+        return;
+    }
+
+    if (result.type === 'student') {
+        await manualLogStudent(result);
+    } else {
+        await manualLogEmployee(result);
+    }
+}
+
+// Resolve a typed ID string: check students first, then employees
+async function resolveIdInput(val) {
+    // Try students.stud_id
+    try {
+        const { data: sRows } = await supabaseClient
+            .from('students')
+            .select('student_id, stud_id, first_name, middle_name, last_name, grade_level, section_name')
+            .eq('stud_id', val)
+            .limit(1);
+        if (sRows && sRows.length > 0) return { type: 'student', ...sRows[0] };
+    } catch (_) {}
+
+    // Try employees.emp_no
+    try {
+        const { data: eRows } = await supabaseClient
+            .from('employees')
+            .select('employee_id, emp_no, first_name, middle_name, last_name, department')
+            .eq('emp_no', val)
+            .limit(1);
+        if (eRows && eRows.length > 0) return { type: 'employee', ...eRows[0] };
+    } catch (_) {}
+
+    return null;
+}
+
+async function manualLogStudent(student) {
+    try {
+        const today   = new Date().toLocaleDateString('en-CA');
+        const logType = await determineLogType(student.student_id, today);
+        const isLate  = await checkIfLate();
+
+        const { error } = await supabaseClient.from('entry_exit_logs').insert({
+            student_id:    student.student_id,
+            employee_id:   null,
+            log_type:      logType,
+            scan_method:   'manual',
+            log_date:      today,
+            log_timestamp: new Date().toISOString(),
+            is_late:       isLate && logType === 'entry'
+        });
+        if (error) throw error;
+
+        const meta = {
+            name:         `${student.last_name}, ${student.first_name}`,
+            stud_id:      student.stud_id,
+            grade_level:  student.grade_level,
+            section_name: student.section_name
+        };
+        showResultStudent(meta, logType, isLate);
+        flashStatus('faceStatus', logType, isLate, meta.name, false);
+
+    } catch (e) {
+        console.error('[entryExitScanner] manualLogStudent:', e);
+        showToast('Failed to log student entry', 'red', 3000);
+    }
+}
+
+async function manualLogEmployee(emp) {
+    try {
+        const today   = new Date().toLocaleDateString('en-CA');
+        const logType = await determineLogTypeEmployee(emp.employee_id, today);
+        const isLate  = await checkIfLate();
+
+        const { error } = await supabaseClient.from('entry_exit_logs').insert({
+            student_id:    null,
+            employee_id:   emp.employee_id,
+            log_type:      logType,
+            scan_method:   'manual',
+            log_date:      today,
+            log_timestamp: new Date().toISOString(),
+            is_late:       isLate && logType === 'entry'
+        });
+        if (error) throw error;
+
+        const name = `${emp.last_name}, ${emp.first_name}`;
+        showResultEmployee(name, emp.emp_no, emp.department, logType, isLate);
+        flashStatus('faceStatus', logType, isLate, name, true);
+
+    } catch (e) {
+        console.error('[entryExitScanner] manualLogEmployee:', e);
+        showToast('Failed to log employee entry', 'red', 3000);
+    }
+}
+
+/* ══════════════════════════════════════════════════
+   OVERLAYS
+══════════════════════════════════════════════════ */
+function showSpoofOverlay(name, reason) {
+    clearOverlayTimer();
+    const el = document.getElementById('spoofOverlay');
+    document.getElementById('spoofName').textContent   = name;
+    document.getElementById('spoofReason').textContent = reason;
+
+    // Reset and restart the timer bar animation
+    const fill = document.getElementById('spoofTimerFill');
+    fill.style.animation = 'none';
+    fill.offsetHeight; // reflow
+    fill.style.animation = `timerShrink ${OVERLAY_DISMISS_MS/1000}s linear forwards`;
+
+    el.classList.add('show');
+    overlayTimer = setTimeout(() => dismissOverlay('spoofOverlay'), OVERLAY_DISMISS_MS);
+}
+
+function showInfoOverlay(data) {
+    clearOverlayTimer();
+    const el   = document.getElementById('infoOverlay');
+    const icon = document.getElementById('infoIcon');
+    const badge = document.getElementById('infoBadge');
+
+    // Configure icon and badge color based on type
+    const cfg = {
+        not_participant:  { icon: 'fa-user-xmark',   iconCls: '',     badge: 'NOT REGISTERED',   badgeCls: 'info-badge' },
+        error:            { icon: 'fa-circle-xmark',  iconCls: 'warn', badge: 'NO ACTIVE EVENT',  badgeCls: 'info-badge' },
+        already_recorded: { icon: 'fa-check-double',  iconCls: '',     badge: 'ALREADY LOGGED',   badgeCls: 'info-badge' },
+        upcoming:         { icon: 'fa-clock',          iconCls: 'warn', badge: 'UPCOMING EVENT',   badgeCls: 'info-badge' }
+    };
+    const c = cfg[data.type] || cfg['error'];
+
+    icon.className  = `overlay-icon info-icon ${c.iconCls}`;
+    icon.innerHTML  = `<i class="fa-solid ${c.icon}"></i>`;
+    badge.className = `overlay-badge ${c.badgeCls}`;
+    badge.textContent = c.badge;
+
+    document.getElementById('infoName').textContent   = data.name || '—';
+    document.getElementById('infoReason').textContent = data.reason || data.message || '—';
+
+    // Reset timer bar
+    const fill = document.getElementById('infoTimerFill');
+    fill.style.animation = 'none';
+    fill.offsetHeight;
+    fill.style.animation = `timerShrink ${OVERLAY_DISMISS_MS/1000}s linear forwards`;
+
+    el.classList.add('show');
+    overlayTimer = setTimeout(() => dismissOverlay('infoOverlay'), OVERLAY_DISMISS_MS);
+}
+
+function dismissOverlay(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('show');
+}
+
+function clearOverlayTimer() {
+    if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
+    dismissOverlay('spoofOverlay');
+    dismissOverlay('infoOverlay');
+}
+
+/* ══════════════════════════════════════════════════
+   RESULT STRIP
+══════════════════════════════════════════════════ */
+function showResultStudent(meta, logType, isLate) {
+    const avatar = document.getElementById('resultAvatar');
+    avatar.className = 'result-avatar';
+    avatar.innerHTML = '<i class="fa-solid fa-user-graduate"></i>';
+
+    document.getElementById('resultName').textContent = meta.name || '—';
+    document.getElementById('resultMeta').textContent =
+        `${meta.stud_id || '—'} · Grade ${meta.grade_level || '—'} — ${meta.section_name || '—'}`;
+
+    const typeBadge = logType === 'entry'
+        ? '<span class="rbadge rbadge-entry"><i class="fa-solid fa-door-open"></i> Entry</span>'
+        : '<span class="rbadge rbadge-exit"><i class="fa-solid fa-right-from-bracket"></i> Exit</span>';
+    const lateBadge = (isLate && logType === 'entry')
+        ? '<span class="rbadge rbadge-late"><i class="fa-solid fa-clock"></i> Late</span>' : '';
+    const roleBadge = '<span class="rbadge rbadge-student"><i class="fa-solid fa-user-graduate"></i> Student</span>';
+
+    document.getElementById('resultBadges').innerHTML = typeBadge + lateBadge + roleBadge;
+    document.getElementById('resultStrip').classList.add('show');
+}
+
+function showResultEmployee(name, empNo, department, logType, isLate) {
+    const avatar = document.getElementById('resultAvatar');
+    avatar.className = 'result-avatar employee-avatar';
+    avatar.innerHTML = '<i class="fa-solid fa-user-tie"></i>';
+
+    document.getElementById('resultName').textContent = name || '—';
+    document.getElementById('resultMeta').textContent =
+        `${empNo || '—'} · ${department || '—'}`;
+
+    const typeBadge = logType === 'entry'
+        ? '<span class="rbadge rbadge-entry"><i class="fa-solid fa-door-open"></i> Entry</span>'
+        : '<span class="rbadge rbadge-exit"><i class="fa-solid fa-right-from-bracket"></i> Exit</span>';
+    const lateBadge = (isLate && logType === 'entry')
+        ? '<span class="rbadge rbadge-late"><i class="fa-solid fa-clock"></i> Late</span>' : '';
+    const empBadge = '<span class="rbadge rbadge-employee"><i class="fa-solid fa-user-tie"></i> Employee</span>';
+
+    document.getElementById('resultBadges').innerHTML = typeBadge + lateBadge + empBadge;
+    document.getElementById('resultStrip').classList.add('show');
 }
 
 /* ══════════════════════════════════════════════════
    HELPERS
 ══════════════════════════════════════════════════ */
-async function determineLogType(studentId, today) {
+// Determine entry/exit for students based on last log
+async function determineLogType(studentUUID, today) {
     if (!AUTO_EXIT) return 'entry';
     try {
         const { data } = await supabaseClient
             .from('entry_exit_logs')
             .select('log_type')
-            .eq('student_id', studentId)
+            .eq('student_id', studentUUID)
+            .eq('log_date', today)
+            .order('log_timestamp', { ascending: false })
+            .limit(1)
+            .single();
+        return data?.log_type === 'entry' ? 'exit' : 'entry';
+    } catch (_) { return 'entry'; }
+}
+
+// Determine entry/exit for employees based on last log
+async function determineLogTypeEmployee(employeeUUID, today) {
+    if (!AUTO_EXIT) return 'entry';
+    try {
+        const { data } = await supabaseClient
+            .from('entry_exit_logs')
+            .select('log_type')
+            .eq('employee_id', employeeUUID)
             .eq('log_date', today)
             .order('log_timestamp', { ascending: false })
             .limit(1)
@@ -331,42 +758,10 @@ async function checkIfLate() {
     return now.getHours() > th || (now.getHours() === th && now.getMinutes() >= tm);
 }
 
-async function fetchStudentMeta(uuid) {
-    try {
-        const { data } = await supabaseClient
-            .from('students')
-            .select('stud_id, first_name, last_name, grade_level, section_name')
-            .eq('id', uuid).limit(1);
-        if (data && data[0]) {
-            const s = data[0];
-            return {
-                name:         `${s.last_name}, ${s.first_name}`,
-                stud_id:      s.stud_id,
-                grade_level:  s.grade_level,
-                section_name: s.section_name
-            };
-        }
-    } catch (_) {}
-    return { name: '—', stud_id: '—', grade_level: '—', section_name: '—' };
-}
-
-function showResult(meta, logType, isLate) {
-    document.getElementById('resultName').textContent = meta.name || '—';
-    document.getElementById('resultMeta').textContent =
-        `${meta.stud_id || '—'} · Grade ${meta.grade_level || '—'} — ${meta.section_name || '—'}`;
-    const typeBadge = logType === 'entry'
-        ? '<span class="rbadge rbadge-entry"><i class="fa-solid fa-door-open"></i> Entry</span>'
-        : '<span class="rbadge rbadge-exit"><i class="fa-solid fa-right-from-bracket"></i> Exit</span>';
-    const lateBadge = (isLate && logType === 'entry')
-        ? '<span class="rbadge rbadge-late"><i class="fa-solid fa-clock"></i> Late</span>' : '';
-    document.getElementById('resultBadges').innerHTML = typeBadge + lateBadge;
-    document.getElementById('resultStrip').classList.add('show');
-}
-
-function flashStatus(statusId, logType, isLate, name) {
+function flashStatus(statusId, logType, isLate, name, isEmployee) {
     const icon  = logType === 'entry' ? 'fa-door-open' : 'fa-right-from-bracket';
     const label = logType === 'entry' ? 'Entry Logged' : 'Exit Logged';
-    const cls   = (isLate && logType === 'entry') ? 'late' : 'success';
+    const cls   = isEmployee ? 'employee' : (isLate && logType === 'entry') ? 'late' : 'success';
     setStatus(statusId, cls, `<i class="fa-solid ${icon}"></i> ${label}: ${name}`);
     setTimeout(() => {
         if (currentMode === 'face') {
@@ -397,4 +792,9 @@ function showToast(msg, type = 'green', duration = 3000) {
     toast.textContent = msg;
     toast.style.display = 'block';
     setTimeout(() => { toast.style.display = 'none'; }, duration);
+}
+
+function debounce(fn, ms) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
