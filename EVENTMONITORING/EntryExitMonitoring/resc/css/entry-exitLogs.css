@@ -1,5 +1,6 @@
 /* ============================================================
-   StudentEntryExit/resc/css/entryExitLogs.css
+   EntryExitMonitoring/resc/css/entry-exitLogs.css
+   Updated: added log-badge, log-role-badge for employee rows
 ============================================================ */
 
 :root {
@@ -81,9 +82,11 @@ hr {
     font-size: 15px; font-weight: 700; color: var(--blue-dark);
     display: flex; align-items: center; gap: 8px;
 }
+
+/* Updated grid: now 7 columns to accommodate userTypeFilter */
 .table-controls {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr auto;
     gap: 14px; align-items: end;
 }
 .control-group { display: flex; flex-direction: column; gap: 5px; }
@@ -101,14 +104,14 @@ hr {
 .control-group input:focus,
 .control-group select:focus { outline: none; border-color: var(--blue-mid); background: var(--white); }
 
-.btn.btn-clear {
+.btn-clear {
     padding: 9px 16px; border: 1.5px solid var(--border);
     border-radius: 8px; background: var(--white); color: var(--text-muted);
     font-size: 13px; font-weight: 600; cursor: pointer;
     display: inline-flex; align-items: center; gap: 6px;
     transition: all .2s; font-family: 'Nunito Sans', sans-serif;
 }
-.btn.btn-clear:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+.btn-clear:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
 
 .table-container { overflow-x: auto; border-radius: var(--radius-lg); border: 1.5px solid var(--border); }
 .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -127,6 +130,7 @@ hr {
 .data-table tbody tr:last-child td { border-bottom: none; }
 .loading-cell { text-align: center; padding: 40px; color: var(--text-muted); }
 
+/* ── Old badge classes (kept for backward compat) ─────────── */
 .badge {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 3px 10px; border-radius: 20px;
@@ -138,6 +142,31 @@ hr {
 .badge-qr     { background: #fef9c3; color: #854d0e; }
 .badge-manual { background: #f3e8ff; color: #6b21a8; }
 
+/* ── NEW: log-badge — used by updated entry-exitLogs.js ────── */
+.log-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 700;
+    font-family: 'Nunito Sans', sans-serif;
+    margin-right: 4px;
+}
+.log-badge.entry  { background: #d1fae5; color: #065f46; }
+.log-badge.exit   { background: #fee2e2; color: #991b1b; }
+.log-badge.late   { background: #fef9c3; color: #854d0e; }
+
+/* ── NEW: Employee role badge in log rows ──────────────────── */
+.log-role-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 700;
+    font-family: 'Nunito Sans', sans-serif;
+}
+.log-role-badge.emp {
+    background: #ede9fe; color: #5b21b6;
+    border: 1px solid #c4b5fd;
+}
+
+/* ── Pagination ────────────────────────────────────────────── */
 .pagination { display: flex; justify-content: flex-end; gap: 6px; margin-top: 20px; flex-wrap: wrap; }
 .page-btn {
     padding: 7px 13px; border: 1.5px solid var(--border);
@@ -148,6 +177,7 @@ hr {
 .page-btn:hover { background: var(--surface); border-color: var(--blue-mid); }
 .page-btn.active { background: var(--blue-dark); color: var(--white); border-color: var(--blue-dark); }
 
+/* ── Toast ─────────────────────────────────────────────────── */
 .toast {
     position: fixed; bottom: 28px; right: 28px;
     background: var(--blue-dark); color: #fff;
@@ -161,6 +191,10 @@ hr {
 }
 .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+    .table-controls { grid-template-columns: 2fr 1fr 1fr 1fr; }
+}
 @media (max-width: 1100px) {
     .table-controls { grid-template-columns: 1fr 1fr 1fr; }
 }

@@ -65,6 +65,14 @@
                         </select>
                     </div>
                     <div class="control-group">
+                        <label for="userTypeFilter"><i class="fa-solid fa-users"></i> Filter by User Type</label>
+                        <select id="userTypeFilter">
+                            <option value="">All Users</option>
+                            <option value="student">Students Only</option>
+                            <option value="employee">Employees Only</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
                         <label><i class="fa-regular fa-calendar"></i> Date From</label>
                         <input type="date" id="dateFrom">
                     </div>
@@ -85,10 +93,10 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Student ID</th>
+                            <th>ID / Emp No.</th>
                             <th>Name</th>
                             <th>Grade</th>
-                            <th>Section</th>
+                            <th>Section / Role</th>
                             <th>Type</th>
                             <th>Method</th>
                             <th>Date</th>
