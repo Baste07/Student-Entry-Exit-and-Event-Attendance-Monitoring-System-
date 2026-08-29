@@ -66,10 +66,3 @@ camera_owner.json
 # XML logs and audit trails (per-machine runtime data)
 *.xml
 
-# Per-teammate local scripts (different storage/paths, kept local-only)
-TimeInAndTimeOutMonitoring/students/flask_attendance.py
-TimeInAndTimeOutMonitoring/students/START_ATTENDANCE.bat
-TimeInAndTimeOutMonitoring/students/START_REGISTRATION.bat
-TimeInAndTimeOutMonitoring/students/START_SILENT.bat
-TimeInAndTimeOutMonitoring/students/trigger_attendance.php
-TimeInAndTimeOutMonitoring/students/trigger_registration.php
