@@ -89,8 +89,8 @@
                 Student <span class="role-accent">Registration</span>
             </button>
             <button class="role-btn" id="btnProfessor" onclick="switchRole('professor')">
-                <i class="fa-solid fa-chalkboard-teacher"></i>
-                Teacher <span class="role-accent">Registration</span>
+                <i class="fa-solid fa-users"></i>
+                Employee <span class="role-accent">Registration</span>
             </button>
         </div>
 
@@ -177,9 +177,9 @@
         <div id="professorSection" style="display:none;">
             <div class="form-card">
                 <div class="form-card-header">
-                    <div class="hicon"><i class="fa-solid fa-chalkboard-teacher"></i></div>
+                    <div class="hicon"><i class="fa-solid fa-users"></i></div>
                     <div>
-                        <h3>Teacher Face Registration</h3>
+                        <h3>Employee Face Registration</h3>
                         <p>Enter your Employee ID to retrieve your information, then scan your face.</p>
                     </div>
                 </div>
@@ -187,11 +187,12 @@
 
                     <div id="professorInfoCard" class="info-card professor">
                         <div class="info-card-head">
-                            <h4><i class="fa-solid fa-circle-check"></i> Teacher Found</h4>
+                            <h4><i class="fa-solid fa-circle-check"></i> Employee Found</h4>
                             <span id="professorFaceBadge" class="status-badge"></span>
                         </div>
                         <div class="info-grid">
                             <div class="info-item"><strong>Full Name</strong><span id="p_displayName"></span></div>
+                            <div class="info-item"><strong>Role</strong><span id="p_displayRole"></span></div>
                             <div class="info-item"><strong>Department</strong><span id="p_displayDept"></span></div>
                             <div class="info-item"><strong>Employee ID</strong><span id="p_displayEmpId"></span></div>
                             <div class="info-item"><strong>Email</strong><span id="p_displayEmail"></span></div>
@@ -202,8 +203,8 @@
                         <p class="form-section-label">Employee Lookup</p>
                         <div class="form-row cols-1">
                             <div class="form-group">
-                                <label><i class="fa-solid fa-id-badge"></i> Employee ID</label>
-                                <input type="text" id="employeeIdInput" placeholder="e.g. EMP2024001" autocomplete="off">
+                                <label><i class="fa-solid fa-id-badge"></i> Employee Number</label>
+                                <input type="text" id="employeeIdInput" placeholder="e.g. 12345" autocomplete="off">
                                 <span class="field-msg error"   id="p_idError"></span>
                                 <span class="field-msg success" id="p_idSuccess"></span>
                             </div>
@@ -224,9 +225,13 @@
                                 <input type="text" id="p_lastName" readonly placeholder="Auto-filled">
                             </div>
                         </div>
-                        <div class="form-row cols-2">
+                        <div class="form-row cols-3">
                             <div class="form-group">
-                                <label><i class="fa-solid fa-building"></i> Department</label>
+                                <label><i class="fa-solid fa-briefcase"></i> Role</label>
+                                <input type="text" id="p_role" readonly placeholder="Auto-filled">
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fa-solid fa-building"></i> Faculty</label>
                                 <input type="text" id="p_department" readonly placeholder="Auto-filled">
                             </div>
                             <div class="form-group">
@@ -237,7 +242,7 @@
 
                         <div class="button-row">
                             <button type="button" class="btn-primary" id="professorScanBtn" disabled>
-                                <i class="fa-solid fa-camera"></i> <span class="btn-accent">Scan</span> &amp; Register Face
+                                <i class="fa-solid fa-camera"></i> Scan &amp; Register Face
                             </button>
                             <button type="button" class="btn-outline" id="professorClearBtn">
                                 <i class="fa-solid fa-eraser"></i> Clear

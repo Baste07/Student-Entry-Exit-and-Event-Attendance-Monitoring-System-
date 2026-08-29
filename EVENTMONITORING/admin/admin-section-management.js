@@ -78,9 +78,10 @@ async function loadTeachers() {
     try {
         if (!supabaseClient) return;
         const { data, error } = await supabaseClient
-            .from('teachers')
-            .select('teacher_id, first_name, last_name, employee_id')
+            .from('employees')
+            .select('employee_id, emp_no, first_name, last_name, role, status')
             .eq('status', 'active')
+            .eq('role', 'teacher')
             .order('last_name', { ascending: true })
             .order('first_name', { ascending: true });
 
@@ -88,7 +89,7 @@ async function loadTeachers() {
         allTeachers = data || [];
         populateAdviserDropdown();
     } catch (error) {
-        console.error('Error loading teachers:', error);
+        console.error('Error loading teacher-role employees:', error);
     }
 }
 
@@ -96,20 +97,19 @@ function populateAdviserDropdown() {
     const select = document.getElementById('adviserSelect');
     if (!select) return;
 
-    // Keep the first option
     select.innerHTML = '<option value="">No adviser assigned</option>';
 
     allTeachers.forEach(t => {
         const option = document.createElement('option');
-        option.value = t.teacher_id;
-        option.textContent = `${t.last_name}, ${t.first_name} (${t.employee_id})`;
+        option.value = t.employee_id;
+        option.textContent = `${t.last_name}, ${t.first_name} (${t.emp_no || 'N/A'})`;
         select.appendChild(option);
     });
 }
 
 function getAdviserName(adviserId) {
     if (!adviserId) return '—';
-    const teacher = allTeachers.find(t => t.teacher_id === adviserId);
+    const teacher = allTeachers.find(t => t.employee_id === adviserId);
     if (!teacher) return '—';
     return `${teacher.last_name}, ${teacher.first_name}`;
 }

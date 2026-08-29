@@ -139,96 +139,94 @@ header {
 .header-right {
     display: flex;
     align-items: center;
-    gap: 12px; /* Added gap to separate the two buttons */
+    justify-content: flex-end;
+    gap: 10px;
     flex-shrink: 0;
+    min-height: 44px;
 }
 
-/* Homepage Button Styling */
-.header-home-btn {
+.header-back-btn,
+.header-home-btn,
+.header-attendance-btn,
+.header-logout {
+    min-height: 42px;
+    height: 42px;
+    padding: 0 16px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 8px;
+    border: 1.5px solid rgba(255,255,255,.16);
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1;
+    letter-spacing: .2px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
+}
+
+.header-back-btn,
+.header-home-btn,
+.header-attendance-btn {
     background: transparent;
     color: rgba(255,255,255,.85);
     text-decoration: none;
-    border: 1.5px solid rgba(255,255,255,.16);
-    border-radius: 8px;
-    padding: 8px 18px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-family: 'Nunito', sans-serif;
-    font-weight: 700;
-    font-size: 13.5px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
-    letter-spacing: .2px;
 }
 
+.header-back-btn i,
+.header-home-btn i,
+.header-attendance-btn i,
+.header-logout i {
+    font-size: 13px;
+}
 
+.header-back-btn:hover,
+.header-home-btn:hover,
+.header-attendance-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--white);
+    border-color: rgba(255,255,255,0.24);
+}
 
-.header-home-btn i { font-size: 13px; }
+.header-back-btn:hover {
+    background: rgba(255,255,255,0.12);
+    box-shadow: 0 4px 16px rgba(255,255,255,0.12);
+}
 
 .header-home-btn:hover {
     background: var(--blue-bright);
     color: var(--white);
     border-color: var(--blue-bright);
-    box-shadow: 0 4px 16px rgba(64,145,108,.35); /* Soft green glow */
+    box-shadow: 0 4px 16px rgba(64,145,108,.35);
 }
 
-/* Logout Button Styling */
 .header-logout {
     background: transparent;
     color: rgba(255,255,255,.65);
-    border: 1.5px solid rgba(255,255,255,.16);
-    border-radius: 8px;
-    padding: 8px 18px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-family: 'Nunito', sans-serif;
-    font-weight: 700;
-    font-size: 13.5px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
-    letter-spacing: .2px;
 }
-
-.header-logout i { font-size: 13px; }
 
 .header-logout:hover {
     background: #ef4444;
     color: var(--white);
     border-color: #ef4444;
-    box-shadow: 0 4px 16px rgba(239,68,68,.35); /* Soft red glow */
+    box-shadow: 0 4px 16px rgba(239,68,68,.35);
 }
 
-/* Take Attendance Button Styling */
 .header-attendance-btn {
     background: transparent;
     color: rgba(255,255,255,.85);
     text-decoration: none;
-    border: 1.5px solid rgba(255,255,255,.16);
-    border-radius: 8px;
-    padding: 8px 18px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-family: 'Nunito', sans-serif;
-    font-weight: 700;
-    font-size: 13.5px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
-    letter-spacing: .2px;
 }
 
-.header-attendance-btn i { font-size: 13px; }
-
 .header-attendance-btn:hover {
-    background: var(--yellow); /* Bright yellow/amber hover */
-    color: var(--blue-dark);  /* Dark text for contrast */
+    background: var(--yellow);
+    color: var(--blue-dark);
     border-color: var(--yellow);
-    box-shadow: 0 4px 16px rgba(244, 196, 48, 0.35); /* Yellow glow */
+    box-shadow: 0 4px 16px rgba(244, 196, 48, 0.35);
 }
 
 /* ====== RESPONSIVE ====== */

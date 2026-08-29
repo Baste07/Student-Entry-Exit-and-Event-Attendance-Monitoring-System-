@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
         idInput.dispatchEvent(new Event('input'));
     }
 
-    // Pre-fill Professor ID from URL
+    // Pre-fill Employee ID from URL
     const empId = params.get('employee_id');
     if (empId && currentRole === 'professor') {
         const empInput = document.getElementById('employeeIdInput');
@@ -247,9 +247,9 @@ function switchRole(role) {
     document.getElementById('btnStudent').classList.toggle('active',   role === 'student');
     document.getElementById('btnProfessor').classList.toggle('active', role === 'professor');
 
-    const isProf = role === 'professor';
-    document.getElementById('heroSub').textContent = isProf
-        ? 'Look up your Employee ID, then launch the Lab Camera to register.'
+    const isEmp = role === 'professor';
+    document.getElementById('heroSub').textContent = isEmp
+        ? 'Look up your Employee Number, then launch the Lab Camera to register.'
         : 'Look up your Student ID, then launch the Lab Camera to register.';
 }
 
@@ -308,9 +308,9 @@ function clearProfessorForm() {
     professorInfoCard.classList.remove('show');
     empIdInput.value = '';
     professorData = null;
-    ['p_firstName','p_middleName','p_lastName','p_department','p_email']
+    ['p_firstName','p_middleName','p_lastName','p_role','p_department','p_email']
         .forEach(id => document.getElementById(id).value = '');
-    ['p_displayName','p_displayDept','p_displayEmpId','p_displayEmail']
+    ['p_displayName','p_displayRole','p_displayDept','p_displayEmpId','p_displayEmail']
         .forEach(id => document.getElementById(id).textContent = '');
     const pIdSuccess = document.getElementById('p_idSuccess');
     const pIdError = document.getElementById('p_idError');
@@ -547,9 +547,9 @@ empIdInput.addEventListener('input', function () {
 
 async function searchProfessor(id) {
     const { data } = await supabaseClient
-        .from('teachers')
+        .from('employees')
         .select('*')
-        .eq('employee_id', id)
+        .eq('emp_no', id)
         .maybeSingle();
 
     if (data) {
@@ -566,20 +566,23 @@ async function fillProfessorFields(data) {
     document.getElementById('p_firstName').value  = data.first_name  || '';
     document.getElementById('p_middleName').value = data.middle_name || '';
     document.getElementById('p_lastName').value   = data.last_name   || '';
-    document.getElementById('p_department').value = 'N/A';
+    document.getElementById('p_role').value       = data.role        || '';
+    document.getElementById('p_department').value = data.faculty     || 'N/A';
     document.getElementById('p_email').value      = data.email       || '';
 
+    const roleLabel = (data.role || 'employee').replace(/\b\w/g, ch => ch.toUpperCase());
     document.getElementById('p_displayName').textContent  = `${data.first_name} ${data.last_name}`;
-    document.getElementById('p_displayDept').textContent  = 'N/A';
-    document.getElementById('p_displayEmpId').textContent = data.employee_id || 'N/A';
-    document.getElementById('p_displayEmail').textContent = data.email       || 'N/A';
+    document.getElementById('p_displayRole').textContent  = roleLabel;
+    document.getElementById('p_displayDept').textContent  = data.faculty || 'N/A';
+    document.getElementById('p_displayEmpId').textContent = data.emp_no || 'N/A';
+    document.getElementById('p_displayEmail').textContent = data.email  || 'N/A';
 
     const badge = document.getElementById('professorFaceBadge');
     badge.className = 'status-badge not-registered';
     badge.textContent = 'Checking...';
 
     const hasFace = await hasFaceFiles(data.facial_dataset_path);
-    if (!professorData || professorData.teacher_id !== data.teacher_id) return;
+    if (!professorData || professorData.employee_id !== data.employee_id) return;
 
     if (hasFace) {
         badge.className = 'status-badge registered';
@@ -607,10 +610,10 @@ professorScanBtn.addEventListener('click', async () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                id_number: professorData.employee_id,
+                id_number: professorData.emp_no,
                 firstName: professorData.first_name,
                 lastName:  professorData.last_name,
-                role:      'professor'
+                role:      professorData.role || 'teacher'
             })
         });
 

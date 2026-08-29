@@ -30,7 +30,7 @@
                 <div class="user-role"></div>
             </div>
             <div class="user-avatar"></div>
-            <button class="btn-logout">Log Out</button>
+            <button type="button" class="btn-logout" id="portalLogoutBtn">Log Out</button>
         </div>
     </header>
 
@@ -62,7 +62,7 @@
             </div>
 
             <!-- Card 1: Event Attendance (Admin/Superadmin only) -->
-            <a href="../TimeInAndTimeOutMonitoring/admin/dashboard.html" class="system-card event-attendance-card">
+            <a href="../TimeInAndTimeOutMonitoring/admin/dashboard.html" class="system-card event-attendance-card" data-audit-action="MODULE_SELECT" data-audit-module="event_attendance" data-audit-label="Event Attendance">
                 <span class="card-number">01</span>
                 <div class="card-icon-wrap">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -91,7 +91,7 @@
             </a>
 
             <!-- Card 2: Entry & Exit Attendance (Admin/Superadmin only) -->
-            <a href="../EntryExitMonitoring/admin/dashboard.html" class="system-card entry-exit-card">
+            <a href="../EntryExitMonitoring/admin/dashboard.html" class="system-card entry-exit-card" data-audit-action="MODULE_SELECT" data-audit-module="entry_exit" data-audit-label="Entry & Exit Records">
                 <span class="card-number">02</span>
                 <div class="card-icon-wrap">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -120,7 +120,7 @@
             </a>
 
             <!-- Card 3: SUPERADMIN Panel (Superadmin only) -->
-            <a href="../admin/usermanagement.html" class="system-card superadmin-panel-card">
+            <a href="../admin/usermanagement.html" class="system-card superadmin-panel-card" data-audit-action="MODULE_SELECT" data-audit-module="superadmin_panel" data-audit-label="SUPERADMIN">
                 <span class="card-number">03</span>
                 <div class="card-icon-wrap">
                     <svg viewBox="0 0 24 24" aria-hidden="true">

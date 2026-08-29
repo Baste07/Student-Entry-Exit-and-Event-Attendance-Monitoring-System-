@@ -53,33 +53,34 @@ async function loadTeachers() {
             return;
         }
 
-        const { data: teachers, error } = await supabaseClient
-            .from('teachers')
+        const { data: employees, error } = await supabaseClient
+            .from('employees')
             .select('*')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        allTeachers = (teachers || []).map(teacher => {
-            let fullName = teacher.last_name || 'Unknown';
-            if (teacher.first_name) fullName += `, ${teacher.first_name}`;
-            if (teacher.middle_name) fullName += ` ${teacher.middle_name}`;
-            if (teacher.suffix) fullName += ` ${teacher.suffix}`;
+        allTeachers = (employees || []).map(employee => {
+            let fullName = employee.last_name || 'Unknown';
+            if (employee.first_name) fullName += `, ${employee.first_name}`;
+            if (employee.middle_name) fullName += ` ${employee.middle_name}`;
+            if (employee.suffix) fullName += ` ${employee.suffix}`;
 
             return {
-                id: teacher.teacher_id,
-                employeeId: teacher.employee_id,
+                id: employee.employee_id,
+                employeeId: employee.emp_no || employee.employee_id,
                 name: fullName.trim(),
-                firstName: teacher.first_name,
-                middleName: teacher.middle_name,
-                lastName: teacher.last_name,
-                suffix: teacher.suffix,
-                email: teacher.email,
-                phone: teacher.phone_number,
-                faculty: teacher.faculty || 'N/A',
-                status: normalizeStatus(teacher.status, 'active'),
-                created_at: teacher.created_at,
-                rawData: teacher
+                firstName: employee.first_name,
+                middleName: employee.middle_name,
+                lastName: employee.last_name,
+                suffix: employee.suffix,
+                email: employee.email,
+                phone: employee.phone_number,
+                faculty: employee.faculty || 'N/A',
+                role: employee.role || 'teacher',
+                status: normalizeStatus(employee.status, 'active'),
+                created_at: employee.created_at,
+                rawData: employee
             };
         });
 
@@ -87,8 +88,8 @@ async function loadTeachers() {
         updateStatistics();
 
     } catch (error) {
-        console.error('Error loading teachers:', error);
-        alert('Failed to load teachers. Please try again.');
+        console.error('Error loading employees:', error);
+        alert('Failed to load employees. Please try again.');
     }
 }
 
@@ -107,8 +108,8 @@ function displayTeachers(teachers) {
     if (teachers.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted);">
-                    No teachers found
+                <td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                    No employees found
                 </td>
             </tr>
         `;
@@ -126,23 +127,25 @@ function displayTeachers(teachers) {
         if (teacher.status === 'active') { statusBadgeClass = 'badge-active'; statusText = 'Active'; }
         else if (teacher.status === 'suspended') { statusBadgeClass = 'badge-suspended'; statusText = 'Suspended'; }
 
+        const roleLabel = (teacher.role || 'teacher').replace(/\b\w/g, ch => ch.toUpperCase());
+
         let buttons = [];
         
         buttons.push(`
-            <button class="btn-icon" title="Edit Teacher" onclick="openTeacherModal('${teacher.id}')">
+            <button class="btn-icon" title="Edit Employee" onclick="openTeacherModal('${teacher.id}')">
                 <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </button>
         `);
         
         if (teacher.status === 'suspended') {
             buttons.push(`
-                <button class="btn-icon" title="Reactivate Teacher" onclick="reactivateTeacher('${teacher.id}', '${escapeHtml(teacher.name)}')">
+                <button class="btn-icon" title="Reactivate Employee" onclick="reactivateTeacher('${teacher.id}', '${escapeHtml(teacher.name)}')">
                     <svg viewBox="0 0 24 24"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64M3.51 15A9 9 0 0 0 18.36 18.36"/></svg>
                 </button>
             `);
         } else {
             buttons.push(`
-                <button class="btn-icon danger" title="Suspend Teacher" onclick="suspendTeacher('${teacher.id}', '${escapeHtml(teacher.name)}')">
+                <button class="btn-icon danger" title="Suspend Employee" onclick="suspendTeacher('${teacher.id}', '${escapeHtml(teacher.name)}')">
                     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
                 </button>
             `);
@@ -152,6 +155,7 @@ function displayTeachers(teachers) {
             <td style="font-weight:500;">${escapeHtml(teacher.name)}</td>
             <td>${escapeHtml(teacher.employeeId)}</td>
             <td>${escapeHtml(teacher.email)}</td>
+            <td>${escapeHtml(roleLabel)}</td>
             <td>${escapeHtml(teacher.faculty)}</td>
             <td><span class="badge ${statusBadgeClass}">${statusText}</span></td>
             <td><div class="action-buttons">${buttons.join('')}</div></td>
@@ -184,16 +188,16 @@ async function suspendTeacher(teacherId, teacherName) {
 
     try {
         const { error } = await supabaseClient
-            .from('teachers')
+            .from('employees')
             .update({ status: 'suspended', updated_at: new Date().toISOString() })
-            .eq('teacher_id', teacherId);
+            .eq('employee_id', teacherId);
 
         if (error) throw error;
         alert(`"${teacherName}" has been suspended.`);
         await loadTeachers();
     } catch (error) {
-        console.error('Error suspending teacher:', error);
-        alert('Failed to suspend teacher. Please try again.');
+        console.error('Error suspending employee:', error);
+        alert('Failed to suspend employee. Please try again.');
     }
 }
 
@@ -204,16 +208,16 @@ async function reactivateTeacher(teacherId, teacherName) {
 
     try {
         const { error } = await supabaseClient
-            .from('teachers')
+            .from('employees')
             .update({ status: 'active', updated_at: new Date().toISOString() })
-            .eq('teacher_id', teacherId);
+            .eq('employee_id', teacherId);
 
         if (error) throw error;
         alert(`"${teacherName}" has been reactivated.`);
         await loadTeachers();
     } catch (error) {
-        console.error('Error reactivating teacher:', error);
-        alert('Failed to reactivate teacher. Please try again.');
+        console.error('Error reactivating employee:', error);
+        alert('Failed to reactivate employee. Please try again.');
     }
 }
 
@@ -286,17 +290,19 @@ function openTeacherModal(teacherId = null) {
         document.getElementById('teacherEmail').value = teacher.email;
         document.getElementById('teacherPhone').value = teacher.phone || '';
         document.getElementById('teacherFaculty').value = teacher.faculty === 'N/A' ? '' : teacher.faculty;
+        document.getElementById('teacherRole').value = teacher.role || 'teacher';
         document.getElementById('teacherStatus').value = teacher.status;
         
         statusField.style.display = 'block';
         employeeIdInput.readOnly = true;
         emailInput.readOnly = true;
     } else {
-        modalLabel.textContent = 'Add New Teacher';
-        submitBtn.textContent = 'Create Teacher';
+        modalLabel.textContent = 'Add New Employee';
+        submitBtn.textContent = 'Create Employee';
         statusField.style.display = 'none';
         employeeIdInput.readOnly = false;
         emailInput.readOnly = false;
+        document.getElementById('teacherRole').value = 'teacher';
     }
     
     if (teacherModal) teacherModal.show();
@@ -316,6 +322,7 @@ async function submitTeacherForm(e) {
     const email = document.getElementById('teacherEmail').value.trim();
     const phone = document.getElementById('teacherPhone').value.trim();
     const faculty = document.getElementById('teacherFaculty').value.trim();
+    const role = document.getElementById('teacherRole').value || 'teacher';
     
     if (!employeeId) { alert('Employee ID is required.'); return; }
     if (!lastName) { alert('Last Name is required.'); return; }
@@ -330,7 +337,7 @@ async function submitTeacherForm(e) {
             const status = document.getElementById('teacherStatus').value;
             
             const { error } = await supabaseClient
-                .from('teachers')
+                .from('employees')
                 .update({
                     first_name: firstName,
                     middle_name: middleName || null,
@@ -338,29 +345,30 @@ async function submitTeacherForm(e) {
                     suffix: suffix || null,
                     phone_number: phone || null,
                     faculty: faculty,
+                    role: role,
                     status: status,
                     updated_at: new Date().toISOString()
                 })
-                .eq('teacher_id', teacherId);
+                .eq('employee_id', teacherId);
                 
             if (error) throw error;
-            alert('Teacher updated successfully!');
+            alert('Employee updated successfully!');
         } else {
             const { data: existing } = await supabaseClient
-                .from('teachers')
-                .select('email, employee_id')
-                .or(`email.eq.${email},employee_id.eq.${employeeId}`)
+                .from('employees')
+                .select('email, emp_no')
+                .or(`email.eq.${email},emp_no.eq.${employeeId}`)
                 .maybeSingle();
                 
             if (existing) {
-                if (existing.email === email) alert('A teacher with this email already exists.');
-                else alert('A teacher with this Employee ID already exists.');
+                if (existing.email === email) alert('An employee with this email already exists.');
+                else alert('An employee with this Employee ID already exists.');
                 return;
             }
             
-            const { error: insertError } = await supabaseClient.from('teachers').insert([{
-                teacher_id: crypto.randomUUID(),
-                employee_id: employeeId,
+            const { error: insertError } = await supabaseClient.from('employees').insert([{
+                employee_id: crypto.randomUUID(),
+                emp_no: employeeId,
                 first_name: firstName,
                 middle_name: middleName || null,
                 last_name: lastName,
@@ -368,13 +376,14 @@ async function submitTeacherForm(e) {
                 email: email,
                 phone_number: phone || null,
                 faculty: faculty,
+                role: role,
                 status: 'active',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             }]);
             
             if (insertError) throw insertError;
-            alert('Teacher created successfully!');
+            alert('Employee created successfully!');
         }
         
         if (teacherModal) teacherModal.hide();
@@ -382,8 +391,8 @@ async function submitTeacherForm(e) {
         await loadTeachers();
         
     } catch (error) {
-        console.error('Error saving teacher:', error);
-        alert(`Failed to save teacher: ${error.message}`);
+        console.error('Error saving employee:', error);
+        alert(`Failed to save employee: ${error.message}`);
     }
 }
 
@@ -534,6 +543,7 @@ async function parseFile() {
                 email:      String(r[5] || '').trim(),
                 phone:      String(r[6] || '').trim(),
                 faculty:    String(r[7] || '').trim(),
+                role:       String(r[8] || '').trim() || 'teacher',
             }));
         }
 
@@ -566,13 +576,14 @@ function parseCSV(text) {
         const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
         return {
             employeeId: cols[0] || '',
-            lastName:   cols[1] || '',
-            firstName:  cols[2] || '',
+            lastName: cols[1] || '',
+            firstName: cols[2] || '',
             middleName: cols[3] || '',
-            suffix:     cols[4] || '',
-            email:      cols[5] || '',
-            phone:      cols[6] || '',
-            faculty:    cols[7] || '',
+            suffix: cols[4] || '',
+            email: cols[5] || '',
+            phone: cols[6] || '',
+            faculty: cols[7] || '',
+            role: cols[8] || 'teacher',
         };
     });
 }
@@ -598,9 +609,19 @@ function validateRow(row, index) {
         errors.push('Faculty is required');
     }
 
+    const normalizedRole = String(row.role || 'teacher').trim().toLowerCase();
+    const allowedRoles = ['teacher', 'principal', 'staff', 'guest'];
+    if (!normalizedRole) {
+        row.role = 'teacher';
+    } else if (!allowedRoles.includes(normalizedRole)) {
+        errors.push('Role must be Teacher, Principal, Staff, or Guest');
+    } else {
+        row.role = normalizedRole;
+    }
+
     const status = errors.length > 0 ? 'error'
-                 : warnings.length > 0 ? 'warning'
-                 : 'ok';
+        : warnings.length > 0 ? 'warning'
+        : 'ok';
 
     return {
         ...row,
@@ -645,14 +666,14 @@ async function removeExistingEmployeeIdsFromParsedRows() {
 
     if (queryableIds.length === 0) return 0;
 
-    const { data: existingTeachers, error } = await supabaseClient
-        .from('teachers')
-        .select('employee_id')
-        .in('employee_id', queryableIds);
+    const { data: existingEmployees, error } = await supabaseClient
+        .from('employees')
+        .select('emp_no')
+        .in('emp_no', queryableIds);
 
     if (error) throw error;
 
-    const existingIds = new Set((existingTeachers || []).map(row => row.employee_id));
+    const existingIds = new Set((existingEmployees || []).map(row => row.emp_no));
     const originalLength = parsedRows.length;
     const removedRows = [];
     
@@ -749,6 +770,7 @@ function renderPreview() {
                 <td style="font-size:0.82rem;">${escapeHtml(row.email)}${warnNote}</td>
                 ${cell(row.phone)}
                 ${cell(row.faculty)}
+                ${cell(row.role ? row.role.charAt(0).toUpperCase() + row.role.slice(1) : 'Teacher')}
                 <td>${statusBadge}</td>
             </tr>
         `;
@@ -780,9 +802,9 @@ async function startImport() {
         const row = validRows[i];
 
         try {
-            const { error: insertError } = await supabaseClient.from('teachers').insert([{
-                teacher_id: crypto.randomUUID(),
-                employee_id: row.employeeId,
+            const { error: insertError } = await supabaseClient.from('employees').insert([{
+                employee_id: crypto.randomUUID(),
+                emp_no: row.employeeId,
                 first_name: row.firstName,
                 middle_name: row.middleName || null,
                 last_name: row.lastName,
@@ -790,6 +812,7 @@ async function startImport() {
                 email: row.email,
                 phone_number: row.phone || null,
                 faculty: row.faculty,
+                role: row.role || 'teacher',
                 status: 'active',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -906,13 +929,14 @@ function downloadTeacherTemplate() {
         'Suffix',
         'Email',
         'Phone',
-        'Faculty'
+        'Faculty',
+        'Role'
     ];
 
     const sampleRows = [
-        ['12345', 'Dela Cruz', 'Juan', 'Santos', '', 'juan.delacruz@plpasig.edu.ph', '09171234567', 'College of Computer Studies'],
-        ['12346', 'Cruz', 'Maria', 'Reyes', 'Jr.', 'maria.cruz@plpasig.edu.ph', '09179876543', 'College of Business and Accountancy'],
-        ['12347', 'Reyes', 'Jose', '', '', 'jose.reyes@plpasig.edu.ph', '', 'College of Arts and Sciences']
+        ['12345', 'Dela Cruz', 'Juan', 'Santos', '', 'juan.delacruz@plpasig.edu.ph', '09171234567', 'College of Computer Studies', 'teacher'],
+        ['12346', 'Cruz', 'Maria', 'Reyes', 'Jr.', 'maria.cruz@plpasig.edu.ph', '09179876543', 'College of Business and Accountancy', 'principal'],
+        ['12347', 'Reyes', 'Jose', '', '', 'jose.reyes@plpasig.edu.ph', '', 'College of Arts and Sciences', 'staff']
     ];
 
     if (window.XLSX) {
