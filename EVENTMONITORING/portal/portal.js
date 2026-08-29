@@ -21,12 +21,40 @@ async function loadSystemFeatures() {
     }
 }
 
+function logoutUser() {
+    const user = getCurrentUser();
+    if (user) {
+        logSystemAudit({
+            action: 'LOGOUT',
+            moduleName: 'portal',
+            pageName: 'portal.html',
+            details: {
+                logout_reason: 'manual_logout',
+                user_role: user.role || user.userType || user.adminLevel || null
+            }
+        });
+    }
+    sessionStorage.clear();
+    localStorage.clear();
+    window.location.href = '../auth/login.html';
+}
+
 document.addEventListener('DOMContentLoaded', async function () {
     console.log('=== DOMContentLoaded fired ===');
     checkUserSession();
     await loadSystemFeatures();
     loadDepartmentLogoAndInfo();
     displayUserInfo();
+
+    const logoutBtn = document.getElementById('portalLogoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (confirm('Are you sure you want to log out?')) {
+                logoutUser();
+            }
+        });
+    }
 
     // 1. Set hrefs only — never touch visibility here
     setThesisLink();
@@ -60,6 +88,20 @@ document.addEventListener('DOMContentLoaded', async function () {
                 e.preventDefault();
                 return;
             }
+
+            const moduleName = card.dataset.auditModule || 'portal_module';
+            const moduleLabel = card.dataset.auditLabel || card.querySelector('.card-title-text')?.textContent || 'Module';
+            logSystemAudit({
+                action: 'MODULE_SELECT',
+                moduleName: moduleName,
+                pageName: 'portal.html',
+                details: {
+                    selected_module: moduleName,
+                    module_label: moduleLabel,
+                    href: card.getAttribute('href') || ''
+                }
+            });
+
             card.style.opacity = '0.8';
             card.style.transform = 'scale(0.98)';
             setTimeout(function () {

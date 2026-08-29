@@ -294,41 +294,34 @@ async function writeLoginAudit(userObj, tableName) {
         return;
     }
 
-    const userName = tableName === 'admins'
-        ? (userObj.lastName || '').trim()
-        : `${userObj.firstName || ''} ${userObj.lastName || ''}`.trim();
+    const fullName = `${userObj.firstName || ''} ${userObj.lastName || ''}`.trim() || (userObj.email || 'Unknown User');
 
-    let entry = {
-        action:        'LOGIN',
-        target_table:  tableName,
-        target_id:     userObj.id           || null,
-        target_name:   userName             || null,
-        old_value:     null,
-        new_value:     null,
-        department_id: userObj.departmentId || null,
+    const entry = {
+        user_id: userObj.id || null,
+        full_name: fullName,
+        email: userObj.email || null,
+        role: userObj.role || userObj.userType || userObj.adminLevel || null,
+        action: 'LOGIN',
+        module_name: 'auth',
+        page_name: 'login.html',
+        target_table: tableName || 'admins',
+        target_id: userObj.id || null,
+        details: {
+            login_time: userObj.loginTime || new Date().toISOString(),
+            department: userObj.department || null,
+            department_id: userObj.departmentId || null
+        }
     };
 
-    if (tableName === 'admins') {
-        entry.admin_id = userObj.id || null;
-    } 
-
-    console.log('[AuditLog] Inserting entry:', entry);
-
     try {
-        const { data, error } = await supabaseClient
-            .from('requirement_submission_audit_logs')
-            .insert([entry])
-            .select();
+        const { error } = await supabaseClient
+            .from('system_audit_logs')
+            .insert([entry]);
 
         if (error) {
-            console.error('[AuditLog] ✗ Insert failed:', {
-                message: error.message,
-                code:    error.code,
-                details: error.details,
-                hint:    error.hint,
-            });
+            console.error('[AuditLog] ✗ Insert failed:', error.message);
         } else {
-            console.log('[AuditLog] ✓ LOGIN audit logged successfully for', tableName, ':', data);
+            console.log('[AuditLog] ✓ LOGIN audit logged successfully for', tableName);
         }
     } catch (err) {
         console.error('[AuditLog] ✗ Unexpected error during insert:', err);

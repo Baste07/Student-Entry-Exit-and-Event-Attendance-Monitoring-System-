@@ -22,13 +22,13 @@
     <!-- Page Header -->
     <div class="page-header anim anim-1" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;width:100%;">
         <div>
-            <h1>Teacher Management</h1>
-            <p>Create and manage teacher accounts</p>
+            <h1>Employee Management</h1>
+            <p>Create and manage employee accounts and roles</p>
         </div>
         <div style="display:flex;gap:.6rem;align-items:center;white-space:nowrap;margin-left:auto;flex-shrink:0;">
             <button type="button" class="btn-download-template" id="addSingleTeacherBtn">
                 <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-                Add Single Teacher
+                Add Single Employee
             </button>
             <button type="button" class="btn-download-template" id="downloadTemplateBtn">
                 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -222,12 +222,12 @@
         <div class="toolbar">
             <div class="toolbar-title">
                 <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"/></svg>
-                All Teachers
+                All Employees
             </div>
             <div class="toolbar-right">
                 <div class="search-box">
                     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input type="text" class="search-input" id="teacherSearchInput" placeholder="Search teachers..."/>
+                    <input type="text" class="search-input" id="teacherSearchInput" placeholder="Search employees..."/>
                 </div>
                 <select class="filter-select status-filter" id="teacherStatusFilter">
                     <option value="">All Statuses</option>
@@ -245,6 +245,7 @@
                     <th>Name</th>
                     <th>Employee ID</th>
                     <th>Email</th>
+                    <th>Role</th>
                     <th>Department</th>
                     <th>Status</th>
                     <th>Actions</th>
@@ -252,7 +253,7 @@
             </thead>
             <tbody id="teachersTableBody">
                 <tr>
-                    <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted);">Loading teachers...</td>
+                    <td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted);">Loading employees...</td>
                 </tr>
             </tbody>
         </table>
@@ -310,7 +311,17 @@
                         <div class="col-md-6">
                             <label for="teacherFaculty" class="form-label">Department <span class="text-danger">*</span></label>
                             <input type="text" id="teacherFaculty" class="form-control" placeholder="e.g. Elementary Department" required>
-                            <div class="form-text">The grade level or subject department this teacher belongs to.</div>
+                            <div class="form-text">The grade level or subject department this employee belongs to.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="teacherRole" class="form-label">Role <span class="text-danger">*</span></label>
+                            <select id="teacherRole" class="form-select" required>
+                                <option value="teacher">Teacher</option>
+                                <option value="principal">Principal</option>
+                                <option value="staff">Staff</option>
+                                <option value="guest">Guest</option>
+                            </select>
                         </div>
                         
                         <div class="col-12" id="teacherStatusField" style="display:none;">

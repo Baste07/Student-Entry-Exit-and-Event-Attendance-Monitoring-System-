@@ -85,6 +85,7 @@ body {
     letter-spacing: .04em;
 }
 
+.btn-back-module,
 .btn-logout {
     display: flex;
     align-items: center;
@@ -102,12 +103,19 @@ body {
     text-decoration: none;
 }
 
+.btn-back-module:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255,255,255,0.7);
+    color: #fff;
+}
+
 .btn-logout:hover {
     background: rgba(220, 38, 38, 0.18);
     border-color: rgba(248, 113, 113, 0.8);
     color: #fff;
 }
 
+.btn-back-module svg,
 .btn-logout svg {
     width: 15px; height: 15px;
     stroke: currentColor; fill: none;

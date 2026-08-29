@@ -80,8 +80,106 @@ function getDepartmentLogo() {
     return '../auth/assets/ccslogo.png';
 }
 
+async function logSystemAudit({ action = 'ACCESS', moduleName = 'system', pageName = '', targetTable = null, targetId = null, details = {} } = {}) {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+        return;
+    }
+
+    const user = getCurrentUser();
+    if (!user) {
+        return;
+    }
+
+    const payload = {
+        user_id: user.id || null,
+        full_name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || (user.email || null),
+        email: user.email || null,
+        role: user.role || user.userType || user.adminLevel || null,
+        action: String(action).toUpperCase(),
+        module_name: moduleName,
+        page_name: pageName || window.location.pathname.split('/').pop() || 'unknown',
+        target_table: targetTable || null,
+        target_id: targetId || null,
+        details: (details && typeof details === 'object') ? details : { value: details },
+        created_at: new Date().toISOString()
+    };
+
+    try {
+        const { error } = await supabaseClient
+            .from('system_audit_logs')
+            .insert([payload]);
+
+        if (error) {
+            console.error('[Audit] Insert failed:', error.message);
+        }
+    } catch (err) {
+        console.error('[Audit] Unexpected error:', err);
+    }
+}
+
+function registerAuditActionTracking() {
+    document.addEventListener('click', async function (e) {
+        const trigger = e.target.closest('[data-audit-action]');
+        if (trigger) {
+            const action = (trigger.dataset.auditAction || 'ACTION').toUpperCase();
+            const moduleName = trigger.dataset.auditModule || 'system';
+            const targetTable = trigger.dataset.auditTable || null;
+            const targetId = trigger.dataset.auditId || null;
+            const details = {
+                label: trigger.textContent?.trim() || trigger.dataset.auditLabel || '',
+                element: trigger.tagName,
+                dataset: trigger.dataset || {}
+            };
+            await logSystemAudit({ action, moduleName, pageName: window.location.pathname.split('/').pop() || 'unknown', targetTable, targetId, details });
+        }
+
+        const deleteCandidate = e.target.closest('.btn-delete, .delete-btn, [data-action="delete"], [data-audit-action="delete"]');
+        if (deleteCandidate && !deleteCandidate.dataset.auditAction) {
+            await logSystemAudit({ action: 'DELETE', moduleName: 'system', pageName: window.location.pathname.split('/').pop() || 'unknown', details: { label: deleteCandidate.textContent?.trim() || 'delete action' } });
+        }
+
+        const addCandidate = e.target.closest('.btn-add, .add-btn, [data-action="add"], [data-audit-action="add"]');
+        if (addCandidate && !addCandidate.dataset.auditAction) {
+            await logSystemAudit({ action: 'ADD', moduleName: 'system', pageName: window.location.pathname.split('/').pop() || 'unknown', details: { label: addCandidate.textContent?.trim() || 'add action' } });
+        }
+    });
+
+    document.addEventListener('submit', async function (e) {
+        const form = e.target;
+        if (!form || form.tagName !== 'FORM') return;
+
+        const action = (form.dataset.auditAction || 'FORM_SUBMIT').toUpperCase();
+        await logSystemAudit({
+            action,
+            moduleName: form.dataset.auditModule || 'system',
+            pageName: window.location.pathname.split('/').pop() || 'unknown',
+            targetTable: form.dataset.auditTable || null,
+            targetId: form.dataset.auditId || null,
+            details: {
+                formId: form.id || null,
+                formName: form.name || null
+            }
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     checkSupabaseConnection();
+
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+        logSystemAudit({
+            action: 'PAGE_ACCESS',
+            moduleName: document.body.dataset.module || 'portal',
+            pageName: window.location.pathname.split('/').pop() || 'unknown',
+            details: {
+                url: window.location.href,
+                access_type: 'page_view'
+            }
+        });
+    }
+
+    registerAuditActionTracking();
 
     const modalBackdrop = document.createElement('div');
     modalBackdrop.className = 'logout-modal-backdrop';
@@ -123,6 +221,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (e.target.closest('.btn-logout-confirm')) {
+            const user = getCurrentUser();
+            if (user) {
+                logSystemAudit({
+                    action: 'LOGOUT',
+                    moduleName: 'system',
+                    pageName: window.location.pathname.split('/').pop() || 'unknown',
+                    details: {
+                        logout_reason: 'manual_logout',
+                        user_role: user.role || user.userType || user.adminLevel || null
+                    }
+                });
+            }
             sessionStorage.removeItem('user');
             const path = window.location.pathname;
             let authPath = '../auth/login.html';
