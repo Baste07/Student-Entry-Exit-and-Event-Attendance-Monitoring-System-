@@ -25,10 +25,12 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadSections() {
     setTableLoading(true);
     try {
-        // Load teachers for adviser names
+        // Load active teacher employees for adviser names.
         const { data: teachers, error: tErr } = await supabaseClient
-            .from('teachers')
-            .select('teacher_id, first_name, last_name')
+            .from('employees')
+            .select('employee_id, first_name, last_name, role, status')
+            .eq('role', 'teacher')
+            .eq('status', 'active')
             .order('last_name', { ascending: true });
         if (tErr) throw tErr;
         allTeachersForSections = teachers || [];
@@ -40,10 +42,10 @@ async function loadSections() {
         if (syErr) throw syErr;
         allSchoolYears = schoolYears || [];
 
-        // Load sections with adviser info
+        // Load sections separately because adviser_id references employees.
         const { data: sections, error: sErr } = await supabaseClient
             .from('sections')
-            .select('*, teachers!adviser_id(teacher_id, first_name, last_name)')
+            .select('section_id, section_name, grade_level, school_year_id, adviser_id')
             .order('grade_level', { ascending: true })
             .order('section_name', { ascending: true });
         if (sErr) throw sErr;
@@ -99,8 +101,9 @@ function renderTable(rows) {
     }
 
     tbody.innerHTML = rows.map(s => {
-        const adviserName = s.teachers
-            ? `${s.teachers.first_name} ${s.teachers.last_name}`
+        const adviser = allTeachersForSections.find(t => t.employee_id === s.adviser_id);
+        const adviserName = adviser
+            ? `${adviser.first_name} ${adviser.last_name}`
             : '<span style="color:#999;font-style:italic">Unassigned</span>';
         const schoolYearName = getSchoolYearName(s.school_year_id);
 
@@ -108,7 +111,7 @@ function renderTable(rows) {
         <tr data-grade="${escHtml(s.grade_level || '')}">
             <td><span class="primary-cell">${escHtml(s.section_name || '')}</span></td>
             <td><span class="badge info">${escHtml(s.grade_level || '—')}</span></td>
-            <td>${s.teachers ? escHtml(adviserName) : adviserName}</td>
+            <td>${adviser ? escHtml(adviserName) : adviserName}</td>
             <td>${escHtml(schoolYearName)}</td>
             <td><span class="badge status-active"><i class="fa-solid fa-users"></i> ${s.student_count}</span></td>
         </tr>`;

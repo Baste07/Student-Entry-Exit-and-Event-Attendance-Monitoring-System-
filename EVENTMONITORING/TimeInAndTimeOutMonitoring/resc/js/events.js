@@ -29,12 +29,12 @@ document.addEventListener('DOMContentLoaded', () => {
     loadEvents();
     bindEvents();
 
-    // Auto-update statuses every 30 seconds
+    // Refresh the displayed status at second precision so transitions are immediate.
     setInterval(() => {
         if (allEvents.length > 0) {
             updateEventStatusesLocal();
         }
-    }, 30000);
+    }, 1000);
 });
 
 // ══════════════════════════════════════════════════════════
@@ -50,7 +50,7 @@ function computeEventStatus(event) {
 
     const now = getManilaNow();
     const todayStr = now.toLocaleDateString('en-CA');
-    const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
+    const currentTime = now.toTimeString().slice(0, 8); // "HH:MM:SS"
 
     const startDate = event.event_date;
     const endDate = event.end_date || event.event_date; // <-- FIX: fallback to event_date if no end_date
@@ -111,29 +111,25 @@ async function updateEventStatusesLocal() {
 
     if (updates.length === 0) return;
 
-    // Update UI immediately so it feels responsive
+    // Update the local state immediately; database writes happen in parallel.
+    updates.forEach(upd => {
+        const ev = allEvents.find(e => e.event_id === upd.event_id);
+        if (ev) ev.status = upd.status;
+    });
     updateBadges();
     renderTable(allEvents);
 
-    for (const upd of updates) {
+    await Promise.all(updates.map(async upd => {
         try {
             const { error } = await supabaseClient
                 .from('events')
                 .update({ status: upd.status, updated_at: new Date().toISOString() })
                 .eq('event_id', upd.event_id);
-
             if (error) throw error;
-
-            // Only adopt the new status locally once the DB confirms it
-            const ev = allEvents.find(e => e.event_id === upd.event_id);
-            if (ev) ev.status = upd.status;
-
         } catch (err) {
             console.error('Status sync failed for', upd.event_id, err);
-            // If it fails, ev.status stays as the DB value, so the next
-            // 30-second interval will retry automatically.
         }
-    }
+    }));
 }
 
 // ══════════════════════════════════════════════════════════

@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   teachers.js — Teachers Management Logic (Supabase)
+    teachers.js — Employee Management Logic (Supabase)
    K-10 Attendance System — Read-Only View
    ═══════════════════════════════════════════════════════════ */
 
@@ -24,13 +24,14 @@ async function loadTeachers() {
     setTableLoading(true);
     try {
         const { data, error } = await supabaseClient
-            .from('teachers')
-            .select('*')
+            .from('employees')
+            .select('employee_id, emp_no, first_name, last_name, middle_name, suffix, faculty, phone_number, email, role, status')
             .order('last_name', { ascending: true });
 
         if (error) throw error;
 
         allTeachers = data || [];
+        populateRoleFilter();
         populateFacultyFilter();
         updateBadges();
         renderTable(allTeachers);
@@ -47,6 +48,16 @@ function populateFacultyFilter() {
     const faculties = [...new Set(allTeachers.map(t => t.faculty).filter(Boolean))].sort();
     select.innerHTML = '<option value="">All Faculties</option>' +
         faculties.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
+    select.value = current;
+}
+
+function populateRoleFilter() {
+    const select = document.getElementById('roleFilter');
+    if (!select) return;
+    const current = select.value;
+    const roles = [...new Set(allTeachers.map(t => t.role).filter(Boolean))].sort();
+    select.innerHTML = '<option value="">All Roles</option>' +
+        roles.map(role => `<option value="${escHtml(role)}">${escHtml(role.replace(/\b\w/g, char => char.toUpperCase()))}</option>`).join('');
     select.value = current;
 }
 
@@ -67,7 +78,7 @@ function renderTable(rows) {
     const tbody = document.getElementById('teachersTableBody');
     if (!rows || rows.length === 0) {
         tbody.innerHTML = `
-            <tr><td colspan="9" class="empty-cell">
+            <tr><td colspan="10" class="empty-cell">
                 <i class="fa-solid fa-chalkboard-user" style="font-size:36px;display:block;margin-bottom:10px;color:#e0f2fe"></i>
                 No teachers found.
             </td></tr>`;
@@ -81,8 +92,8 @@ function renderTable(rows) {
             : '<span class="badge status-inactive">Inactive</span>';
 
         return `
-        <tr data-faculty="${escHtml(t.faculty || '')}" data-status="${status}">
-            <td><span class="primary-cell">${escHtml(t.employee_id || '')}</span></td>
+        <tr data-faculty="${escHtml(t.faculty || '')}" data-role="${escHtml(t.role || '')}" data-status="${status}">
+            <td><span class="primary-cell">${escHtml(t.emp_no ?? '—')}</span></td>
             <td>${escHtml(t.last_name || '')}</td>
             <td>${escHtml(t.first_name || '')}</td>
             <td><span class="secondary-cell">${escHtml(t.middle_name || '—')}</span></td>
@@ -90,6 +101,7 @@ function renderTable(rows) {
             <td>${escHtml(t.faculty || '—')}</td>
             <td>${escHtml(t.phone_number || '—')}</td>
             <td>${escHtml(t.email || '—')}</td>
+            <td>${escHtml((t.role || 'teacher').replace(/\b\w/g, char => char.toUpperCase()))}</td>
             <td>${statusBadge}</td>
         </tr>`;
     }).join('');
@@ -103,24 +115,28 @@ function applyFilters() {
     const q      = document.getElementById('searchInput').value.toLowerCase();
     const fac    = document.getElementById('facultyFilter').value;
     const status = document.getElementById('statusFilter').value;
+    const role   = document.getElementById('roleFilter').value;
 
     document.querySelectorAll('#teachersTableBody tr').forEach(row => {
         if (row.id === 'loadingRow') return;
         const textMatch   = row.textContent.toLowerCase().includes(q);
         const facMatch    = !fac || row.dataset.faculty === fac;
+        const roleMatch   = !role || row.dataset.role === role;
         const statusMatch = !status || row.dataset.status === status;
-        row.style.display = (textMatch && facMatch && statusMatch) ? '' : 'none';
+        row.style.display = (textMatch && facMatch && roleMatch && statusMatch) ? '' : 'none';
     });
 }
 
 function bindEvents() {
     document.getElementById('searchInput').addEventListener('input', applyFilters);
     document.getElementById('facultyFilter').addEventListener('change', applyFilters);
+    document.getElementById('roleFilter').addEventListener('change', applyFilters);
     document.getElementById('statusFilter').addEventListener('change', applyFilters);
 
     document.getElementById('clearFilters').addEventListener('click', function () {
         document.getElementById('searchInput').value = '';
         document.getElementById('facultyFilter').value = '';
+        document.getElementById('roleFilter').value = '';
         document.getElementById('statusFilter').value = '';
         applyFilters();
     });
@@ -132,12 +148,12 @@ function bindEvents() {
 
 function setTableLoading(on) {
     const tbody = document.getElementById('teachersTableBody');
-    if (on) tbody.innerHTML = `<tr id="loadingRow"><td colspan="9" class="loading-cell"><i class="fa-solid fa-spinner fa-spin"></i> Loading teachers…</td></tr>`;
+    if (on) tbody.innerHTML = `<tr id="loadingRow"><td colspan="10" class="loading-cell"><i class="fa-solid fa-spinner fa-spin"></i> Loading employees…</td></tr>`;
 }
 
 function showTableError(msg) {
     document.getElementById('teachersTableBody').innerHTML = `
-        <tr><td colspan="9" class="empty-cell" style="color:#dc2626">
+        <tr><td colspan="10" class="empty-cell" style="color:#dc2626">
             <i class="fa-solid fa-triangle-exclamation" style="font-size:36px;display:block;margin-bottom:10px"></i>
             ${escHtml(msg)}
         </td></tr>`;
