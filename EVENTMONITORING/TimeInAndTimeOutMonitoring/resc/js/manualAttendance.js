@@ -841,7 +841,6 @@ async function confirmStudentEvent(payload) {
             student_id: studentId,
             time_in: nowStore,
             remarks: isLate ? `Late by ${lateMinutes} min` : 'On time',
-            verified_by_facial_recognition: false,
             created_at: nowStore
         });
         if (error) return { success: false, message: error.message || 'Unable to save TIME IN.' };

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teachers Management | K-10 Attendance System</title>
+    <title>Employee Management | K-10 Attendance System</title>
 
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -34,8 +34,8 @@
 
             <div class="page-header">
                 <div class="header-titles">
-                    <h1><i class="fa-solid fa-chalkboard-user"></i> Teachers Management</h1>
-                    <p>View teacher records, employee IDs, and faculty assignments</p>
+                    <h1><i class="fa-solid fa-users"></i> Employee Management</h1>
+                    <p>View employee records, roles, employee IDs, and faculty assignments</p>
                 </div>
 
                 <div class="stats-badges">
@@ -60,6 +60,12 @@
                         <label for="facultyFilter"><i class="fa-solid fa-building"></i> Filter by Faculty</label>
                         <select id="facultyFilter">
                             <option value="">All Faculties</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="roleFilter"><i class="fa-solid fa-user-tag"></i> Filter by Role</label>
+                        <select id="roleFilter">
+                            <option value="">All Roles</option>
                         </select>
                     </div>
                     <div class="control-group">
@@ -91,12 +97,13 @@
                             <th>Faculty</th>
                             <th>Phone Number</th>
                             <th>Email</th>
+                            <th>Role</th>
                             <th>Status</th>
                         </tr>
                     </thead>
                     <tbody id="teachersTableBody">
                         <tr id="loadingRow">
-                            <td colspan="9" class="loading-cell">
+                            <td colspan="10" class="loading-cell">
                                 <i class="fa-solid fa-spinner fa-spin"></i> Loading teachers...
                             </td>
                         </tr>

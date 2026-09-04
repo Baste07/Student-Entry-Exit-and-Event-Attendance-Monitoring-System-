@@ -696,7 +696,7 @@ def _build_remote_face_manifest(students_rows, teachers_rows):
         folder_images = _list_face_images_for_folder(folder)
         manifest.append({
             "role": "teacher",
-            "id": _to_json_safe(row.get("teacher_id")),
+            "id": _to_json_safe(row.get("employee_id")),
             "path": folder,
             "folder_signature": _hash_payload([
                 {
@@ -732,8 +732,8 @@ def _parse_pg_vector(raw):
     return np.array([float(x) for x in s.split(",")], dtype=np.float32)
 
 def _upsert_face_embedding(role, person_id, embedding, fingerprint):
-    table = "students" if role == "student" else "teachers"
-    id_col = "student_id" if role == "student" else "teacher_id"
+    table = "students" if role == "student" else "employees"
+    id_col = "student_id" if role == "student" else "employee_id"
     try:
         supabase.table(table).update({
             "face_embedding": _vector_to_pg_literal(embedding),
@@ -810,25 +810,30 @@ def _activate_face_db(encodings, meta):
         known_encodings_np = np.asarray(encodings, dtype=np.float32) if len(encodings) else None
 
 def _fetch_face_rows():
-    students_result = supabase.table("students")\
-.select("student_id, stud_id, first_name, middle_name, last_name, facial_dataset_path, section_id, face_embedding, face_embedding_fingerprint")\
-        .not_.is_("facial_dataset_path", "null")\
-        .neq("facial_dataset_path", "")\
+    students_result = (
+        supabase.table("students")
+        .select("student_id, stud_id, first_name, middle_name, last_name, facial_dataset_path, section_id, face_embedding, face_embedding_fingerprint")
+        .not_.is_("facial_dataset_path", "null")
+        .neq("facial_dataset_path", "")
         .execute()
+    )
     students_data = students_result.data or []
 
     teachers_data = []
     try:
-        teachers_result = supabase.table("teachers")\
-           .select("teacher_id, employee_id, first_name, middle_name, last_name, facial_dataset_path, face_embedding, face_embedding_fingerprint")\
-            .not_.is_("facial_dataset_path", "null")\
-            .neq("facial_dataset_path", "")\
+        teachers_result = (
+            supabase.table("employees")
+            .select("employee_id, emp_no, first_name, middle_name, last_name, role, facial_dataset_path, face_embedding, face_embedding_fingerprint")
+            .eq("role", "teacher")
+            .not_.is_("facial_dataset_path", "null")
+            .neq("facial_dataset_path", "")
             .execute()
+        )
         teachers_data = teachers_result.data or []
     except Exception as e:
         err_msg = str(e).lower()
         if "column" in err_msg and "facial_dataset_path" in err_msg:
-            print("⚠ teachers.facial_dataset_path column not found — skipping teacher face recognition")
+            print("⚠ employees.facial_dataset_path column not found — skipping employee face recognition")
         else:
             print(f"⚠ Failed to fetch teachers: {e}")
         teachers_data = []
@@ -1010,11 +1015,11 @@ def load_all_faces(force_rebuild=False):
                     working_encodings.append(vec)
                     working_meta.append({
                         "role": "teacher",
-                        "id": row["teacher_id"],
+                        "id": row["employee_id"],
                         "employee_id": row["employee_id"],
                         "name": f"{row['first_name']} {mid} {row['last_name']}".strip(),
                     })
-                    working_per_person[f"teacher_{row['teacher_id']}"] = fp_db
+                    working_per_person[f"teacher_{row['employee_id']}"] = fp_db
             if working_meta:
                 print(f"✓ Seeded {len(working_meta)} encodings from pgvector (no local cache present)")
 
@@ -1125,9 +1130,9 @@ def load_all_faces(force_rebuild=False):
             if not folder:
                 continue
             images     = _list_face_images_for_folder(folder)
-            person_key = f"teacher_{row['teacher_id']}"
+            person_key = f"teacher_{row['employee_id']}"
             remote_keys.add(person_key)
-            new_fp     = _person_fingerprint("teacher", row["teacher_id"], folder, images)
+            new_fp     = _person_fingerprint("teacher", row["employee_id"], folder, images)
             all_remote_rows.append({
                 "key":    person_key,
                 "role":   "teacher",
@@ -1198,7 +1203,7 @@ def load_all_faces(force_rebuild=False):
                 mid  = row.get("middle_name") or ""
                 meta = {
                     "role":        "teacher",
-                    "id":          row["teacher_id"],
+                    "id":          row["employee_id"],
                     "employee_id": row["employee_id"],
                     "name":        f"{row['first_name']} {mid} {row['last_name']}".strip(),
                 }
@@ -1399,7 +1404,6 @@ def _record_event_attendance(student_id, meta):
                     "student_id": student_id,
                     "time_in": now.isoformat(),
                     "remarks": attendance_remarks,
-                    "verified_by_facial_recognition": True,
                 }).execute()
 
                     # ── SEND TIME-IN EMAIL ──
@@ -1465,7 +1469,6 @@ def _record_event_attendance(student_id, meta):
                 if row and row.get("time_in") and not row.get("time_out"):
                     supabase.table("event_attendance").update({
                         "time_out": now.isoformat(),
-                        "verified_by_facial_recognition": True,
                     }).eq("attendance_id", row["attendance_id"]).execute()
 
                        # ── SEND TIME-OUT EMAIL ──
