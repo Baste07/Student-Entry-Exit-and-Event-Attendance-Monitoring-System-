@@ -47,12 +47,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     displayUserInfo();
 
     const logoutBtn = document.getElementById('portalLogoutBtn');
+
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            if (confirm('Are you sure you want to log out?')) {
-                logoutUser();
-            }
+        logoutBtn.addEventListener('click', function (event) {
+            event.preventDefault();
+            openLogoutModal();
         });
     }
 
@@ -324,5 +323,12 @@ function setTimeInOutLink() {
         // Admin / Superadmin: card is hidden by filterCardsByRole, no href needed
     } catch (e) {
         console.error('Error setting Time In/Out link:', e);
+    }
+}
+
+function openLogoutModal() {
+    const modal = document.getElementById('logoutModal');
+    if (modal) {
+        modal.style.display = 'block';
     }
 }

@@ -46,7 +46,7 @@ function loadHeader() {
     const userStr = sessionStorage.getItem('user');
     let subtitle = 'Administration';
     let userDisplay = 'Administrator';
-    let siteName = 'Admin Module';
+    let siteName = 'Super Admin Module';
 
     if (userStr) {
         try {
@@ -66,7 +66,7 @@ function loadHeader() {
             
             // Update site name based on department
             if (user.department) {
-                siteName = `${user.department} — Admin Module`;
+                siteName = `${user.department} — Super Admin Module`;
             }
         } catch (e) {
             console.error('Error parsing user:', e);
