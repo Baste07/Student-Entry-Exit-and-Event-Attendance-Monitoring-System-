@@ -32,7 +32,7 @@ function computeEventStatus(event) {
 
     const now = getManilaNow();
     const todayStr = now.toLocaleDateString('en-CA');
-    const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
+    const currentTime = now.toTimeString().slice(0, 8); // "HH:MM:SS"
 
     const startDate = event.event_date;
     const endDate = event.end_date || event.event_date;
@@ -79,7 +79,7 @@ async function syncEventStatuses(events) {
 
     if (updates.length === 0) return;
 
-    for (const upd of updates) {
+    Promise.all(updates.map(async upd => {
         try {
             const { error } = await supabaseClient
                 .from('events')
@@ -88,10 +88,8 @@ async function syncEventStatuses(events) {
             if (error) throw error;
         } catch (err) {
             console.error('Dashboard status sync failed for', upd.event_id, err);
-            // Leave ev.status as the computed value for this render; the next
-            // 30-second refresh will retry the write.
         }
-    }
+    }));
 }
 
 // ── Live Clock ───────────────────────────────────────────
@@ -309,10 +307,10 @@ async function loadPage() {
     // ── Refresh label ──
     const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     const refreshLabel = document.getElementById('refreshLabel');
-    if (refreshLabel) refreshLabel.textContent = `Last updated ${now} · auto-refreshes every 30s`;
+    if (refreshLabel) refreshLabel.textContent = `Last updated ${now} · auto-refreshes every 5s`;
     if (icon) icon.classList.remove('fa-spin');
 }
 
-// Initial load + auto-refresh every 30 seconds
+// Initial load + auto-refresh every 5 seconds
 loadPage();
-setInterval(loadPage, 30_000);
+setInterval(loadPage, 5_000);

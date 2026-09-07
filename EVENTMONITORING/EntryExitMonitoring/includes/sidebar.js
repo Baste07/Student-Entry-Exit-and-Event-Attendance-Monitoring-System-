@@ -81,6 +81,18 @@ async function loadSidebar(activePage = '') {
 
 /* ── Logout ── */
 function logout() {
+    const user = getCurrentUser ? getCurrentUser() : null;
+    if (user && typeof logSystemAudit === 'function') {
+        logSystemAudit({
+            action: 'LOGOUT',
+            moduleName: 'entry_exit',
+            pageName: window.location.pathname.split('/').pop() || 'unknown',
+            details: {
+                logout_reason: 'manual_logout',
+                user_role: user.role || user.userType || user.adminLevel || null
+            }
+        });
+    }
     window.location.href = '../../auth/login.html';
 }
 

@@ -87,13 +87,25 @@ function loadHeader() {
                 <div class="supabase-indicator" id="supabaseIndicator" title="Checking Connection...">
                     <div class="status-light"></div>
                 </div>
-                <button class="btn-logout">
+                <button type="button" class="btn-back-module" aria-label="Back to module choices">
+                    <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                    Back to Modules
+                </button>
+                <button type="button" class="btn-logout">
                     <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                     Log Out
                 </button>
             </div>
         </header>
     `;
+
+    const backButton = headerContainer.querySelector('.btn-back-module');
+    if (backButton) {
+        backButton.addEventListener('click', () => {
+            window.location.href = '../portal/portal.html';
+        });
+    }
+
     // Update connection indicator now that the header (and element) exists
     if (typeof checkSupabaseConnection === 'function') {
         checkSupabaseConnection();
@@ -119,6 +131,7 @@ function loadSidebar(activePage = '') {
     const departmentManagementClass = activePage === 'admin-section-management' ? 'active' : '';
     const systemSettingsClass = activePage === 'system-settings' ? 'active' : '';
     const studentImportClass = activePage === 'student-import' ? 'active' : '';
+    const auditLogsClass = activePage === 'audit-logs' ? 'active' : '';
 
     const backToPortalLink = isSuperAdmin ? '' : `
             <a href="../portal/portal.html" class="nav-item">
@@ -158,6 +171,11 @@ function loadSidebar(activePage = '') {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Student Import
             </a>
+            ${isSuperAdmin ? `
+            <a href="audit-logs.html" class="nav-item ${auditLogsClass}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9h.01"/></svg>
+                Audit Logs
+            </a>` : ''}
             ${departmentManagementLink}
             ${subjectsLink}
             ${systemSettingsLink}

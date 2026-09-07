@@ -85,47 +85,76 @@ header {
 
 /* Right buttons */
 .header-right {
-    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-shrink: 0;
+    min-height: 44px;
 }
 
-.header-attendance-btn {
-    background: transparent;
-    color: rgba(255,255,255,.85);
-    text-decoration: none;
-    border: 1.5px solid rgba(255,255,255,.16);
+.header-back-btn,
+.header-attendance-btn,
+.header-home-btn,
+.header-logout {
+    min-height: 42px;
+    height: 42px;
+    padding: 0 16px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     border-radius: 8px;
-    padding: 8px 18px;
-    display: flex; align-items: center; gap: 8px;
+    border: 1.5px solid rgba(255,255,255,.16);
     font-family: 'Nunito', sans-serif;
-    font-weight: 700; font-size: 13.5px;
-    cursor: pointer; white-space: nowrap;
-    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1;
     letter-spacing: .2px;
-}
-.header-attendance-btn i { font-size: 13px; }
-.header-attendance-btn:hover {
-    background: var(--yellow); color: var(--blue-dark);
-    border-color: var(--yellow);
-    box-shadow: 0 4px 16px rgba(244,196,48,.35);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
 }
 
+.header-back-btn,
+.header-attendance-btn,
 .header-home-btn {
     background: transparent;
     color: rgba(255,255,255,.85);
     text-decoration: none;
-    border: 1.5px solid rgba(255,255,255,.16);
-    border-radius: 8px;
-    padding: 8px 18px;
-    display: flex; align-items: center; gap: 8px;
-    font-family: 'Nunito', sans-serif;
-    font-weight: 700; font-size: 13.5px;
-    cursor: pointer; white-space: nowrap;
-    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
-    letter-spacing: .2px;
 }
-.header-home-btn i { font-size: 13px; }
+
+.header-back-btn i,
+.header-attendance-btn i,
+.header-home-btn i,
+.header-logout i {
+    font-size: 13px;
+}
+
+.header-back-btn:hover,
+.header-attendance-btn:hover,
 .header-home-btn:hover {
-    background: var(--blue-bright); color: var(--white);
+    background: rgba(255,255,255,0.08);
+    color: var(--white);
+    border-color: rgba(255,255,255,0.24);
+}
+
+.header-back-btn:hover {
+    background: rgba(255,255,255,0.12);
+    box-shadow: 0 4px 16px rgba(255,255,255,0.12);
+}
+
+.header-attendance-btn:hover {
+    background: var(--yellow);
+    color: var(--blue-dark);
+    border-color: var(--yellow);
+    box-shadow: 0 4px 16px rgba(244,196,48,.35);
+}
+
+.header-home-btn:hover {
+    background: var(--blue-bright);
+    color: var(--white);
     border-color: var(--blue-bright);
     box-shadow: 0 4px 16px rgba(64,145,108,.35);
 }
@@ -133,19 +162,11 @@ header {
 .header-logout {
     background: transparent;
     color: rgba(255,255,255,.65);
-    border: 1.5px solid rgba(255,255,255,.16);
-    border-radius: 8px;
-    padding: 8px 18px;
-    display: flex; align-items: center; gap: 8px;
-    font-family: 'Nunito', sans-serif;
-    font-weight: 700; font-size: 13.5px;
-    cursor: pointer; white-space: nowrap;
-    transition: background .2s, color .2s, border-color .2s, box-shadow .18s;
-    letter-spacing: .2px;
 }
-.header-logout i { font-size: 13px; }
+
 .header-logout:hover {
-    background: #ef4444; color: var(--white);
+    background: #ef4444;
+    color: var(--white);
     border-color: #ef4444;
     box-shadow: 0 4px 16px rgba(239,68,68,.35);
 }
