@@ -40,6 +40,7 @@ let professorData = null;
 let studentTimer = null;
 let isEngineOnline = false;
 let isBooting = false; 
+let registrationErrorShown = false;
 const REG_ENGINE_BASE = 'http://127.0.0.1:5001';
 const ATT_ENGINE_BASE = 'http://127.0.0.1:5000';
 const FACE_BUCKET = 'facial_data';
@@ -326,8 +327,14 @@ cameraContainer.addEventListener('click', e => { if (e.target === cameraContaine
 // STUDENT SCAN BUTTON
 // ═══════════════════════════════════════════
 studentScanBtn.addEventListener('click', async () => {
+    if (!studentIdInput.value.trim()) {
+        alert('Required field should not be left blank');
+        studentIdInput.focus();
+        return;
+    }
     if (!studentData || !isEngineOnline) return;
 
+    registrationErrorShown = false;
     const btn = document.getElementById('studentScanBtn');
     btn.disabled = true;
     cameraContainer.style.display = 'flex';
@@ -335,7 +342,7 @@ studentScanBtn.addEventListener('click', async () => {
     try {
         captureStatus.innerHTML = '<i class="fa-solid fa-broom fa-spin"></i> Purging old data & preparing camera...';
         
-        await fetch(`${REG_ENGINE_BASE}/start_registration`, {
+        const startResponse = await fetch(`${REG_ENGINE_BASE}/start_registration`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -345,13 +352,20 @@ studentScanBtn.addEventListener('click', async () => {
                 role:      'student'
             })
         });
+        const startResult = await startResponse.json().catch(() => ({}));
+        if (!startResponse.ok || startResult.error_message) {
+            throw new Error(startResult.error_message || 'Registration could not be started.');
+        }
 
         await new Promise(resolve => setTimeout(resolve, 1000));
         openCameraUI();
 
     } catch (err) {
         cameraContainer.style.display = 'none';
-        alert("❌ Registration Error: " + err.message);
+        const message = err.message === 'REGISTRATION FAILED, INTERNET REQUIRED'
+            ? err.message
+            : "❌ Registration Error: " + err.message;
+        alert(message);
     } finally {
         btn.disabled = false;
     }
@@ -363,6 +377,17 @@ function startProgressPolling() {
         try {
             const res = await fetch(`${REG_ENGINE_BASE}/status`);
             const data = await res.json();
+
+            if (data.error_message) {
+                if (!registrationErrorShown) {
+                    registrationErrorShown = true;
+                    captureStatus.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color:#ff4757"></i> REGISTRATION FAILED, INTERNET REQUIRED';
+                    closeCameraUI();
+                    alert(data.error_message);
+                    updateScanButtonsState();
+                }
+                return;
+            }
 
             dots.forEach((dot, i) => dot.classList.toggle('done', i < data.count));
 
@@ -597,8 +622,14 @@ async function fillProfessorFields(data) {
 // PROFESSOR SCAN BUTTON
 // ═══════════════════════════════════════════
 professorScanBtn.addEventListener('click', async () => {
+    if (!empIdInput.value.trim()) {
+        alert('Required field should not be left blank');
+        empIdInput.focus();
+        return;
+    }
     if (!professorData || !isEngineOnline) return;
 
+    registrationErrorShown = false;
     const btn = document.getElementById('professorScanBtn');
     btn.disabled = true;
     cameraContainer.style.display = 'flex';
@@ -606,7 +637,7 @@ professorScanBtn.addEventListener('click', async () => {
     try {
         captureStatus.innerHTML = '<i class="fa-solid fa-broom fa-spin"></i> Purging old data & preparing camera...';
 
-        await fetch(`${REG_ENGINE_BASE}/start_registration`, {
+        const startResponse = await fetch(`${REG_ENGINE_BASE}/start_registration`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -616,13 +647,20 @@ professorScanBtn.addEventListener('click', async () => {
                 role:      professorData.role || 'teacher'
             })
         });
+        const startResult = await startResponse.json().catch(() => ({}));
+        if (!startResponse.ok || startResult.error_message) {
+            throw new Error(startResult.error_message || 'Registration could not be started.');
+        }
 
         await new Promise(resolve => setTimeout(resolve, 1000));
         openCameraUI();
 
     } catch (err) {
         cameraContainer.style.display = 'none';
-        alert("❌ Registration Error: " + err.message);
+        const message = err.message === 'REGISTRATION FAILED, INTERNET REQUIRED'
+            ? err.message
+            : "❌ Registration Error: " + err.message;
+        alert(message);
     } finally {
         btn.disabled = false;
     }

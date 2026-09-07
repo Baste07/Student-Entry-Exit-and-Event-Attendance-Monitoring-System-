@@ -324,14 +324,31 @@ async function submitTeacherForm(e) {
     const faculty = document.getElementById('teacherFaculty').value.trim();
     const role = document.getElementById('teacherRole').value || 'teacher';
     
-    if (!employeeId) { alert('Employee ID is required.'); return; }
-    if (!lastName) { alert('Last Name is required.'); return; }
-    if (!firstName) { alert('First Name is required.'); return; }
-    if (!email) { alert('Email is required.'); return; }
-    if (!faculty) { alert('Faculty is required.'); return; }
+    if (!employeeId) { alert('Required field should not be left blank'); return; }
+    if (!lastName) { alert('Required field should not be left blank'); return; }
+    if (!firstName) { alert('Required field should not be left blank'); return; }
+    if (!email) { alert('Required field should not be left blank'); return; }
+    if (!faculty) { alert('Required field should not be left blank'); return; }
     
     try {
         if (!supabaseClient) throw new Error('Database connection not available');
+
+        if (phone) {
+            let phoneQuery = supabaseClient
+                .from('employees')
+                .select('employee_id')
+                .eq('phone_number', phone)
+                .limit(1);
+
+            if (isEdit) phoneQuery = phoneQuery.neq('employee_id', teacherId);
+
+            const { data: existingPhone, error: phoneError } = await phoneQuery.maybeSingle();
+            if (phoneError) throw phoneError;
+            if (existingPhone) {
+                alert('Mobile number already registered.');
+                return;
+            }
+        }
         
         if (isEdit) {
             const status = document.getElementById('teacherStatus').value;
@@ -469,11 +486,11 @@ function setupBulkImportEventListeners() {
 }
 
 function handleFileSelected(file) {
-    const allowedExts = ['.xlsx', '.xls', '.csv'];
+    const allowedExts = ['.xlsx', '.xls'];
     const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
 
     if (!allowedExts.includes(ext)) {
-        showImportAlert('Invalid file type. Please upload .xlsx, .xls, or .csv files only.', 'danger');
+        showImportAlert('Invalid file format', 'danger');
         return;
     }
 
@@ -511,6 +528,10 @@ async function parseFile() {
     if (!selectedFile) return;
 
     const ext = selectedFile.name.slice(selectedFile.name.lastIndexOf('.')).toLowerCase();
+    if (!['.xlsx', '.xls'].includes(ext)) {
+        showImportAlert('Invalid file format', 'danger');
+        return;
+    }
     duplicateRowsInFileCount = 0;
     duplicateRowsInDatabaseCount = 0;
     duplicateRowsInFile = [];
@@ -519,33 +540,35 @@ async function parseFile() {
     try {
         let rows = [];
 
-        if (ext === '.csv') {
-            const text = await selectedFile.text();
-            rows = parseCSV(text);
-        } else {
-            const buffer = await selectedFile.arrayBuffer();
-            const wb = XLSX.read(buffer, { type: 'array' });
-            const sheetName = wb.SheetNames[0];
-            const ws = wb.Sheets[sheetName];
-            const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        const buffer = await selectedFile.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-            if (raw.length < 2) {
-                showImportAlert('The file appears to be empty or has no data rows.', 'warning');
-                return;
-            }
-
-            rows = raw.slice(1).map(r => ({
-                employeeId: String(r[0] || '').trim(),
-                lastName:   String(r[1] || '').trim(),
-                firstName:  String(r[2] || '').trim(),
-                middleName: String(r[3] || '').trim(),
-                suffix:     String(r[4] || '').trim(),
-                email:      String(r[5] || '').trim(),
-                phone:      String(r[6] || '').trim(),
-                faculty:    String(r[7] || '').trim(),
-                role:       String(r[8] || '').trim() || 'teacher',
-            }));
+        if (raw.length < 2) {
+            showImportAlert('The file appears to be empty or has no data rows.', 'warning');
+            return;
         }
+
+        const headers = raw[0].map(value => String(value || '').trim().toLowerCase());
+        const requiredHeaders = ['employee id', 'last name', 'first name', 'email', 'faculty'];
+        if (requiredHeaders.some(header => !headers.includes(header))) {
+            showImportAlert('Format is wrong. Please use the downloaded employee template.', 'danger');
+            return;
+        }
+
+        rows = raw.slice(1).map(r => ({
+            employeeId: String(r[0] || '').trim(),
+            lastName:   String(r[1] || '').trim(),
+            firstName:  String(r[2] || '').trim(),
+            middleName: String(r[3] || '').trim(),
+            suffix:     String(r[4] || '').trim(),
+            email:      String(r[5] || '').trim(),
+            phone:      String(r[6] || '').trim(),
+            faculty:    String(r[7] || '').trim(),
+            role:       String(r[8] || '').trim() || 'teacher',
+        }));
 
         rows = rows.filter(r => r.employeeId || r.firstName || r.lastName);
 
@@ -564,7 +587,7 @@ async function parseFile() {
 
     } catch (err) {
         console.error('Parse error:', err);
-        showImportAlert('Failed to parse file: ' + err.message, 'danger');
+        showImportAlert('Format is wrong. Please use the downloaded employee template.', 'danger');
     }
 }
 

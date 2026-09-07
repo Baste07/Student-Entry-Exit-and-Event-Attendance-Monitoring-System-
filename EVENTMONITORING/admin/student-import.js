@@ -411,11 +411,11 @@ function handleFileSelected(file) {
         return;
     }
 
-    const allowedExts = ['.xlsx', '.xls', '.csv'];
+    const allowedExts = ['.xlsx', '.xls'];
     const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
 
     if (!allowedExts.includes(ext)) {
-        showImportAlert('Invalid file type. Please upload .xlsx, .xls, or .csv files only.', 'danger');
+        showImportAlert('Invalid file format', 'danger');
         return;
     }
 
@@ -459,6 +459,10 @@ async function parseFile() {
     if (!selectedFile) return;
 
     const ext = selectedFile.name.slice(selectedFile.name.lastIndexOf('.')).toLowerCase();
+    if (!['.xlsx', '.xls'].includes(ext)) {
+        showImportAlert('Invalid file format', 'danger');
+        return;
+    }
     duplicateRowsInFileCount = 0;
     duplicateRowsInDatabaseCount = 0;
     duplicateRowsInFile = [];
@@ -467,49 +471,62 @@ async function parseFile() {
     try {
         let rows = [];
 
-        if (ext === '.csv') {
-            const text = await selectedFile.text();
-            rows = parseCSV(text);
-        } else {
-            const buffer = await selectedFile.arrayBuffer();
-            const wb = XLSX.read(buffer, { type: 'array' });
-            const sheetName = wb.SheetNames[0];
-            const ws = wb.Sheets[sheetName];
-            const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        const buffer = await selectedFile.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-            if (raw.length < 2) {
-                showImportAlert('The file appears to be empty or has no data rows.', 'warning');
-                return;
-            }
-            rows = raw.slice(1).map(r => ({
-                studId: String(r[0] || '').trim().toUpperCase(),
-                lastName: String(r[1] || '').trim(),
-                firstName: String(r[2] || '').trim(),
-                middleName: String(r[3] || '').trim(),
-                suffix: String(r[4] || '').trim(),
-                birthDate: String(r[5] || '').trim(),
-                gender: String(r[6] || '').trim(),
-                email: String(r[7] || '').trim(),
-                // Guardian 1
-                g1Phone: String(r[9] || '').trim(),
-                g1Relationship: String(r[10] || '').trim().toLowerCase(),
-                g1FirstName: String(r[11] || '').trim(),
-                g1LastName: String(r[12] || '').trim(),
-                g1MiddleName: String(r[13] || '').trim(),
-                g1AltPhone: String(r[14] || '').trim(),
-                g1Email: String(r[15] || '').trim(),
-                g1Address: String(r[16] || '').trim(),
-                // Guardian 2
-                g2Phone: String(r[17] || '').trim(),
-                g2Relationship: String(r[18] || '').trim().toLowerCase(),
-                g2FirstName: String(r[19] || '').trim(),
-                g2LastName: String(r[20] || '').trim(),
-                g2MiddleName: String(r[21] || '').trim(),
-                g2AltPhone: String(r[22] || '').trim(),
-                g2Email: String(r[23] || '').trim(),
-                g2Address: String(r[24] || '').trim(),
-            }));
+        if (raw.length < 2) {
+            showImportAlert('The file appears to be empty or has no data rows.', 'warning');
+            return;
         }
+
+        const headers = raw[0].map(value => String(value || '').trim().toLowerCase());
+        const requiredHeaders = [
+            'student id',
+            'last name',
+            'first name',
+            'birth date',
+            'gender',
+            'guardian1_phone',
+            'guardian1_relationship',
+            'guardian1_firstname',
+            'guardian1_lastname'
+        ];
+        if (requiredHeaders.some(header => !headers.includes(header))) {
+            showImportAlert('Format is wrong. Please use the downloaded student template.', 'danger');
+            return;
+        }
+
+        rows = raw.slice(1).map(r => ({
+            studId: String(r[0] || '').trim().toUpperCase(),
+            lastName: String(r[1] || '').trim(),
+            firstName: String(r[2] || '').trim(),
+            middleName: String(r[3] || '').trim(),
+            suffix: String(r[4] || '').trim(),
+            birthDate: String(r[5] || '').trim(),
+            gender: String(r[6] || '').trim(),
+            email: String(r[7] || '').trim(),
+            // Guardian 1
+            g1Phone: String(r[9] || '').trim(),
+            g1Relationship: String(r[10] || '').trim().toLowerCase(),
+            g1FirstName: String(r[11] || '').trim(),
+            g1LastName: String(r[12] || '').trim(),
+            g1MiddleName: String(r[13] || '').trim(),
+            g1AltPhone: String(r[14] || '').trim(),
+            g1Email: String(r[15] || '').trim(),
+            g1Address: String(r[16] || '').trim(),
+            // Guardian 2
+            g2Phone: String(r[17] || '').trim(),
+            g2Relationship: String(r[18] || '').trim().toLowerCase(),
+            g2FirstName: String(r[19] || '').trim(),
+            g2LastName: String(r[20] || '').trim(),
+            g2MiddleName: String(r[21] || '').trim(),
+            g2AltPhone: String(r[22] || '').trim(),
+            g2Email: String(r[23] || '').trim(),
+            g2Address: String(r[24] || '').trim(),
+        }));
 
         rows = rows.filter(r => r.studId || r.firstName || r.lastName);
 
@@ -528,7 +545,7 @@ async function parseFile() {
 
     } catch (err) {
         console.error('Parse error:', err);
-        showImportAlert('Failed to parse file: ' + err.message, 'danger');
+        showImportAlert('Format is wrong. Please use the downloaded student template.', 'danger');
     }
 }
 
@@ -1275,7 +1292,7 @@ async function submitAddGuardianForm(event) {
     const address = String(document.getElementById('modalGuardianAddress')?.value || '').trim();
 
     if (!firstName || !lastName || !relationship || !phone || !address) {
-        showImportAlert('Please fill in First Name, Last Name, Relationship, Phone, and Address.', 'warning');
+        showImportAlert('Required field should not be left blank', 'warning');
         return;
     }
     if (!['mother', 'father', 'legal_guardian', 'other'].includes(relationship)) {
@@ -1360,17 +1377,17 @@ async function submitEditStudentForm(event) {
     const email = String(document.getElementById('editEmail')?.value || '').trim();
     const status = String(document.getElementById('editStatus')?.value || 'inactive').trim();
 
-    if (!sectionId || !firstName || !lastName) {
-        showImportAlert('Section, First Name, and Last Name are required.', 'warning');
+    if (!sectionId || !firstName || !lastName || !birthDate || !gender) {
+        showImportAlert('Required field should not be left blank', 'warning');
         return;
     }
 
-    if (birthDate && Number.isNaN(Date.parse(birthDate))) {
+    if (Number.isNaN(Date.parse(birthDate))) {
         showImportAlert('Birth Date must be valid.', 'warning');
         return;
     }
 
-    if (gender && !['male', 'female', 'other'].includes(gender)) {
+    if (!['male', 'female', 'other'].includes(gender)) {
         showImportAlert('Gender must be male, female, or other.', 'warning');
         return;
     }
@@ -1670,8 +1687,8 @@ function proceedToGuardianStep(e) {
     const gender = String(document.getElementById('singleSection')?.value || '').trim().toLowerCase();
     const email = String(document.getElementById('singleEmail')?.value || '').trim();
 
-    if (!sectionId || !studId || !firstName || !lastName) {
-        showImportAlert('Please fill in Section, Student ID, First Name, and Last Name.', 'warning');
+    if (!sectionId || !studId || !firstName || !lastName || !birthDate || !gender) {
+        showImportAlert('Required field should not be left blank', 'warning');
         return;
     }
     if (!STUD_ID_PATTERN.test(studId)) {
@@ -1679,14 +1696,14 @@ function proceedToGuardianStep(e) {
         return;
     }
     if (!email) {
-        showImportAlert('Email is required for QR code notification.', 'warning');
+        showImportAlert('Required field should not be left blank', 'warning');
         return;
     }
-    if (birthDate && Number.isNaN(Date.parse(birthDate))) {
+    if (Number.isNaN(Date.parse(birthDate))) {
         showImportAlert('Birth Date must be valid.', 'warning');
         return;
     }
-    if (gender && !['male', 'female', 'other'].includes(gender)) {
+    if (!['male', 'female', 'other'].includes(gender)) {
         showImportAlert('Gender must be male, female, or other.', 'warning');
         return;
     }
@@ -1836,19 +1853,19 @@ async function submitSingleStudentForm(event) {
         showImportAlert('No active school year found. Please set one in System Settings first.', 'danger');
         return;
     }
-    if (!sectionId || !studId || !firstName || !lastName) {
-        showImportAlert('Please fill in Section, Student ID, First Name, and Last Name.', 'warning');
+    if (!sectionId || !studId || !firstName || !lastName || !birthDate || !gender) {
+        showImportAlert('Required field should not be left blank', 'warning');
         return;
     }
     if (!STUD_ID_PATTERN.test(studId)) {
         showImportAlert('Student ID format: K-####, 1-####, ..., 10-####', 'warning');
         return;
     }
-    if (birthDate && Number.isNaN(Date.parse(birthDate))) {
+    if (Number.isNaN(Date.parse(birthDate))) {
         showImportAlert('Birth Date must be valid.', 'warning');
         return;
     }
-    if (gender && !['male', 'female', 'other'].includes(gender)) {
+    if (!['male', 'female', 'other'].includes(gender)) {
         showImportAlert('Gender must be male, female, or other.', 'warning');
         return;
     }
@@ -1866,7 +1883,7 @@ async function submitSingleStudentForm(event) {
     const partialGuardian1 = g1FirstName || g1LastName || g1Phone || g1Relationship || g1Address;
 
     if (partialGuardian1 && !hasGuardian1) {
-        showImportAlert('Guardian 1 requires First Name, Last Name, Phone, Relationship, and Address.', 'warning');
+        showImportAlert('Required field should not be left blank', 'warning');
         return;
     }
 
@@ -1883,7 +1900,7 @@ async function submitSingleStudentForm(event) {
     const partialGuardian2 = g2FirstName || g2LastName || g2Phone || g2Relationship || g2Address;
 
     if (partialGuardian2 && !hasGuardian2) {
-        showImportAlert('Guardian 2 requires First Name, Last Name, Phone, Relationship, and Address.', 'warning');
+        showImportAlert('Required field should not be left blank', 'warning');
         return;
     }
 
@@ -2156,11 +2173,22 @@ function showImportAlert(message, type = 'info') {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    const main = document.querySelector('.main-content');
-    if (main) {
-        main.insertBefore(alertDiv, main.firstChild);
+    const modalIsOpen = document.querySelector('.modal.show');
+    if (modalIsOpen) {
+        Object.assign(alertDiv.style, {
+            position: 'fixed',
+            top: '1rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'min(90vw, 720px)',
+            zIndex: '2000',
+            boxShadow: '0 0.5rem 1rem rgba(0, 0, 0, 0.2)'
+        });
+        document.body.appendChild(alertDiv);
     } else {
-        document.body.insertBefore(alertDiv, document.body.firstChild);
+        const main = document.querySelector('.main-content');
+        if (main) main.insertBefore(alertDiv, main.firstChild);
+        else document.body.insertBefore(alertDiv, document.body.firstChild);
     }
     setTimeout(() => alertDiv.remove(), 6000);
 }

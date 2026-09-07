@@ -41,7 +41,7 @@
     <div class="import-card anim anim-2" id="stepUpload">
         <div class="step-badge">Step 1 of 3</div>
         <h2 class="step-title">Upload Teacher File</h2>
-        <p class="step-desc">Upload your filled Excel or CSV template with teacher data.</p>
+        <p class="step-desc">Upload your filled Excel template with employee data.</p>
 
         <div class="row g-4 mt-1">
             <div class="col-12">
@@ -50,12 +50,12 @@
                     Upload File <span class="required">*</span>
                 </label>
                 <div class="file-drop-zone" id="fileDropZone">
-                    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden/>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" hidden/>
                     <div class="drop-icon">
                         <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     </div>
                     <p class="drop-text">Drag & drop your file here, or <span class="drop-link">browse</span></p>
-                    <p class="drop-hint">Supports .xlsx, .xls, .csv — Max 10MB</p>
+                    <p class="drop-hint">Supports .xlsx, .xls — Max 10MB</p>
                     <div class="file-selected" id="fileSelected" style="display:none;">
                         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         <span id="fileSelectedName"></span>

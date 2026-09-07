@@ -23,7 +23,7 @@
     <div class="page-header anim anim-1" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
         <div>
             <h1>Student Import</h1>
-            <p>Bulk import student accounts via Excel or CSV file</p>
+            <p>Bulk import student accounts via Excel file</p>
         </div>
         <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
             <button type="button" class="btn-download-template" id="addSingleStudentBtn">
@@ -41,7 +41,7 @@
     <div class="import-card anim anim-2" id="stepUpload">
         <div class="step-badge">Step 1 of 3</div>
         <h2 class="step-title">Select Grade/Section & Upload File</h2>
-        <p class="step-desc">Choose the section these students belong to, then upload your filled Excel or CSV template.</p>
+        <p class="step-desc">Choose the section these students belong to, then upload your filled Excel template.</p>
 
         <div class="row g-4 mt-1">
             <div class="col-md-5">
@@ -89,12 +89,12 @@
                     Upload File <span class="required">*</span>
                 </label>
                 <div class="file-drop-zone" id="fileDropZone">
-                    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden/>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" hidden/>
                     <div class="drop-icon">
                         <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     </div>
                     <p class="drop-text">Drag & drop your file here, or <span class="drop-link">browse</span></p>
-                    <p class="drop-hint">Supports .xlsx, .xls, .csv — Max 10MB</p>
+                    <p class="drop-hint">Supports .xlsx, .xls — Max 10MB</p>
                     <div class="file-selected" id="fileSelected" style="display:none;">
                         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         <span id="fileSelectedName"></span>
@@ -418,12 +418,12 @@
                                 <input type="text" id="singleSuffix" class="form-control" placeholder="e.g. Sr, Jr">
                             </div>
                             <div class="col-md-4">
-                                <label for="singleYearLevel" class="form-label">Birth Date</label>
-                                <input type="date" id="singleYearLevel" class="form-control">
+                                <label for="singleYearLevel" class="form-label">Birth Date <span class="text-danger">*</span></label>
+                                <input type="date" id="singleYearLevel" class="form-control" required>
                             </div>
                             <div class="col-md-4">
-                                <label for="singleSection" class="form-label">Gender</label>
-                                <select id="singleSection" class="form-select">
+                                <label for="singleSection" class="form-label">Gender <span class="text-danger">*</span></label>
+                                <select id="singleSection" class="form-select" required>
                                     <option value="">Select gender...</option>
                                     <option value="male">Male</option>
                                     <option value="female">Female</option>
@@ -643,12 +643,12 @@
                             <input type="text" id="editSuffix" class="form-control" placeholder="e.g. Sr, Jr">
                         </div>
                         <div class="col-md-4">
-                            <label for="editYearLevel" class="form-label">Birth Date</label>
-                            <input type="date" id="editYearLevel" class="form-control">
+                            <label for="editYearLevel" class="form-label">Birth Date <span class="text-danger">*</span></label>
+                            <input type="date" id="editYearLevel" class="form-control" required>
                         </div>
                         <div class="col-md-4">
-                            <label for="editSection" class="form-label">Gender</label>
-                            <select id="editSection" class="form-select">
+                            <label for="editSection" class="form-label">Gender <span class="text-danger">*</span></label>
+                            <select id="editSection" class="form-select" required>
                                 <option value="">Select gender...</option>
                                 <option value="male">male</option>
                                 <option value="female">female</option>
