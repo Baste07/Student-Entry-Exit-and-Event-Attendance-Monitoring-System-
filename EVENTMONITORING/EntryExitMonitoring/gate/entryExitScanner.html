@@ -88,6 +88,16 @@
             </span>
         </div>
 
+        <div class="instruction">
+            <p>
+                Click <strong>Start Scanner</strong> to boot the face engine and begin gate scanning.<br>
+                <span style="font-size:13px;color:#888;">
+                    <i class="fa-solid fa-circle-info"></i>
+                    Choose <strong>QR Code</strong> when using a student QR code instead.
+                </span>
+            </p>
+        </div>
+
         <!-- Face mode -->
         <div id="faceMode">
             <div id="faceStreamOff" class="stream-off">
@@ -122,16 +132,25 @@
 
         <!-- Controls -->
         <div class="btn-wrap">
+            <button class="btn btn-boot" id="btnStartEngine" onclick="startEngine()">
+                <i class="fa-solid fa-power-off"></i> Start Engine
+            </button>
             <button class="btn btn-start" id="btnStart" onclick="startScanner()">
                 <i class="fa-solid fa-play"></i> Start Scanner
             </button>
             <button class="btn btn-stop" id="btnStop" onclick="stopScanner()" style="display:none;">
                 <i class="fa-solid fa-stop"></i> Stop
             </button>
-            <button class="btn btn-manual" onclick="openManual()">
-                <i class="fa-solid fa-keyboard"></i> Manual Entry
-            </button>
         </div>
+
+        <div class="divider" style="margin-top:18px"></div>
+        <p class="manual-caption">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            Facial recognition unavailable?
+        </p>
+        <button class="btn-manual manual-switch" onclick="openManual()">
+            <i class="fa-solid fa-keyboard"></i> Switch to Manual Attendance
+        </button>
 
     </div>
 </div>

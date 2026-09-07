@@ -49,6 +49,16 @@
                 <div class="selector-body">
                     <div class="selector-field">
                         <label for="eventSelect"><i class="fa-solid fa-list"></i> Choose an Event</label>
+                        <div class="event-date-filters">
+                            <div>
+                                <label for="eventDateFrom"><i class="fa-regular fa-calendar"></i> Date From</label>
+                                <input type="date" id="eventDateFrom">
+                            </div>
+                            <div>
+                                <label for="eventDateTo"><i class="fa-regular fa-calendar"></i> Date To</label>
+                                <input type="date" id="eventDateTo">
+                            </div>
+                        </div>
                         <select id="eventSelect">
                             <option value="">-- Select an Event --</option>
                         </select>
@@ -97,6 +107,12 @@
                             <option value="late">Late</option>
                             <option value="absent">Absent</option>
                             <option value="excused">Excused</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="sectionFilter"><i class="fa-solid fa-school"></i> Section / Department</label>
+                        <select id="sectionFilter">
+                            <option value="">All Sections</option>
                         </select>
                     </div>
                     <div class="control-group" style="display:flex; align-items:flex-end;">
