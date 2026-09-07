@@ -202,7 +202,7 @@ async function searchEmployee() {
     const searchBtn = document.getElementById('searchBtn');
     const searchRes = document.getElementById('searchResult');
 
-    if (!empNo) { showToast('Please enter an Employee Number.', false); return; }
+    if (!empNo) { showToast('Required field should not be left blank', false); return; }
 
     searchBtn.disabled = true;
     searchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';

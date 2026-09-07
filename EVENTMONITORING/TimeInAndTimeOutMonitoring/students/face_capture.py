@@ -433,6 +433,7 @@ session = {
     "active": False,
     "syncing": False,
     "completed": False,  
+    "error_message": "",
     "paths": [],
     "last_t": 0,
     "done_t": 0,
@@ -682,6 +683,16 @@ def generate_pipeline_snapshot():
 def upload_to_supabase():
     global session
     role = session.get("role", "student")
+
+    try:
+        requests.get(SUPABASE_URL, timeout=3)
+    except requests.RequestException as exc:
+        session["error_message"] = "REGISTRATION FAILED, INTERNET REQUIRED"
+        session["syncing"] = False
+        session["active"] = False
+        print(f"[UPLOAD] Registration stopped: internet connection required ({exc})")
+        _audit_event("error", {"phase": "internet_check", "error": str(exc)})
+        return
 
     _audit_event("upload_start", {"id_number": session.get("id_number"), "role": role, "paths": ",".join(session.get("paths", []))})
 
@@ -1110,6 +1121,16 @@ def generate_frames():
 @app.route('/start_registration', methods=['POST'])
 def start_reg():
     global session
+    try:
+        requests.get(SUPABASE_URL, timeout=3)
+    except requests.RequestException as exc:
+        print(f"[REGISTRATION] Start rejected: internet connection required ({exc})")
+        _audit_event("error", {"phase": "internet_check", "error": str(exc)})
+        return jsonify({
+            "status": "error",
+            "error_message": "REGISTRATION FAILED, INTERNET REQUIRED"
+        }), 503
+
     _claim_camera_owner(force=True)
     session['active'] = False 
     session['completed'] = False 
@@ -1130,6 +1151,7 @@ def start_reg():
         "role": data.get('role', 'student'),
         "count": 0,
         "active": True,
+        "error_message": "",
         "paths": [],
         "last_t": time.time(),
         "countdown_done": False, 

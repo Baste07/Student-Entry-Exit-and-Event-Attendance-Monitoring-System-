@@ -1,3 +1,28 @@
+const ADMIN_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+let adminIdleTimer = null;
+
+function startAdminIdleTimeout() {
+    if (adminIdleTimer) clearTimeout(adminIdleTimer);
+
+    const logoutForInactivity = () => {
+        sessionStorage.removeItem('user');
+        sessionStorage.removeItem('manual_access_granted');
+        sessionStorage.removeItem('manual_access_role');
+        window.location.replace('../auth/login.html');
+    };
+
+    const resetIdleTimer = () => {
+        clearTimeout(adminIdleTimer);
+        adminIdleTimer = setTimeout(logoutForInactivity, ADMIN_IDLE_TIMEOUT_MS);
+    };
+
+    ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach(eventName => {
+        document.addEventListener(eventName, resetIdleTimer, { passive: true });
+    });
+
+    resetIdleTimer();
+}
+
 function checkAdminSession() {
     const user = sessionStorage.getItem('user');
     if (!user) {
@@ -132,6 +157,7 @@ function loadSidebar(activePage = '') {
     const systemSettingsClass = activePage === 'system-settings' ? 'active' : '';
     const studentImportClass = activePage === 'student-import' ? 'active' : '';
     const auditLogsClass = activePage === 'audit-logs' ? 'active' : '';
+    const spoofAttemptsClass = activePage === 'spoof-attempts' ? 'active' : '';
 
     const backToPortalLink = isSuperAdmin ? '' : `
             <a href="../portal/portal.html" class="nav-item">
@@ -176,6 +202,11 @@ function loadSidebar(activePage = '') {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9h.01"/></svg>
                 Audit Logs
             </a>` : ''}
+            ${isSuperAdmin ? `
+            <a href="spoof-attempts.html" class="nav-item ${spoofAttemptsClass}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v5c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-3z"/><path d="m9 12 2 2 4-4"/></svg>
+                Spoofing Attempts
+            </a>` : ''}
             ${departmentManagementLink}
             ${subjectsLink}
             ${systemSettingsLink}
@@ -184,5 +215,5 @@ function loadSidebar(activePage = '') {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    checkAdminSession();
+    if (checkAdminSession()) startAdminIdleTimeout();
 });

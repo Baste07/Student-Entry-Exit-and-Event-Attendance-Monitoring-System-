@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="../auth/assets/ElTresEresCenciaEscuelaLogo.png" />
+    <title>Spoofing Attempts | Smart Academic Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../shared/global.css" />
+    <link rel="stylesheet" href="../Gemma/gemma.css" />
+    <link rel="stylesheet" href="admin-specific.css" />
+    <style>
+        .spoof-summary { display:grid; grid-template-columns:repeat(3,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+        .spoof-toolbar { display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; }
+        .spoof-filters { display:flex; gap:.7rem; flex-wrap:wrap; }
+        .spoof-filters input, .spoof-filters select { min-height:42px; padding:.55rem .75rem; border:1px solid #d9e3ee; border-radius:.6rem; background:#f9fbfe; color:var(--text-main); }
+        .spoof-table-wrap { overflow:auto; border:1px solid #dfeaf5; border-radius:.8rem; background:#fff; }
+        .spoof-table { width:100%; min-width:980px; border-collapse:collapse; font-size:.88rem; }
+        .spoof-table th { padding:.9rem .8rem; background:#fff1f1; color:#7f1d1d; text-transform:uppercase; letter-spacing:.04em; text-align:left; border-bottom:1px solid #f1d2d2; }
+        .spoof-table td { padding:.8rem; color:#1d3557; border-bottom:1px solid #edf3f9; vertical-align:top; }
+        .spoof-table tr:hover { background:#fffafa; }
+        .spoof-badge { display:inline-flex; padding:.35rem .65rem; border-radius:999px; background:#ffe7e7; color:#b42318; font-size:.72rem; font-weight:700; }
+        .spoof-reason { max-width:460px; white-space:normal; color:#526b80; }
+        .empty-state { padding:2rem 1rem; text-align:center; color:var(--text-muted); }
+        @media (max-width:600px) { .spoof-summary { grid-template-columns:1fr; } }
+    </style>
+</head>
+<body>
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="main-content">
+        <div class="page-header anim anim-1" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;width:100%;">
+            <div>
+                <h1>Spoofing Attempts</h1>
+                <p>Review blocked facial liveness checks and the users involved.</p>
+            </div>
+            <button type="button" class="btn-back" id="refreshSpoofBtn">Refresh Records</button>
+        </div>
+
+        <div class="spoof-summary anim anim-2">
+            <div class="stat-card blue"><div class="stat-label">Total Attempts</div><div class="stat-value" id="totalSpoofCount">0</div></div>
+            <div class="stat-card red"><div class="stat-label">Today</div><div class="stat-value" id="todaySpoofCount">0</div></div>
+            <div class="stat-card orange"><div class="stat-label">Attendance Scans</div><div class="stat-value" id="attendanceSpoofCount">0</div></div>
+        </div>
+
+        <div class="panel anim anim-3">
+            <div class="spoof-toolbar">
+                <div class="toolbar-title">Blocked Liveness Events</div>
+                <div class="spoof-filters">
+                    <input type="search" id="spoofSearch" placeholder="Search user or reason..." />
+                    <select id="spoofSourceFilter">
+                        <option value="all">All Sources</option>
+                        <option value="daily_attendance">Daily Attendance</option>
+                        <option value="entry_exit">Entry / Exit</option>
+                    </select>
+                    <input type="date" id="spoofDateFilter" aria-label="Filter by date" />
+                </div>
+            </div>
+
+            <div class="spoof-table-wrap">
+                <table class="spoof-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>User Name</th>
+                            <th>User ID</th>
+                            <th>Source</th>
+                            <th>Detection Details</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="spoofTableBody">
+                        <tr><td colspan="7" class="empty-state">Loading spoofing attempts...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../config/.env.js"></script>
+    <script src="../config/config.js"></script>
+    <script src="../shared/global.js"></script>
+    <script src="admin-specific.js"></script>
+    <script>
+        requireSuperAdmin();
+        loadHeader();
+        loadSidebar('spoof-attempts');
+
+        const spoofState = { rows: [], search: '', source: 'all', date: '' };
+        const body = document.getElementById('spoofTableBody');
+
+        function escapeSpoof(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' })[char]);
+        }
+
+        function dateValue(value) {
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? { date: '—', time: '—', stamp: '' } : {
+                date: date.toLocaleDateString([], { year:'numeric', month:'short', day:'numeric' }),
+                time: date.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' }),
+                stamp: date.toISOString().slice(0, 10)
+            };
+        }
+
+        function renderSpoofRows() {
+            const query = spoofState.search.toLowerCase();
+            const filtered = spoofState.rows.filter(row => {
+                const when = dateValue(row.detected_at);
+                const haystack = `${row.detected_name || ''} ${row.reason || ''} ${row.student_id || ''} ${row.employee_id || ''}`.toLowerCase();
+                return (!query || haystack.includes(query))
+                    && (spoofState.source === 'all' || row.source_module === spoofState.source)
+                    && (!spoofState.date || when.stamp === spoofState.date);
+            });
+
+            if (!filtered.length) {
+                body.innerHTML = '<tr><td colspan="7" class="empty-state">No spoofing attempts found.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = filtered.map(row => {
+                const when = dateValue(row.detected_at);
+                const userId = row.student_id || row.employee_id || '—';
+                const source = row.source_module === 'entry_exit' ? 'Entry / Exit' : 'Daily Attendance';
+                const score = row.liveness_score === null || row.liveness_score === undefined
+                    ? ''
+                    : ` Score: ${Number(row.liveness_score).toFixed(4)}.`;
+                return `<tr>
+                    <td>${escapeSpoof(when.date)}</td>
+                    <td>${escapeSpoof(when.time)}</td>
+                    <td><strong>${escapeSpoof(row.detected_name || 'Unknown')}</strong></td>
+                    <td>${escapeSpoof(userId)}</td>
+                    <td>${escapeSpoof(source)}</td>
+                    <td class="spoof-reason">${escapeSpoof((row.reason || 'Liveness check failed') + score)}</td>
+                    <td><span class="spoof-badge">Blocked</span></td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function loadSpoofAttempts() {
+            body.innerHTML = '<tr><td colspan="7" class="empty-state">Loading spoofing attempts...</td></tr>';
+            const { data, error } = await supabaseClient
+                .from('spoof_attempts')
+                .select('spoof_log_id, student_id, employee_id, liveness_score, source_module, detected_name, reason, detected_at')
+                .order('detected_at', { ascending: false });
+
+            if (error) {
+                console.error('Failed to load spoof attempts:', error);
+                body.innerHTML = `<tr><td colspan="7" class="empty-state">Unable to load records: ${escapeSpoof(error.message)}</td></tr>`;
+                return;
+            }
+
+            spoofState.rows = data || [];
+            const today = new Date().toISOString().slice(0, 10);
+            document.getElementById('totalSpoofCount').textContent = spoofState.rows.length;
+            document.getElementById('todaySpoofCount').textContent = spoofState.rows.filter(row => dateValue(row.detected_at).stamp === today).length;
+            document.getElementById('attendanceSpoofCount').textContent = spoofState.rows.filter(row => row.source_module === 'daily_attendance').length;
+            renderSpoofRows();
+        }
+
+        document.getElementById('spoofSearch').addEventListener('input', event => { spoofState.search = event.target.value; renderSpoofRows(); });
+        document.getElementById('spoofSourceFilter').addEventListener('change', event => { spoofState.source = event.target.value; renderSpoofRows(); });
+        document.getElementById('spoofDateFilter').addEventListener('change', event => { spoofState.date = event.target.value; renderSpoofRows(); });
+        document.getElementById('refreshSpoofBtn').addEventListener('click', loadSpoofAttempts);
+        loadSpoofAttempts();
+    </script>
+</body>
+</html>

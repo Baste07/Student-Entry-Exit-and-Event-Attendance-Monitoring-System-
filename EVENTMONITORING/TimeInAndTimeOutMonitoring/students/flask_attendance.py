@@ -1335,6 +1335,24 @@ def _handle_recognition(meta):
     thread_pool.submit(_record_event_attendance, meta["id"], meta)
 
 
+def _record_spoof_attempt(meta, reason, score=None):
+    """Persist a blocked liveness check without delaying the camera loop."""
+    role = str(meta.get("role") or "").lower()
+    payload = {
+        "student_id": meta.get("id") if role == "student" else None,
+        "employee_id": meta.get("id") if role != "student" else None,
+        "source_module": "daily_attendance",
+        "detected_name": meta.get("name") or "Unknown",
+        "reason": reason,
+        "liveness_score": score,
+        "detected_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+    try:
+        supabase.table("spoof_attempts").insert(payload).execute()
+    except Exception as exc:
+        print(f"⚠ Failed to record spoof attempt: {exc}")
+
+
 def _record_event_attendance(student_id, meta):
     """
     Auto-detect event from the student's participation list.
@@ -1653,11 +1671,17 @@ def recognition_worker():
                         recently_seen[key] = datetime.datetime.now()
                         print(f"[ANTI-SPOOF] -> BLOCKED: liveness check failed for {meta['name']}, "
                               f"attendance NOT recorded")
+                        spoof_reason = f"Liveness check failed (score={score_txt}, threshold={ANTI_SPOOF_THRESHOLD:.2f}). Please face the camera directly and try again."
+                        threading.Thread(
+                            target=_record_spoof_attempt,
+                            args=(meta, spoof_reason, score),
+                            daemon=True,
+                        ).start()
                         _push({
                             "message": "SPOOF DETECTED",
                             "name": meta["name"],
                             "type": "spoof",
-                            "reason": f"Liveness check failed (score={score_txt}, threshold={ANTI_SPOOF_THRESHOLD:.2f}). Please face the camera directly and try again.",
+                            "reason": spoof_reason,
                         })
                         new_locs.append((top, right, bottom, left))
                         new_labels.append(label)

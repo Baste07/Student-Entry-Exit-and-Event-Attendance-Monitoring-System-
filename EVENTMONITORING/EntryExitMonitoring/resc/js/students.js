@@ -289,7 +289,7 @@ async function searchStudent() {
     const searchBtn    = document.getElementById('searchBtn');
     const searchResult = document.getElementById('searchResult');
 
-    if (!studentId) { showToast('Please enter a Student ID.', false); return; }
+    if (!studentId) { showToast('Required field should not be left blank', false); return; }
 
     searchBtn.disabled = true;
     searchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
