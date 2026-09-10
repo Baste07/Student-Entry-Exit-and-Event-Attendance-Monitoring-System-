@@ -10,6 +10,46 @@
      dashboard | students | entry-exit-logs | reports | settings
 ============================================================ */
 
+/* Every page using this loader is an admin page. Reject direct URL access
+   before the page-specific scripts can initialize or query Supabase. */
+(function enforceAdminSession() {
+    document.documentElement.style.visibility = 'hidden';
+
+    const userStr = sessionStorage.getItem('user');
+    const allowedRoute = sessionStorage.getItem('allowed_admin_route');
+    let user = null;
+
+    try {
+        user = userStr ? JSON.parse(userStr) : null;
+    } catch (error) {
+        sessionStorage.removeItem('user');
+    }
+
+    sessionStorage.removeItem('allowed_admin_route');
+
+    if (!user || user.userType !== 'admin') {
+        window.location.replace('../../auth/login.html');
+        return;
+    }
+
+    if (allowedRoute !== window.location.pathname) {
+        window.location.replace('../../portal/portal.html');
+        return;
+    }
+
+    document.documentElement.style.visibility = '';
+})();
+
+document.addEventListener('click', function (event) {
+    const link = event.target.closest('a[href]');
+    if (!link) return;
+
+    const target = new URL(link.href, window.location.href);
+    if (target.origin === window.location.origin && target.pathname.includes('/admin/')) {
+        sessionStorage.setItem('allowed_admin_route', target.pathname);
+    }
+}, true);
+
 const INCLUDES_PATH = '../includes/';
 
 /* ── loadHeader ── */

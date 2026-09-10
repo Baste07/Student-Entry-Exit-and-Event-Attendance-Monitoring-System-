@@ -32,7 +32,21 @@ function checkAdminSession() {
     return true;
 }
 
+function requireAdminNavigation() {
+    const allowedRoute = sessionStorage.getItem('allowed_admin_route');
+    sessionStorage.removeItem('allowed_admin_route');
+
+    if (allowedRoute !== window.location.pathname) {
+        window.location.replace('../portal/portal.html');
+        return false;
+    }
+
+    return true;
+}
+
 function requireAdmin() {
+    if (!requireAdminNavigation()) return false;
+
     const userStr = sessionStorage.getItem('user');
     
     if (!userStr) {
@@ -49,6 +63,8 @@ function requireAdmin() {
 }
 
 function requireSuperAdmin() {
+    if (!requireAdminNavigation()) return false;
+
     const userStr = sessionStorage.getItem('user');
     
     if (!userStr) {

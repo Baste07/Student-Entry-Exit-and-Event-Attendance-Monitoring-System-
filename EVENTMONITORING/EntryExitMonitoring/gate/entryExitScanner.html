@@ -8,6 +8,30 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../resc/css/entryExitScanner.css">
+<script>
+    (function enforceGateNavigation() {
+        const userStr = sessionStorage.getItem('user');
+        const allowedRoute = sessionStorage.getItem('allowed_admin_route');
+        let user = null;
+
+        try {
+            user = userStr ? JSON.parse(userStr) : null;
+        } catch (error) {
+            sessionStorage.removeItem('user');
+        }
+
+        sessionStorage.removeItem('allowed_admin_route');
+
+        if (!user || user.userType !== 'admin') {
+            window.location.replace('../../auth/login.html');
+            return;
+        }
+
+        if (allowedRoute !== window.location.pathname) {
+            window.location.replace('../../portal/portal.html');
+        }
+    })();
+</script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
@@ -88,6 +112,16 @@
             </span>
         </div>
 
+        <div class="instruction">
+            <p>
+                Click <strong>Start Scanner</strong> to boot the face engine and begin gate scanning.<br>
+                <span style="font-size:13px;color:#888;">
+                    <i class="fa-solid fa-circle-info"></i>
+                    Choose <strong>QR Code</strong> when using a student QR code instead.
+                </span>
+            </p>
+        </div>
+
         <!-- Face mode -->
         <div id="faceMode">
             <div id="faceStreamOff" class="stream-off">
@@ -122,16 +156,25 @@
 
         <!-- Controls -->
         <div class="btn-wrap">
+            <button class="btn btn-boot" id="btnStartEngine" onclick="startEngine()">
+                <i class="fa-solid fa-power-off"></i> Start Engine
+            </button>
             <button class="btn btn-start" id="btnStart" onclick="startScanner()">
                 <i class="fa-solid fa-play"></i> Start Scanner
             </button>
             <button class="btn btn-stop" id="btnStop" onclick="stopScanner()" style="display:none;">
                 <i class="fa-solid fa-stop"></i> Stop
             </button>
-            <button class="btn btn-manual" onclick="openManual()">
-                <i class="fa-solid fa-keyboard"></i> Manual Entry
-            </button>
         </div>
+
+        <div class="divider" style="margin-top:18px"></div>
+        <p class="manual-caption">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            Facial recognition unavailable?
+        </p>
+        <button class="btn-manual manual-switch" onclick="openManual()">
+            <i class="fa-solid fa-keyboard"></i> Switch to Manual Attendance
+        </button>
 
     </div>
 </div>

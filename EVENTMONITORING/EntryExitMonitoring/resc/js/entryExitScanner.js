@@ -7,6 +7,7 @@ const FLASK_BASE          = 'http://127.0.0.1:5000';
 const ENGINE_STATUS_URL   = `${FLASK_BASE}/engine_status`;
 const VIDEO_FEED_URL      = `${FLASK_BASE}/video_feed`;
 const ATTENDEE_STREAM_URL = `${FLASK_BASE}/attendee_stream`;
+const ATTENDANCE_TRIGGER_URL = 'http://localhost/CAPSTONEFINAL/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/trigger_attendance.php';
 const OVERLAY_DISMISS_MS  = 5000; // auto-dismiss overlays after 5s
 
 /* ══════════════════════════════════════════════════
@@ -72,13 +73,16 @@ function setEngineStatus(online) {
     const pill        = document.getElementById('enginePill');
     const engineState = document.getElementById('engineState');
     const stripStatus = document.getElementById('stripStatus');
+    const startEngineButton = document.getElementById('btnStartEngine');
 
     if (online) {
+        if (startEngineButton) startEngineButton.style.display = 'none';
         pill.className = 'engine-pill online';
         pill.innerHTML = '<i class="fa-solid fa-circle"></i> Face Engine Online';
         if (engineState) engineState.textContent = 'Online';
         if (stripStatus) stripStatus.innerHTML   = '<span class="pulse"></span> Online';
     } else {
+        if (startEngineButton) startEngineButton.style.display = 'inline-flex';
         pill.className = 'engine-pill offline';
         pill.innerHTML = '<i class="fa-solid fa-circle"></i> Face Engine Offline — run START_ATTENDANCE.bat';
         if (engineState) engineState.textContent = 'Offline';
@@ -113,7 +117,12 @@ function switchMode(mode) {
 /* ══════════════════════════════════════════════════
    START / STOP
 ══════════════════════════════════════════════════ */
-function startScanner() {
+async function startScanner() {
+    if (currentMode === 'face' && !engineOnline) {
+        const started = await startAttendanceEngine();
+        if (!started) return;
+    }
+
     document.getElementById('btnStart').style.display = 'none';
     document.getElementById('btnStop').style.display  = 'flex';
     const scannerState = document.getElementById('scannerState');
@@ -121,6 +130,55 @@ function startScanner() {
 
     if (currentMode === 'face') startFaceMode();
     else                        startQRMode();
+}
+
+function startEngine() {
+    if (engineOnline) return;
+    startAttendanceEngine();
+}
+
+async function startAttendanceEngine() {
+    const startButton = document.getElementById('btnStartEngine');
+    const scannerState = document.getElementById('scannerState');
+
+    if (startButton) {
+        startButton.disabled = true;
+        startButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting Engine...';
+    }
+    if (scannerState) scannerState.textContent = 'Starting Engine';
+    setStatus('faceStatus', 'scanning', '<i class="fa-solid fa-circle-notch fa-spin"></i> Starting face engine...');
+
+    try {
+        const triggerResponse = await fetch(ATTENDANCE_TRIGGER_URL, { method: 'POST' });
+        if (!triggerResponse.ok) throw new Error('Engine start request failed.');
+
+        for (let attempt = 0; attempt < 60; attempt++) {
+            try {
+                const statusResponse = await fetch(ENGINE_STATUS_URL, {
+                    signal: AbortSignal.timeout(1500)
+                });
+                if (statusResponse.ok) {
+                    setEngineStatus(true);
+                    return true;
+                }
+            } catch (_) {}
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        throw new Error('Engine did not respond.');
+    } catch (error) {
+        setEngineStatus(false);
+        setStatus('faceStatus', 'offline', '<i class="fa-solid fa-triangle-exclamation"></i> Unable to start face engine.');
+        showToast('Unable to start the face engine. Please try again.', 'red', 4000);
+        return false;
+    } finally {
+        if (startButton) {
+            startButton.disabled = false;
+            startButton.innerHTML = '<i class="fa-solid fa-power-off"></i> Start Engine';
+        }
+        if (scannerState && !engineOnline) scannerState.textContent = 'Idle';
+    }
 }
 
 function stopScanner() {

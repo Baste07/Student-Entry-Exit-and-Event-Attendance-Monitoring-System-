@@ -34,13 +34,7 @@ async function init() {
 
         allEventsList = data || [];
 
-        const select = document.getElementById('eventSelect');
-        select.innerHTML = '<option value="">-- Select an Event --</option>' +
-            allEventsList.map(ev => {
-                const dateStr = formatDate(ev.event_date);
-                const statusIcon = ev.status === 'ongoing' ? '🔴 ' : (ev.status === 'upcoming' ? '🔵 ' : '✅ ');
-                return `<option value="${ev.event_id}">${statusIcon}${escHtml(ev.event_name)} (${dateStr})</option>`;
-            }).join('');
+        renderEventOptions();
     } catch (err) {
         console.error('init error:', err);
         showToast('Failed to load events: ' + (err.message || err), true);
@@ -133,7 +127,6 @@ async function loadAttendanceForEvent(eventId) {
                 student_id,
                 time_in,
                 time_out,
-                verified_by_facial_recognition,
                 remarks,
                 created_at,
                 students (
@@ -154,6 +147,8 @@ async function loadAttendanceForEvent(eventId) {
         if (error) throw error;
 
         currentRecords = data || [];
+            updateExportButtons();
+        populateSectionFilter();
         updateBadges();
 
         if (currentRecords.length === 0) {
@@ -183,6 +178,33 @@ function updateBadges() {
     setText('badgeLate', late);
     setText('badgeAbsent', absent);
     setText('badgeTotal', total);
+}
+
+function getFilteredRecords() {
+    const query = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+    const status = document.getElementById('statusFilter')?.value || '';
+    const section = document.getElementById('sectionFilter')?.value || '';
+
+    return currentRecords.filter(record => {
+        const student = record.students;
+        const name = `${student?.first_name || ''} ${student?.last_name || ''}`.toLowerCase();
+        const studentId = String(student?.stud_id || '').toLowerCase();
+        const sectionLabel = student?.sections
+            ? `${student.sections.grade_level || ''} - ${student.sections.section_name || ''}`.trim()
+            : '';
+
+        return (!query || `${name} ${studentId} ${sectionLabel}`.includes(query))
+            && (!status || getAttendanceStatus(record) === status)
+            && (!section || sectionLabel === section);
+    });
+}
+
+function updateExportButtons() {
+    const enabled = Boolean(currentEventId);
+    ['btnExportExcel', 'btnExportPdf'].forEach(id => {
+        const button = document.getElementById(id);
+        if (button) button.disabled = !enabled;
+    });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -237,6 +259,21 @@ function truncate(str, len) {
     return str.length > len ? str.substring(0, len) + '…' : str;
 }
 
+function populateSectionFilter() {
+    const sectionFilter = document.getElementById('sectionFilter');
+    if (!sectionFilter) return;
+
+    const sections = [...new Set(currentRecords
+        .map(record => record.students?.sections)
+        .filter(Boolean)
+        .map(section => `${section.grade_level || ''} - ${section.section_name || ''}`.trim())
+        .filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+    sectionFilter.innerHTML = '<option value="">All Sections</option>' +
+        sections.map(section => `<option value="${escHtml(section)}">${escHtml(section)}</option>`).join('');
+}
+
 function formatTime(t) {
     if (!t) return '—';
     // Handle both time string and timestamp
@@ -258,15 +295,7 @@ function formatTime(t) {
 // ══════════════════════════════════════════════════════════
 
 function applyFilters() {
-    const q      = document.getElementById('searchInput').value.toLowerCase();
-    const status = document.getElementById('statusFilter').value;
-
-    document.querySelectorAll('#attendanceTableBody tr').forEach(row => {
-        if (row.id === 'loadingRow') return;
-        const textMatch   = row.textContent.toLowerCase().includes(q);
-        const statusMatch = !status || row.dataset.status === status;
-        row.style.display = (textMatch && statusMatch) ? '' : 'none';
-    });
+    renderTable(getFilteredRecords());
 }
 
 function bindEvents() {
@@ -276,12 +305,115 @@ function bindEvents() {
 
     document.getElementById('searchInput').addEventListener('input', applyFilters);
     document.getElementById('statusFilter').addEventListener('change', applyFilters);
+    document.getElementById('sectionFilter').addEventListener('change', applyFilters);
+    document.getElementById('eventDateFrom').addEventListener('change', renderEventOptions);
+    document.getElementById('eventDateTo').addEventListener('change', renderEventOptions);
 
     document.getElementById('clearFilters').addEventListener('click', function () {
         document.getElementById('searchInput').value = '';
         document.getElementById('statusFilter').value = '';
-        applyFilters();
+        document.getElementById('sectionFilter').value = '';
+        renderTable(currentRecords);
     });
+
+    document.getElementById('btnExportExcel').addEventListener('click', exportExcel);
+    document.getElementById('btnExportPdf').addEventListener('click', exportPdf);
+}
+
+function getReportRows() {
+    return getFilteredRecords().map(record => {
+        const student = record.students;
+        const name = student ? `${student.first_name || ''} ${student.last_name || ''}`.trim() : 'Unknown';
+        const section = student?.sections
+            ? `${student.sections.grade_level || ''} - ${student.sections.section_name || ''}`.trim()
+            : '—';
+        const lateMinutes = getLateMinutes(record);
+
+        return {
+            'Student': name,
+            'Student ID': student?.stud_id || '—',
+            'Grade & Section': section,
+            'Status': getAttendanceStatus(record),
+            'Time In': record.time_in ? formatTime(record.time_in) : '—',
+            'Time Out': record.time_out ? formatTime(record.time_out) : '—',
+            'Late (min)': lateMinutes,
+            'Remarks': record.remarks || '—'
+        };
+    });
+}
+
+function getReportFileName(extension) {
+    const eventName = (currentEvent?.event_name || 'event-attendance')
+        .replace(/[^a-z0-9]+/gi, '-')
+        .replace(/^-|-$/g, '')
+        .toLowerCase();
+    return `${eventName || 'event-attendance'}-${new Date().toISOString().slice(0, 10)}.${extension}`;
+}
+
+function exportExcel() {
+    const rows = getReportRows();
+    if (!rows.length) {
+        showToast('No attendance records to export.', true);
+        return;
+    }
+    if (!window.XLSX) {
+        showToast('Excel library is not available. Please try again.', true);
+        return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = [
+        { wch: 28 }, { wch: 16 }, { wch: 20 }, { wch: 12 },
+        { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 32 }
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Event Attendance');
+    XLSX.writeFile(workbook, getReportFileName('xlsx'));
+    showToast('Excel report downloaded.');
+}
+
+function exportPdf() {
+    const rows = getReportRows();
+    if (!rows.length) {
+        showToast('No attendance records to export.', true);
+        return;
+    }
+    if (!window.jspdf || typeof window.jspdf.jsPDF !== 'function') {
+        showToast('PDF library is not available. Please try again.', true);
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const eventTarget = currentEvent?.target_grade_level
+        ? `Target: ${currentEvent.target_grade_level}${currentEvent.target_section ? ` - ${currentEvent.target_section}` : ' (all sections)'}`
+        : 'Target: All students';
+
+    doc.setFontSize(16);
+    doc.setTextColor(11, 78, 120);
+    doc.text('Event Attendance Report', 14, 15);
+    doc.setFontSize(11);
+    doc.setTextColor(45, 72, 96);
+    doc.text(currentEvent?.event_name || 'Selected Event', 14, 22);
+    doc.setFontSize(9);
+    doc.text(`${formatDate(currentEvent?.event_date)} | ${eventTarget}`, 14, 28);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 34);
+
+    doc.autoTable({
+        head: [['Student', 'Student ID', 'Grade & Section', 'Status', 'Time In', 'Time Out', 'Late (min)', 'Remarks']],
+        body: rows.map(row => [
+            row['Student'], row['Student ID'], row['Grade & Section'], row.Status,
+            row['Time In'], row['Time Out'], row['Late (min)'], row.Remarks
+        ]),
+        startY: 40,
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        headStyles: { fillColor: [11, 78, 120], textColor: 255 },
+        alternateRowStyles: { fillColor: [240, 248, 253] },
+        columnStyles: { 0: { cellWidth: 39 }, 1: { cellWidth: 25 }, 2: { cellWidth: 35 }, 7: { cellWidth: 42 } }
+    });
+
+    doc.save(getReportFileName('pdf'));
+    showToast('PDF report downloaded.');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -315,4 +447,31 @@ function escHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+function renderEventOptions() {
+    const select = document.getElementById('eventSelect');
+    if (!select) return;
+
+    const dateFrom = document.getElementById('eventDateFrom')?.value || '';
+    const dateTo = document.getElementById('eventDateTo')?.value || '';
+    const selectedEventId = select.value;
+    const filteredEvents = allEventsList.filter(event =>
+        (!dateFrom || event.event_date >= dateFrom) &&
+        (!dateTo || event.event_date <= dateTo)
+    );
+
+    select.innerHTML = '<option value="">-- Select an Event --</option>' +
+        filteredEvents.map(ev => {
+            const dateStr = formatDate(ev.event_date);
+            const statusIcon = ev.status === 'ongoing' ? '🔴 ' : (ev.status === 'upcoming' ? '🔵 ' : '✅ ');
+            return `<option value="${ev.event_id}">${statusIcon}${escHtml(ev.event_name)} (${dateStr})</option>`;
+        }).join('');
+
+    if (filteredEvents.some(event => event.event_id === selectedEventId)) {
+        select.value = selectedEventId;
+    } else if (selectedEventId) {
+        select.value = '';
+        loadAttendanceForEvent('');
+    }
 }
