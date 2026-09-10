@@ -71,6 +71,22 @@ function getCurrentUser() {
     }
 }
 
+function isProtectedAdminRoute(pathname) {
+    return pathname.includes('/admin/') || pathname.includes('/EntryExitMonitoring/gate/');
+}
+
+function registerProtectedNavigation() {
+    document.addEventListener('click', function (event) {
+        const link = event.target.closest('a[href]');
+        if (!link) return;
+
+        const target = new URL(link.href, window.location.href);
+        if (target.origin === window.location.origin && isProtectedAdminRoute(target.pathname)) {
+            sessionStorage.setItem('allowed_admin_route', target.pathname);
+        }
+    }, true);
+}
+
 function getDepartmentLogo() {
     const user = getCurrentUser();
     if (user && user.departmentLogo) {
@@ -165,6 +181,7 @@ function registerAuditActionTracking() {
 
 document.addEventListener('DOMContentLoaded', function () {
     checkSupabaseConnection();
+    registerProtectedNavigation();
 
     const currentUser = getCurrentUser();
     if (currentUser) {

@@ -88,6 +88,11 @@ document.addEventListener('DOMContentLoaded', async function () {
                 return;
             }
 
+            const target = new URL(card.href, window.location.href);
+            if (target.origin === window.location.origin && target.pathname.includes('/admin/')) {
+                sessionStorage.setItem('allowed_admin_route', target.pathname);
+            }
+
             const moduleName = card.dataset.auditModule || 'portal_module';
             const moduleLabel = card.dataset.auditLabel || card.querySelector('.card-title-text')?.textContent || 'Module';
             logSystemAudit({

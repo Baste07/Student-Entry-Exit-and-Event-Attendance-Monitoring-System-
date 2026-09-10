@@ -22,6 +22,10 @@
     <link rel="shortcut icon" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
 </head>
 <body>
 
@@ -45,6 +49,14 @@
                 <div class="selector-header">
                     <i class="fa-solid fa-calendar-day" style="color: var(--blue-bright);"></i>
                     <h2>Select Event</h2>
+                    <div class="event-export-actions">
+                        <button type="button" class="btn-report excel" id="btnExportExcel" disabled>
+                            <i class="fa-solid fa-file-excel"></i> Excel
+                        </button>
+                        <button type="button" class="btn-report pdf" id="btnExportPdf" disabled>
+                            <i class="fa-solid fa-file-pdf"></i> PDF
+                        </button>
+                    </div>
                 </div>
                 <div class="selector-body">
                     <div class="selector-field">

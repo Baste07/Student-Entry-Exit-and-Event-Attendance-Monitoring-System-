@@ -8,6 +8,30 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../resc/css/entryExitScanner.css">
+<script>
+    (function enforceGateNavigation() {
+        const userStr = sessionStorage.getItem('user');
+        const allowedRoute = sessionStorage.getItem('allowed_admin_route');
+        let user = null;
+
+        try {
+            user = userStr ? JSON.parse(userStr) : null;
+        } catch (error) {
+            sessionStorage.removeItem('user');
+        }
+
+        sessionStorage.removeItem('allowed_admin_route');
+
+        if (!user || user.userType !== 'admin') {
+            window.location.replace('../../auth/login.html');
+            return;
+        }
+
+        if (allowedRoute !== window.location.pathname) {
+            window.location.replace('../../portal/portal.html');
+        }
+    })();
+</script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
