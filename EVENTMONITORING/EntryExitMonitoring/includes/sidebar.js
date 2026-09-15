@@ -45,7 +45,8 @@ document.addEventListener('click', function (event) {
     if (!link) return;
 
     const target = new URL(link.href, window.location.href);
-    if (target.origin === window.location.origin && target.pathname.includes('/admin/')) {
+    if (target.origin === window.location.origin &&
+        (target.pathname.includes('/admin/') || target.pathname.includes('/gate/'))) {
         sessionStorage.setItem('allowed_admin_route', target.pathname);
     }
 }, true);

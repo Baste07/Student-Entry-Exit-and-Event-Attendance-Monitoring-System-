@@ -128,6 +128,8 @@ attendee_clients = set()
 attendee_clients_lock = threading.Lock()
 recently_seen  = {}
 COOLDOWN_SECS  = 5
+scanner_mode_lock = threading.Lock()
+scanner_mode = "event_attendance"
 
 # Face database state for fast startup.
 face_db_lock = threading.Lock()
@@ -223,6 +225,11 @@ def _camera_owner_now():
 
 def _has_camera_owner():
     return _camera_owner_now() == ENGINE_CAMERA_OWNER
+
+
+def _get_scanner_mode():
+    with scanner_mode_lock:
+        return scanner_mode
 
 # Module-level face DB globals (must exist before any function uses them)
 known_encodings    = []
@@ -1323,6 +1330,24 @@ def get_guide_bounds(frame_shape):
 
 def _handle_recognition(meta):
     """Called by the recognition worker when a known face passes liveness."""
+    thread_pool.submit(_record_gate_log, meta)
+
+    _push({
+        "message": f"RECOGNIZED {meta['name']}",
+        "name": meta["name"],
+        "type": "recognized",
+        "source": "shared_face_engine",
+        "recognition_only": True,
+        "role": meta.get("role"),
+        "stud_id": meta.get("stud_id"),
+        "grade": meta.get("grade_level", ""),
+        "section": meta.get("section_name", ""),
+        "employee_id": meta.get("employee_id"),
+        "id": meta.get("id"),
+        "emp_no": meta.get("emp_no"),
+        "department": meta.get("faculty") or meta.get("role", ""),
+    })
+
     if meta.get("role") != "student":
         _push({
             "message": f"HELLO {meta['name']}",
@@ -1331,8 +1356,53 @@ def _handle_recognition(meta):
             "role": "teacher"
         })
         return
-    # Offload the DB write to the thread pool so the video loop never blocks
+
+    # Always evaluate event attendance in the background. Entry-Exit logging
+    # consumes the neutral recognition event independently.
     thread_pool.submit(_record_event_attendance, meta["id"], meta)
+
+
+def _record_gate_log(meta):
+    """Save the school gate movement for every live recognized person."""
+    role = str(meta.get("role") or "").lower()
+    person_id = meta.get("id")
+    if not person_id:
+        return
+
+    id_column = "student_id" if role == "student" else "employee_id"
+    try:
+        latest = supabase.table("entry_exit_logs") \
+            .select("log_type") \
+            .eq(id_column, person_id) \
+            .order("log_timestamp", desc=True) \
+            .limit(1) \
+            .execute()
+        previous_type = latest.data[0].get("log_type") if latest.data else None
+        log_type = "exit" if previous_type == "entry" else "entry"
+        payload = {
+            "student_id": person_id if role == "student" else None,
+            "employee_id": person_id if role != "student" else None,
+            "log_type": log_type,
+            "scan_method": "face",
+            "log_date": datetime.datetime.now().date().isoformat(),
+            "log_timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "is_late": False,
+        }
+        supabase.table("entry_exit_logs").insert(payload).execute()
+        _push({
+            "message": f"GATE {log_type.upper()} {meta.get('name', '')}",
+            "name": meta.get("name"),
+            "type": "gate_recorded",
+            "log_type": log_type,
+            "role": role,
+            "stud_id": meta.get("stud_id"),
+            "grade": meta.get("grade_level", ""),
+            "section": meta.get("section_name", ""),
+            "employee_id": meta.get("employee_id"),
+            "emp_no": meta.get("emp_no"),
+        })
+    except Exception as exc:
+        print(f"⚠ Failed to record gate log for {meta.get('name', 'unknown')}: {exc}")
 
 
 def _record_spoof_attempt(meta, reason, score=None):
@@ -2002,6 +2072,27 @@ def camera_control():
         "engine": ENGINE_CAMERA_OWNER,
         "owns_camera": state.get("owner") == ENGINE_CAMERA_OWNER,
         "changed": bool(changed),
+    })
+
+
+@app.route('/scanner_mode', methods=['GET', 'POST'])
+def scanner_mode_control():
+    global scanner_mode
+
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        requested_mode = str(data.get('mode') or '').strip().lower()
+        if requested_mode not in {'event_attendance', 'entry_exit'}:
+            return jsonify({
+                "success": False,
+                "message": "mode must be event_attendance or entry_exit",
+            }), 400
+        with scanner_mode_lock:
+            scanner_mode = requested_mode
+
+    return jsonify({
+        "success": True,
+        "mode": _get_scanner_mode(),
     })
 
 

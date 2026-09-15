@@ -100,8 +100,8 @@
             <button class="mode-tab active" id="tabFace" onclick="switchMode('face')">
                 <i class="fa-solid fa-face-smile"></i> Face Recognition
             </button>
-            <button class="mode-tab" id="tabQR" onclick="switchMode('qr')">
-                <i class="fa-solid fa-qrcode"></i> QR Code
+            <button class="mode-tab" id="tabManual" type="button" onclick="openManualAccess()">
+                <i class="fa-solid fa-keyboard"></i> Manual Attendance
             </button>
         </div>
 
@@ -114,10 +114,10 @@
 
         <div class="instruction">
             <p>
-                Click <strong>Start Scanner</strong> to boot the face engine and begin gate scanning.<br>
+                Click <strong>Start Engine</strong>, switch the camera to Entry-Exit, then click <strong>Start Scanner</strong> to begin gate scanning.<br>
                 <span style="font-size:13px;color:#888;">
                     <i class="fa-solid fa-circle-info"></i>
-                    Choose <strong>QR Code</strong> when using a student QR code instead.
+                    Use <strong>Manual Attendance</strong> when facial recognition is unavailable.
                 </span>
             </p>
         </div>
@@ -131,14 +131,6 @@
             <img id="faceStream" src="" alt="Face Recognition Stream" style="display:none;">
             <div class="scan-status idle" id="faceStatus">
                 <i class="fa-solid fa-circle-info"></i> Start the scanner to begin
-            </div>
-        </div>
-
-        <!-- QR mode -->
-        <div id="qrMode" style="display:none;">
-            <div id="qrReader"></div>
-            <div class="scan-status idle" id="qrStatus">
-                <i class="fa-solid fa-qrcode"></i> QR scanner not started
             </div>
         </div>
 
@@ -159,28 +151,41 @@
             <button class="btn btn-boot" id="btnStartEngine" onclick="startEngine()">
                 <i class="fa-solid fa-power-off"></i> Start Engine
             </button>
+            <button class="btn btn-start" id="switchCameraBtn" type="button">
+                <i class="fa-solid fa-repeat"></i> Use Camera for Entry-Exit
+            </button>
             <button class="btn btn-start" id="btnStart" onclick="startScanner()">
                 <i class="fa-solid fa-play"></i> Start Scanner
             </button>
             <button class="btn btn-stop" id="btnStop" onclick="stopScanner()" style="display:none;">
                 <i class="fa-solid fa-stop"></i> Stop
             </button>
+            <button class="btn btn-stop" id="btnStopEngine" onclick="stopEngine()" style="display:none;">
+                <i class="fa-solid fa-power-off"></i> Stop Engine
+            </button>
         </div>
-
-        <div class="divider" style="margin-top:18px"></div>
-        <p class="manual-caption">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            Facial recognition unavailable?
-        </p>
-        <button class="btn-manual manual-switch" onclick="openManual()">
-            <i class="fa-solid fa-keyboard"></i> Switch to Manual Attendance
-        </button>
 
     </div>
 </div>
 
 <!-- TOAST -->
 <div id="toast"></div>
+
+<!-- FACIAL DATA SYNC SUMMARY -->
+<div class="sync-overlay" id="gateSyncOverlay" onclick="if(event.target===this)dismissGateSyncModal()">
+    <div class="sync-box" id="gateSyncBox">
+        <div class="sync-icon" id="gateSyncIcon"><i class="fa-solid fa-rotate"></i></div>
+        <h3 id="gateSyncTitle">Facial Data Synced</h3>
+        <p id="gateSyncSubtext">Changes were detected and applied in the background.</p>
+        <div class="sync-stats">
+            <div class="sync-stat add"><div class="sync-stat-num" id="gateSyncAdded">0</div><div class="sync-stat-label"><i class="fa-solid fa-plus"></i> Added</div></div>
+            <div class="sync-stat upd"><div class="sync-stat-num" id="gateSyncUpdated">0</div><div class="sync-stat-label"><i class="fa-solid fa-rotate"></i> Updated</div></div>
+            <div class="sync-stat rem" id="gateSyncRemovedStat"><div class="sync-stat-num" id="gateSyncRemoved">0</div><div class="sync-stat-label"><i class="fa-solid fa-minus"></i> Removed</div></div>
+        </div>
+        <div class="sync-duration" id="gateSyncDuration"></div>
+        <button class="sync-btn-close" type="button" onclick="dismissGateSyncModal()"><i class="fa-solid fa-check"></i> Got it</button>
+    </div>
+</div>
 
 <!-- SPOOF OVERLAY — full-screen red alert -->
 <div class="overlay-backdrop" id="spoofOverlay">
@@ -214,7 +219,50 @@
     </div>
 </div>
 
-<!-- MANUAL MODAL — accepts Student ID or Employee ID (emp_no) -->
+<!-- GATE RESULT OVERLAY — successful entry/exit confirmation -->
+<div class="overlay-backdrop" id="gateResultOverlay">
+    <div class="overlay-box gate-result-box">
+        <div class="overlay-icon gate-result-icon" id="gateResultAvatar">
+            <i class="fa-solid fa-door-open"></i>
+        </div>
+        <div class="overlay-badge gate-result-badge">GATE ACCESS RECORDED</div>
+        <h2 class="overlay-name" id="gateResultName">—</h2>
+        <p class="overlay-reason" id="gateResultMeta">—</p>
+        <div class="result-badges gate-result-badges" id="gateResultBadges"></div>
+        <div class="overlay-timer-bar">
+            <div class="overlay-timer-fill gate-result-fill" id="gateResultTimerFill"></div>
+        </div>
+        <span class="overlay-dismiss">Automatically dismissing...</span>
+    </div>
+</div>
+
+<!-- MANUAL ACCESS MODAL -->
+<div class="modal-backdrop" id="manualAccessModal">
+    <div class="modal-box access-modal-box">
+        <div class="cred-bar"></div>
+        <div class="modal-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <h3>Manual Attendance Access</h3>
+        <p>Enter an administrator account to open manual attendance.</p>
+        <div class="access-error" id="manualAccessError">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span id="manualAccessErrorText"></span>
+        </div>
+        <div class="cred-fg">
+            <label><i class="fa-solid fa-envelope"></i> Admin Email</label>
+            <input type="email" class="modal-input" id="manualAccessEmail" autocomplete="username" placeholder="admin@plpasig.edu.ph">
+        </div>
+        <div class="cred-fg">
+            <label><i class="fa-solid fa-lock"></i> Password</label>
+            <input type="password" class="modal-input" id="manualAccessPassword" autocomplete="current-password" placeholder="Enter password" onkeydown="if(event.key==='Enter') submitManualAccess()">
+        </div>
+        <div class="cred-btns">
+            <button class="cred-btn-cancel" type="button" onclick="closeManualAccess()"><i class="fa-solid fa-xmark"></i> Cancel</button>
+            <button class="cred-btn-submit" type="button" id="manualAccessSubmit" onclick="submitManualAccess()"><i class="fa-solid fa-arrow-right"></i> Continue</button>
+        </div>
+    </div>
+</div>
+
+<!-- MANUAL GATE LOG MODAL — accepts Student ID or Employee ID (emp_no) -->
 <div class="modal-backdrop" id="manualModal">
     <div class="modal-box">
         <div class="cred-bar"></div>
@@ -245,7 +293,14 @@
 <script src="../../config/config.js"></script>
 <script src="../resc/js/entryExitScanner.js"></script>
 <script>
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeManual(); });
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        closeManualAccess();
+        closeManual();
+    });
+    document.getElementById('manualAccessModal').addEventListener('click', e => {
+        if (e.target.id === 'manualAccessModal') closeManualAccess();
+    });
 </script>
 
 </body>

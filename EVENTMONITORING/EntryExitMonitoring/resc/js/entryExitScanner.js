@@ -22,6 +22,11 @@ let COOLDOWN_MS   = 10000;
 let AUTO_EXIT     = true;
 let GATE_SETTINGS = {};
 let overlayTimer  = null; // shared dismiss timer
+let isBooting     = false;
+let isFaceDbReady = false;
+let previousFaceDbPhase = null;
+let previousRebuildSummaryTimestamp = null;
+let gateSyncModalTimer = null;
 
 /* ══════════════════════════════════════════════════
    CLOCK
@@ -45,6 +50,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadGateSettings();
     checkEngineStatus();
     setInterval(checkEngineStatus, 10000);
+
+    const switchCameraButton = document.getElementById('switchCameraBtn');
+    if (switchCameraButton) {
+        switchCameraButton.addEventListener('click', switchCameraToEntryExit);
+    }
 });
 
 async function loadGateSettings() {
@@ -62,29 +72,35 @@ async function loadGateSettings() {
 async function checkEngineStatus() {
     try {
         const res = await fetch(ENGINE_STATUS_URL, { signal: AbortSignal.timeout(3000) });
-        setEngineStatus(res.ok);
+        const status = res.ok ? await res.json() : null;
+        if (status) handleFaceDbSync(status);
+        setEngineStatus(res.ok, status);
     } catch (_) {
-        setEngineStatus(false);
+        setEngineStatus(false, null);
     }
 }
 
-function setEngineStatus(online) {
+function setEngineStatus(online, status = null) {
     engineOnline = online;
+    isFaceDbReady = !!status?.face_db_ready && status?.face_db_phase === 'ready';
     const pill        = document.getElementById('enginePill');
     const engineState = document.getElementById('engineState');
     const stripStatus = document.getElementById('stripStatus');
     const startEngineButton = document.getElementById('btnStartEngine');
+    const stopEngineButton = document.getElementById('btnStopEngine');
 
     if (online) {
         if (startEngineButton) startEngineButton.style.display = 'none';
+        if (stopEngineButton) stopEngineButton.style.display = 'inline-flex';
         pill.className = 'engine-pill online';
         pill.innerHTML = '<i class="fa-solid fa-circle"></i> Face Engine Online';
         if (engineState) engineState.textContent = 'Online';
         if (stripStatus) stripStatus.innerHTML   = '<span class="pulse"></span> Online';
     } else {
         if (startEngineButton) startEngineButton.style.display = 'inline-flex';
+        if (stopEngineButton) stopEngineButton.style.display = 'none';
         pill.className = 'engine-pill offline';
-        pill.innerHTML = '<i class="fa-solid fa-circle"></i> Face Engine Offline — run START_ATTENDANCE.bat';
+        pill.innerHTML = '<i class="fa-solid fa-circle"></i> Face Engine Offline';
         if (engineState) engineState.textContent = 'Offline';
         if (stripStatus) stripStatus.textContent = 'Offline';
     }
@@ -128,12 +144,17 @@ async function startScanner() {
     const scannerState = document.getElementById('scannerState');
     if (scannerState) scannerState.textContent = 'Active';
 
-    if (currentMode === 'face') startFaceMode();
+    if (currentMode === 'face') await startFaceMode();
     else                        startQRMode();
 }
 
 function startEngine() {
-    if (engineOnline) return;
+    if (isBooting) return;
+    if (engineOnline) {
+        document.getElementById('scannerState').textContent = 'Idle';
+        setStatus('faceStatus', 'idle', '<i class="fa-solid fa-circle-info"></i> Engine ready. Start the scanner to begin');
+        return;
+    }
     startAttendanceEngine();
 }
 
@@ -141,6 +162,13 @@ async function startAttendanceEngine() {
     const startButton = document.getElementById('btnStartEngine');
     const scannerState = document.getElementById('scannerState');
 
+    if (engineOnline) {
+        if (scannerState) scannerState.textContent = 'Idle';
+        setStatus('faceStatus', 'idle', '<i class="fa-solid fa-circle-info"></i> Engine ready. Start the scanner to begin');
+        return true;
+    }
+
+    isBooting = true;
     if (startButton) {
         startButton.disabled = true;
         startButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting Engine...';
@@ -158,7 +186,8 @@ async function startAttendanceEngine() {
                     signal: AbortSignal.timeout(1500)
                 });
                 if (statusResponse.ok) {
-                    setEngineStatus(true);
+                    const status = await statusResponse.json();
+                    setEngineStatus(true, status);
                     return true;
                 }
             } catch (_) {}
@@ -177,7 +206,65 @@ async function startAttendanceEngine() {
             startButton.disabled = false;
             startButton.innerHTML = '<i class="fa-solid fa-power-off"></i> Start Engine';
         }
-        if (scannerState && !engineOnline) scannerState.textContent = 'Idle';
+        if (scannerState) {
+            scannerState.textContent = engineOnline
+                ? (document.getElementById('btnStop').style.display === 'none' ? 'Idle' : 'Active')
+                : 'Idle';
+        }
+        if (engineOnline && document.getElementById('btnStop').style.display === 'none') {
+            setStatus('faceStatus', 'idle', '<i class="fa-solid fa-circle-info"></i> Engine ready. Start the scanner to begin');
+        }
+        isBooting = false;
+    }
+}
+
+async function stopEngine() {
+    if (!confirm('Stop the face engine? The camera will be released.')) return;
+
+    stopScanner();
+    try {
+        await fetch(`${FLASK_BASE}/shutdown`, { method: 'POST' });
+    } catch (_) {}
+
+    engineOnline = false;
+    isFaceDbReady = false;
+    setEngineStatus(false);
+}
+
+async function switchCameraToEntryExit() {
+    const button = document.getElementById('switchCameraBtn');
+    if (!button) return;
+
+    button.disabled = true;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Switching...';
+
+    try {
+        let switched = false;
+        for (const base of [FLASK_BASE, 'http://127.0.0.1:5001']) {
+            try {
+                const response = await fetch(`${base}/camera_control`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ owner: 'attendance', force: true })
+                });
+                if (!response.ok) continue;
+                const data = await response.json();
+                switched = switched || data.success && data.owner === 'attendance';
+            } catch (_) {}
+        }
+
+        if (switched) {
+            showToast('Camera is now assigned to Entry-Exit.', 'green', 3000);
+            if (sseSource) {
+                const stream = document.getElementById('faceStream');
+                stream.src = `${VIDEO_FEED_URL}?t=${Date.now()}`;
+            }
+        } else {
+            showToast('Unable to switch camera ownership.', 'red', 4000);
+        }
+    } finally {
+        button.disabled = false;
+        button.innerHTML = '<i class="fa-solid fa-repeat"></i> Use Camera for Entry-Exit';
     }
 }
 
@@ -208,12 +295,31 @@ function stopScanner() {
      not_participant / error / already_recorded → info overlay
      upcoming → info overlay (reminder)
 ══════════════════════════════════════════════════ */
-function startFaceMode() {
+async function setScannerMode(mode) {
+    const response = await fetch(`${FLASK_BASE}/scanner_mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+    });
+    if (!response.ok) throw new Error('Unable to select scanner mode.');
+}
+
+async function startFaceMode() {
     if (!engineOnline) {
         setStatus('faceStatus', 'offline',
             '<i class="fa-solid fa-triangle-exclamation"></i> Face engine offline — run START_ATTENDANCE.bat first');
         document.getElementById('btnStart').style.display = 'flex';
         document.getElementById('btnStop').style.display  = 'none';
+        return;
+    }
+
+    try {
+        await setScannerMode('entry_exit');
+    } catch (_) {
+        setStatus('faceStatus', 'error', '<i class="fa-solid fa-triangle-exclamation"></i> Unable to select Entry-Exit mode.');
+        document.getElementById('btnStart').style.display = 'flex';
+        document.getElementById('btnStop').style.display = 'none';
+        document.getElementById('scannerState').textContent = 'Idle';
         return;
     }
 
@@ -235,20 +341,36 @@ function startFaceMode() {
 
             switch (data.type) {
 
-                // ── Employee recognized (liveness already passed in Flask) ──
-                case 'greeting_only': {
-                    setCooldown(cooldownKey);
-                    await logEmployeeEntry(data);
+                // Student gate logging is independent from event attendance.
+                case 'recognized': {
                     break;
                 }
 
-                // ── Student recognized and event attendance recorded in Flask ──
-                // For gate entry/exit we also need to log to entry_exit_logs
+                case 'gate_recorded': {
+                    setCooldown(cooldownKey);
+                    if (data.role === 'student') {
+                        showResultStudent({
+                            name: data.name,
+                            stud_id: data.stud_id,
+                            grade_level: data.grade,
+                            section_name: data.section
+                        }, data.log_type, false);
+                    } else {
+                        showResultEmployee(data.name, data.emp_no, data.department, data.log_type, false);
+                    }
+                    flashStatus('faceStatus', data.log_type, false, data.name, data.role !== 'student');
+                    break;
+                }
+
+                // ── Employee recognized (liveness already passed in Flask) ──
+                case 'greeting_only': {
+                    break;
+                }
+
+                // Event-specific messages are handled by the event attendance page.
+                // Entry-Exit already logged the neutral recognized event above.
                 case 'time_in':
                 case 'time_out': {
-                    if (!data.stud_id) break; // safety check
-                    setCooldown(cooldownKey);
-                    await logStudentGateEntry(data);
                     break;
                 }
 
@@ -311,7 +433,7 @@ async function logEmployeeEntry(data) {
         try {
             const { data: empRows } = await supabaseClient
                 .from('employees')
-                .select('employee_id, emp_no, first_name, last_name, department')
+                .select('employee_id, emp_no, first_name, last_name, faculty, role')
                 .ilike('last_name', `%${lastName}%`)
                 .ilike('first_name', `%${firstName}%`)
                 .limit(1);
@@ -319,7 +441,7 @@ async function logEmployeeEntry(data) {
             if (empRows && empRows.length > 0) {
                 employeeUUID = empRows[0].employee_id;
                 empNo        = empRows[0].emp_no || '—';
-                department   = empRows[0].department || '—';
+                department   = empRows[0].faculty || empRows[0].role || '—';
             }
         } catch (_) {}
 
@@ -341,7 +463,8 @@ async function logEmployeeEntry(data) {
 
         if (error) {
             console.warn('[entryExitScanner] employee log insert error:', error.message);
-            showToast(`${rawName} recognized (DB save pending)`, 'purple', 3000);
+            showToast(`${rawName} recognized, but the gate log was not saved.`, 'red', 4000);
+            return;
         }
 
         showResultEmployee(rawName, empNo, department, logType, isLate);
@@ -387,7 +510,11 @@ async function logStudentGateEntry(data) {
             is_late:       isLate && logType === 'entry'
         });
 
-        if (error) console.warn('[entryExitScanner] student gate log error:', error.message);
+        if (error) {
+            console.warn('[entryExitScanner] student gate log error:', error.message);
+            showToast(`${data.name || 'Student'} recognized, but the gate log was not saved.`, 'red', 4000);
+            return;
+        }
 
         const displayMeta = {
             name:         data.name || '—',
@@ -471,7 +598,7 @@ async function logEntryByStudId(studId, method) {
     try {
         const { data: rows, error } = await supabaseClient
             .from('students')
-            .select('student_id, stud_id, first_name, last_name, grade_level, section_name')
+            .select('student_id, stud_id, first_name, last_name, section_id, sections ( grade_level, section_name )')
             .eq('stud_id', studId)
             .limit(1);
 
@@ -503,8 +630,8 @@ async function logEntryByStudId(studId, method) {
         const displayMeta = {
             name:         `${student.last_name}, ${student.first_name}`,
             stud_id:      student.stud_id,
-            grade_level:  student.grade_level,
-            section_name: student.section_name
+            grade_level:  student.sections?.grade_level || '—',
+            section_name: student.sections?.section_name || '—'
         };
         showResultStudent(displayMeta, logType, isLate);
         const sid = currentMode === 'face' ? 'faceStatus' : 'qrStatus';
@@ -536,6 +663,62 @@ function closeManual() {
     document.getElementById('manualIdInput').oninput = null;
 }
 
+function openManualAccess() {
+    const modal = document.getElementById('manualAccessModal');
+    const error = document.getElementById('manualAccessError');
+    modal.classList.add('open');
+    error.classList.remove('show');
+    document.getElementById('manualAccessEmail').value = '';
+    document.getElementById('manualAccessPassword').value = '';
+    setTimeout(() => document.getElementById('manualAccessEmail').focus(), 100);
+}
+
+function closeManualAccess() {
+    document.getElementById('manualAccessModal').classList.remove('open');
+}
+
+async function submitManualAccess() {
+    const email = document.getElementById('manualAccessEmail').value.trim();
+    const password = document.getElementById('manualAccessPassword').value;
+    const button = document.getElementById('manualAccessSubmit');
+    const error = document.getElementById('manualAccessError');
+    const errorText = document.getElementById('manualAccessErrorText');
+
+    error.classList.remove('show');
+    if (!email || !password) {
+        errorText.textContent = 'Enter both email and password.';
+        error.classList.add('show');
+        return;
+    }
+
+    button.disabled = true;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
+
+    try {
+        const { data, error: queryError } = await supabaseClient
+            .from('admins')
+            .select('admin_id, admin_level, status')
+            .eq('email', email)
+            .eq('password', password)
+            .eq('status', 'active')
+            .maybeSingle();
+
+        if (queryError) throw queryError;
+        if (!data) throw new Error('Invalid administrator credentials.');
+
+        sessionStorage.setItem('manual_access_granted', 'true');
+        sessionStorage.setItem('manual_access_role', data.admin_level || 'admin');
+        window.location.href = '../../TimeInAndTimeOutMonitoring/students/manualAttendance.html';
+    } catch (err) {
+        console.error('[entryExitScanner] manual access verification failed:', err);
+        errorText.textContent = err.message || 'Unable to verify credentials.';
+        error.classList.add('show');
+    } finally {
+        button.disabled = false;
+        button.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Continue';
+    }
+}
+
 // Preview who will be logged before submitting
 async function previewManualLookup() {
     const val = document.getElementById('manualIdInput').value.trim();
@@ -554,9 +737,10 @@ async function previewManualLookup() {
     }
 
     if (result.type === 'student') {
+        const section = result.sections || {};
         box.className = 'manual-lookup-result found-student';
         box.innerHTML = `<strong><i class="fa-solid fa-user-graduate"></i> ${result.last_name}, ${result.first_name}</strong>
-                         <span>Student · ${result.stud_id} · Grade ${result.grade_level || '—'}</span>`;
+                         <span>Student · ${result.stud_id} · ${section.grade_level || '—'} — ${section.section_name || '—'}</span>`;
     } else {
         box.className = 'manual-lookup-result found-employee';
         box.innerHTML = `<strong><i class="fa-solid fa-user-tie"></i> ${result.last_name}, ${result.first_name}</strong>
@@ -590,7 +774,7 @@ async function resolveIdInput(val) {
     try {
         const { data: sRows } = await supabaseClient
             .from('students')
-            .select('student_id, stud_id, first_name, middle_name, last_name, grade_level, section_name')
+            .select('student_id, stud_id, first_name, middle_name, last_name, section_id, sections ( grade_level, section_name )')
             .eq('stud_id', val)
             .limit(1);
         if (sRows && sRows.length > 0) return { type: 'student', ...sRows[0] };
@@ -600,10 +784,16 @@ async function resolveIdInput(val) {
     try {
         const { data: eRows } = await supabaseClient
             .from('employees')
-            .select('employee_id, emp_no, first_name, middle_name, last_name, department')
+            .select('employee_id, emp_no, first_name, middle_name, last_name, faculty, role')
             .eq('emp_no', val)
             .limit(1);
-        if (eRows && eRows.length > 0) return { type: 'employee', ...eRows[0] };
+        if (eRows && eRows.length > 0) {
+            return {
+                type: 'employee',
+                ...eRows[0],
+                department: eRows[0].faculty || eRows[0].role || '—'
+            };
+        }
     } catch (_) {}
 
     return null;
@@ -629,8 +819,8 @@ async function manualLogStudent(student) {
         const meta = {
             name:         `${student.last_name}, ${student.first_name}`,
             stud_id:      student.stud_id,
-            grade_level:  student.grade_level,
-            section_name: student.section_name
+            grade_level:  student.sections?.grade_level || '—',
+            section_name: student.sections?.section_name || '—'
         };
         showResultStudent(meta, logType, isLate);
         flashStatus('faceStatus', logType, isLate, meta.name, false);
@@ -720,6 +910,25 @@ function showInfoOverlay(data) {
     overlayTimer = setTimeout(() => dismissOverlay('infoOverlay'), OVERLAY_DISMISS_MS);
 }
 
+function showGateResultOverlay(name, meta, badges, isEmployee) {
+    clearOverlayTimer();
+
+    const avatar = document.getElementById('gateResultAvatar');
+    avatar.className = `overlay-icon gate-result-icon${isEmployee ? ' employee-avatar' : ''}`;
+    avatar.innerHTML = `<i class="fa-solid ${isEmployee ? 'fa-user-tie' : 'fa-user-graduate'}"></i>`;
+    document.getElementById('gateResultName').textContent = name || '—';
+    document.getElementById('gateResultMeta').textContent = meta || '—';
+    document.getElementById('gateResultBadges').innerHTML = badges || '';
+
+    const fill = document.getElementById('gateResultTimerFill');
+    fill.style.animation = 'none';
+    fill.offsetHeight;
+    fill.style.animation = `timerShrink ${OVERLAY_DISMISS_MS / 1000}s linear forwards`;
+
+    document.getElementById('gateResultOverlay').classList.add('show');
+    overlayTimer = setTimeout(() => dismissOverlay('gateResultOverlay'), OVERLAY_DISMISS_MS);
+}
+
 function dismissOverlay(id) {
     const el = document.getElementById(id);
     if (el) el.classList.remove('show');
@@ -729,6 +938,7 @@ function clearOverlayTimer() {
     if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
     dismissOverlay('spoofOverlay');
     dismissOverlay('infoOverlay');
+    dismissOverlay('gateResultOverlay');
 }
 
 /* ══════════════════════════════════════════════════
@@ -752,6 +962,12 @@ function showResultStudent(meta, logType, isLate) {
 
     document.getElementById('resultBadges').innerHTML = typeBadge + lateBadge + roleBadge;
     document.getElementById('resultStrip').classList.add('show');
+    showGateResultOverlay(
+        meta.name,
+        `${meta.stud_id || '—'} · Grade ${meta.grade_level || '—'} — ${meta.section_name || '—'}`,
+        typeBadge + lateBadge + roleBadge,
+        false
+    );
 }
 
 function showResultEmployee(name, empNo, department, logType, isLate) {
@@ -772,6 +988,12 @@ function showResultEmployee(name, empNo, department, logType, isLate) {
 
     document.getElementById('resultBadges').innerHTML = typeBadge + lateBadge + empBadge;
     document.getElementById('resultStrip').classList.add('show');
+    showGateResultOverlay(
+        name,
+        `${empNo || '—'} · ${department || '—'}`,
+        typeBadge + lateBadge + empBadge,
+        true
+    );
 }
 
 /* ══════════════════════════════════════════════════
@@ -855,4 +1077,46 @@ function showToast(msg, type = 'green', duration = 3000) {
 function debounce(fn, ms) {
     let t;
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+function handleFaceDbSync(status) {
+    const phase = status.face_db_phase || (status.face_db_ready ? 'ready' : 'starting');
+    if (phase === 'rebuilding' && previousFaceDbPhase !== 'rebuilding') {
+        showToast('Syncing facial data. Recognition will continue in the background.', 'blue', 6000);
+    }
+
+    if (previousFaceDbPhase === 'rebuilding' && phase === 'ready') {
+        const summary = status.last_rebuild_summary;
+        if (summary?.timestamp && summary.timestamp !== previousRebuildSummaryTimestamp) {
+            previousRebuildSummaryTimestamp = summary.timestamp;
+            const changed = (summary.added || 0) + (summary.updated || 0) + (summary.removed || 0);
+            if (changed) showGateSyncSummary(summary);
+            else showToast('Facial data sync complete. No changes found.', 'green', 3000);
+        }
+    }
+    previousFaceDbPhase = phase;
+}
+
+function showGateSyncSummary(summary) {
+    document.getElementById('gateSyncAdded').textContent = summary.added || 0;
+    document.getElementById('gateSyncUpdated').textContent = summary.updated || 0;
+    document.getElementById('gateSyncRemoved').textContent = summary.removed || 0;
+    document.getElementById('gateSyncDuration').textContent = summary.duration_ms
+        ? `Completed in ${Math.round(summary.duration_ms)}ms` : '';
+    const box = document.getElementById('gateSyncBox');
+    const removedOnly = summary.removed > 0 && !summary.added && !summary.updated;
+    box.classList.toggle('warn', removedOnly);
+    document.getElementById('gateSyncTitle').textContent = removedOnly ? 'Facial Data Removed' : 'Facial Data Synced';
+    document.getElementById('gateSyncSubtext').textContent = removedOnly
+        ? 'Some facial records were removed. Recognition may fail until they are registered again.'
+        : 'New or changed facial records are ready for Entry-Exit scanning.';
+    document.getElementById('gateSyncOverlay').classList.add('on');
+    clearTimeout(gateSyncModalTimer);
+    gateSyncModalTimer = setTimeout(dismissGateSyncModal, removedOnly ? 12000 : 8000);
+}
+
+function dismissGateSyncModal() {
+    clearTimeout(gateSyncModalTimer);
+    document.getElementById('gateSyncOverlay').classList.remove('on');
+    document.getElementById('gateSyncBox').classList.remove('warn');
 }

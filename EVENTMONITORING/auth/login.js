@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (AUTH_DISABLED) {
             submitBtn.disabled    = true;
             submitBtn.textContent = 'Entering...';
-            bypassLogin(username, password);
+            await bypassLogin(username, password);
             return;
         }
 
@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    function bypassLogin(username, password) {
+    async function bypassLogin(username, password) {
         const normalizedUsername = String(username || '').trim().toLowerCase();
         const match = HARDCODED_USERS.find(user => {
             return user.usernames.includes(normalizedUsername) && user.password === password;
@@ -100,6 +100,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!match) {
             showError('Invalid credentials. Use admin or superadmin with the default password.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Sign In';
+            return;
+        }
+
+        const authReady = await ensureSupabaseAuthSession(match.profile.email, password);
+        if (!authReady) {
+            showError('Could not establish a secure database session. Please try again.');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Sign In';
             return;

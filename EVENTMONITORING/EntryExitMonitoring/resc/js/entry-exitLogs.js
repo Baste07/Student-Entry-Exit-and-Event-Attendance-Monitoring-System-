@@ -29,8 +29,10 @@ async function loadLogs() {
                 id, log_type, scan_method, log_date, log_timestamp, is_late,
                 student_id,
                 employee_id,
-                students ( stud_id, first_name, last_name, section_id ),
-                employees ( emp_no, first_name, last_name )
+                students ( stud_id, first_name, last_name, section_id,
+                    sections ( grade_level, section_name )
+                ),
+                employees ( emp_no, first_name, last_name, faculty, role )
             `)
             .order('log_timestamp', { ascending: false })
             .limit(1000);
@@ -128,9 +130,11 @@ function renderPage() {
             : escHtml(`${s.last_name || '—'}, ${s.first_name || ''}`);
 
         // For students show grade/section; for employees show "Employee"
+        const section = s.sections || {};
+        const employeeRole = e.faculty || e.role || 'Employee';
         const roleCellHtml = isEmployee
-            ? `<td colspan="2"><span class="log-role-badge emp"><i class="fa-solid fa-user-tie"></i> Employee</span></td>`
-            : `<td>${escHtml(s.grade_level || '—')}</td><td>${escHtml(s.section_name || '—')}</td>`;
+            ? `<td colspan="2"><span class="log-role-badge emp"><i class="fa-solid fa-user-tie"></i> ${escHtml(employeeRole)}</span></td>`
+            : `<td>${escHtml(section.grade_level || '—')}</td><td>${escHtml(section.section_name || '—')}</td>`;
 
         const typeBadge = l.log_type === 'entry'
             ? `<span class="log-badge entry"><i class="fa-solid fa-door-open"></i> Entry</span>`

@@ -26,6 +26,7 @@ async function generateReport() {
     if (from > to)    { showToast('Date From must be before Date To.'); return; }
 
     document.getElementById('emptyState').style.display   = 'none';
+    document.getElementById('analyticsPanel').style.display = 'none';
     document.getElementById('chartPanel').style.display   = 'none';
     document.getElementById('tablePanel').style.display   = 'none';
 
@@ -34,7 +35,9 @@ async function generateReport() {
             .from('entry_exit_logs')
             .select(`
                 log_type, scan_method, log_date, log_timestamp,
-                students ( stud_id, first_name, last_name, grade_level, section_name )
+                students ( stud_id, first_name, last_name, section_id,
+                    sections ( grade_level, section_name )
+                )
             `)
             .gte('log_date', from)
             .lte('log_date', to)
@@ -68,22 +71,29 @@ function buildDailyReport(logs, from, to) {
     const end = new Date(to);
     while (cur <= end) {
         const d = cur.toLocaleDateString('en-CA');
-        days[d] = { entries: 0, exits: 0 };
+        days[d] = { entries: 0, exits: 0, studentIds: new Set() };
         cur.setDate(cur.getDate() + 1);
     }
     logs.forEach(l => {
-        if (!days[l.log_date]) days[l.log_date] = { entries: 0, exits: 0 };
+        if (!days[l.log_date]) days[l.log_date] = { entries: 0, exits: 0, studentIds: new Set() };
         if (l.log_type === 'entry') days[l.log_date].entries++;
         else                        days[l.log_date].exits++;
+        if (l.log_type === 'entry' && l.students?.stud_id) days[l.log_date].studentIds.add(l.students.stud_id);
     });
 
-    reportData = Object.entries(days).map(([date, v]) => ({ date, ...v }));
+    reportData = Object.entries(days).map(([date, v]) => ({
+        date, entries: v.entries, exits: v.exits,
+        uniqueStudents: v.studentIds.size
+    }));
+
+    updateDailyAnalytics(reportData);
 
     // Chart
     renderChart(
         reportData.map(r => r.date),
         [
-            { label: 'Entries', data: reportData.map(r => r.entries), backgroundColor: 'rgba(16,185,129,.7)', borderColor: '#059669', borderWidth: 2 },
+            { label: 'Unique Students Entered', data: reportData.map(r => r.uniqueStudents), backgroundColor: 'rgba(47,143,206,.72)', borderColor: '#176aa4', borderWidth: 2 },
+            { label: 'Entry Scans', data: reportData.map(r => r.entries), backgroundColor: 'rgba(16,185,129,.55)', borderColor: '#059669', borderWidth: 2 },
             { label: 'Exits',   data: reportData.map(r => r.exits),   backgroundColor: 'rgba(239,68,68,.6)',  borderColor: '#dc2626', borderWidth: 2 }
         ],
         'Daily Entry-Exit Count'
@@ -91,10 +101,25 @@ function buildDailyReport(logs, from, to) {
 
     // Table
     renderTable(
-        ['Date', 'Entries', 'Exits', 'Total'],
-        reportData.map(r => [r.date, r.entries, r.exits, r.entries + r.exits]),
+        ['Date', 'Unique Students', 'Entry Scans', 'Exits', 'Total Scans'],
+        reportData.map(r => [r.date, r.uniqueStudents, r.entries, r.exits, r.entries + r.exits]),
         'Daily Summary'
     );
+}
+
+function updateDailyAnalytics(rows) {
+    const panel = document.getElementById('analyticsPanel');
+    if (!panel) return;
+    panel.style.display = 'block';
+    const uniqueTotal = rows.reduce((sum, row) => sum + row.uniqueStudents, 0);
+    const average = rows.length ? uniqueTotal / rows.length : 0;
+    const peak = rows.reduce((best, row) => row.uniqueStudents > best.uniqueStudents ? row : best, { date: null, uniqueStudents: 0 });
+    const peakDate = peak.date ? new Date(`${peak.date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+    document.getElementById('analyticsUniqueStudents').textContent = uniqueTotal;
+    document.getElementById('analyticsAverageStudents').textContent = average.toFixed(1);
+    document.getElementById('analyticsPeakDay').textContent = peakDate;
+    document.getElementById('analyticsPeakCount').textContent = peak.date ? `${peak.uniqueStudents} unique students entered` : 'No entry data';
+    document.getElementById('analyticsEntryScans').textContent = rows.reduce((sum, row) => sum + row.entries, 0);
 }
 
 /* ── Weekly: group by ISO week ── */
@@ -132,10 +157,11 @@ function buildStudentReport(logs) {
     const students = {};
     logs.forEach(l => {
         const s   = l.students || {};
+        const section = s.sections || {};
         const key = s.stud_id || 'unknown';
         if (!students[key]) students[key] = {
             stud_id: s.stud_id, name: `${s.last_name}, ${s.first_name}`,
-            grade: s.grade_level, section: s.section_name,
+            grade: section.grade_level, section: section.section_name,
             entries: 0, exits: 0
         };
         if (l.log_type === 'entry') students[key].entries++;
@@ -157,7 +183,7 @@ function buildStudentReport(logs) {
 function buildGradeReport(logs) {
     const grades = {};
     logs.forEach(l => {
-        const g = l.students?.grade_level || 'Unknown';
+        const g = l.students?.sections?.grade_level || 'Unknown';
         if (!grades[g]) grades[g] = { entries: 0, exits: 0 };
         if (l.log_type === 'entry') grades[g].entries++;
         else                        grades[g].exits++;
@@ -223,8 +249,8 @@ function exportCSV() {
         headers = ['Week','Entries','Exits','Total'];
         rows = reportData.map(r => [r.week, r.entries, r.exits, r.entries + r.exits]);
     } else {
-        headers = ['Date','Entries','Exits','Total'];
-        rows = reportData.map(r => [r.date, r.entries, r.exits, r.entries + r.exits]);
+        headers = ['Date','Unique Students','Entry Scans','Exits','Total Scans'];
+        rows = reportData.map(r => [r.date, r.uniqueStudents, r.entries, r.exits, r.entries + r.exits]);
     }
     const csv  = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -260,8 +286,8 @@ function exportPDF() {
         head = [['Week','Entries','Exits','Total']];
         body = reportData.map(r => [r.week, r.entries, r.exits, r.entries + r.exits]);
     } else {
-        head = [['Date','Entries','Exits','Total']];
-        body = reportData.map(r => [r.date, r.entries, r.exits, r.entries + r.exits]);
+        head = [['Date','Unique Students','Entry Scans','Exits','Total Scans']];
+        body = reportData.map(r => [r.date, r.uniqueStudents, r.entries, r.exits, r.entries + r.exits]);
     }
 
     doc.autoTable({ head, body, startY: 38, styles: { fontSize: 9 }, headStyles: { fillColor: [11,78,120] } });
