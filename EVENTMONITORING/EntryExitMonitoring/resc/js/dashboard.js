@@ -33,14 +33,8 @@ async function loadStats() {
         const entries = (todayLogs || []).filter(l => l.log_type === 'entry');
         const exits   = (todayLogs || []).filter(l => l.log_type === 'exit');
 
-        // "Currently inside" = students who have an entry but whose last record is an entry
-        const studentLastLog = {};
-        (todayLogs || []).forEach(l => { studentLastLog[l.student_id] = l.log_type; });
-        const insideCount = Object.values(studentLastLog).filter(t => t === 'entry').length;
-
         setEl('statTotalStudents', totalStudents ?? 0);
         setEl('statEnteredToday',  entries.length);
-        setEl('statInsideCampus',  insideCount);
         setEl('statExitedToday',   exits.length);
     } catch (e) {
         console.error('[dashboard] loadStats error:', e);
@@ -53,8 +47,10 @@ async function loadRecentLogs() {
         const { data: logs, error } = await supabaseClient
             .from('entry_exit_logs')
             .select(`
-                id, log_type, scan_method, log_timestamp,
-                students ( stud_id, first_name, last_name, grade_level, section_name )
+                id, log_type, scan_method, log_date, log_timestamp,
+                students ( stud_id, first_name, last_name, section_id,
+                    sections ( grade_level, section_name )
+                )
             `)
             .order('log_timestamp', { ascending: false })
             .limit(20);
@@ -62,15 +58,19 @@ async function loadRecentLogs() {
         if (error) throw error;
 
         if (!logs || logs.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="loading-cell">No activity yet today.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="loading-cell">No activity yet today.</td></tr>`;
             return;
         }
 
         tbody.innerHTML = logs.map(log => {
             const s   = log.students || {};
+            const section = s.sections || {};
             const name = `${s.last_name || '—'}, ${s.first_name || '—'}`;
             const time = log.log_timestamp
                 ? new Date(log.log_timestamp).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                : '—';
+            const date = log.log_date
+                ? new Date(`${log.log_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
                 : '—';
             const typeBadge   = log.log_type === 'entry'
                 ? '<span class="badge badge-entry"><i class="fa-solid fa-door-open"></i> Entry</span>'
@@ -79,15 +79,16 @@ async function loadRecentLogs() {
             return `<tr>
                 <td>${name}</td>
                 <td>${s.stud_id || '—'}</td>
-                <td>${s.grade_level || '—'} — ${s.section_name || '—'}</td>
+                <td>${section.grade_level || '—'} — ${section.section_name || '—'}</td>
                 <td>${typeBadge}</td>
                 <td>${methodBadge}</td>
+                <td>${date}</td>
                 <td>${time}</td>
             </tr>`;
         }).join('');
     } catch (e) {
         console.error('[dashboard] loadRecentLogs error:', e);
-        tbody.innerHTML = `<tr><td colspan="6" class="loading-cell">Failed to load logs.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="loading-cell">Failed to load logs.</td></tr>`;
     }
 }
 

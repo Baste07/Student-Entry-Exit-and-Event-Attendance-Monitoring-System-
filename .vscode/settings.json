@@ -2,5 +2,6 @@
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "python.analysis.extraPaths": [
         "./EVENTMONITORING/TimeInAndTimeOutMonitoring/src"
-    ]
+    ],
+    "liveServer.settings.port": 5541
 }

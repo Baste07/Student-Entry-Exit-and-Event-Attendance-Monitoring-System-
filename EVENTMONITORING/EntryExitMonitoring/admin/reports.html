@@ -73,6 +73,36 @@
                 </div>
             </div>
 
+            <!-- Daily analytics -->
+            <div class="analytics-panel" id="analyticsPanel" style="display:none;">
+                <div class="panel-title">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Daily School Attendance Trends</span>
+                </div>
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <span class="analytics-label">Daily Student Entries</span>
+                        <strong id="analyticsUniqueStudents">0</strong>
+                        <small>Sum of unique students per day</small>
+                    </div>
+                    <div class="analytics-card">
+                        <span class="analytics-label">Average Per Day</span>
+                        <strong id="analyticsAverageStudents">0</strong>
+                        <small>Unique student entries</small>
+                    </div>
+                    <div class="analytics-card">
+                        <span class="analytics-label">Busiest Day</span>
+                        <strong id="analyticsPeakDay">—</strong>
+                        <small id="analyticsPeakCount">No entry data</small>
+                    </div>
+                    <div class="analytics-card">
+                        <span class="analytics-label">Total Entry Scans</span>
+                        <strong id="analyticsEntryScans">0</strong>
+                        <small>Includes repeat scans</small>
+                    </div>
+                </div>
+            </div>
+
             <!-- Chart -->
             <div class="panel" id="chartPanel" style="display:none;">
                 <div class="panel-title">

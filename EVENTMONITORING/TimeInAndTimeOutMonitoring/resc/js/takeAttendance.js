@@ -514,11 +514,27 @@ if (switchCameraBtn) {
 // ══════════════════════════════════════════════════
 // SESSION START / STOP
 // ══════════════════════════════════════════════════
+async function setScannerMode(mode) {
+    const response = await fetch('http://127.0.0.1:5000/scanner_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+    });
+    if (!response.ok) throw new Error('Unable to select scanner mode.');
+}
+
 startBtn.addEventListener('click', async () => {
     if (!isEngineOnline) return;
 
     if (!isFaceDbReady) {
         setOutput('info', 'fa-solid fa-database', 'Face database is still warming up. Please wait for Start Session to appear.');
+        return;
+    }
+
+    try {
+        await setScannerMode('event_attendance');
+    } catch (error) {
+        setOutput('error', 'fa-solid fa-triangle-exclamation', error.message);
         return;
     }
 
@@ -556,6 +572,8 @@ function stopAttendanceSession() {
 // SSE — GREETING STREAM
 // ══════════════════════════════════════════════════
 function handleRecognitionEvent(d) {
+    if (d.recognition_only || d.type === 'gate_recorded') return;
+
     const name = d.name || '';
     const message = d.message || '';
     const details = {
