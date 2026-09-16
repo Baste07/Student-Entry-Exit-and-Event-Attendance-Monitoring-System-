@@ -191,82 +191,6 @@
 
 .cred-note i { color: #0b4e78; margin-right: 4px; }
 
-/* ── Greeting Overlay ── */
-.greet-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(10, 20, 15, 0.75);
-    z-index: 9999;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(8px);
-}
-.greet-overlay.on { display: flex; }
-
-.greet-card {
-    background: #ffffff;
-    border-radius: 24px;
-    padding: 48px 40px 36px;
-    max-width: 420px;
-    width: 92%;
-    text-align: center;
-    box-shadow: 0 24px 80px rgba(0,0,0,.35);
-    animation: greetPop .4s cubic-bezier(.34,1.56,.64,1);
-    border: 2px solid #166534;
-}
-
-@keyframes greetPop {
-    from { opacity: 0; transform: scale(.7) translateY(30px); }
-    to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.greet-avatar {
-    width: 80px; height: 80px;
-    border-radius: 50%;
-    margin: 0 auto 20px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 36px;
-    background: #dcfce7;
-    border: 3px solid #166534;
-}
-
-.greet-name {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.6rem;
-    font-weight: 800;
-    color: #0f2419;
-    margin-bottom: 8px;
-}
-
-.greet-msg {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 1.1rem;
-    color: #1a4731;
-    font-weight: 600;
-    margin-bottom: 20px;
-}
-
-.greet-countdown {
-    font-size: .8rem;
-    color: #64748b;
-    font-family: 'DM Sans', sans-serif;
-}
-
-/* Spoof variant */
-.greet-card.spoof {
-    border-color: #7f1d1d;
-}
-.greet-card.spoof .greet-avatar {
-    background: #fef2f2;
-    border-color: #7f1d1d;
-}
-.greet-card.spoof .greet-name {
-    color: #7f1d1d;
-}
-.greet-card.spoof .greet-msg {
-    color: #991b1b;
-}
 </style>
 </head>
 <body>
@@ -394,14 +318,32 @@
 <div id="toast"></div>
 
 <!-- ══ GREETING OVERLAY ══ -->
-<div class="greet-overlay" id="greetOverlay" onclick="if(event.target===this)dismissGreeting()">
-    <div class="greet-card" id="greetCard">
-        <div class="greet-avatar" id="greetAvatar">👋</div>
-        <div class="greet-name" id="greetName"></div>
+<div class="greet-overlay" id="greetOverlay" hidden>
+    <div class="greet-card success" id="greetCard"
+         role="dialog" aria-modal="true" aria-labelledby="greetTitle" aria-describedby="greetMsg" tabindex="-1">
+        <button class="greet-close" id="greetClose" type="button" aria-label="Close notification">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+        <div class="greet-avatar" id="greetAvatar" aria-hidden="true">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div class="greet-badge" id="greetBadge">ATTENDANCE CONFIRMED</div>
+        <h2 class="greet-name" id="greetTitle"></h2>
+        <div class="greet-person" id="greetPerson"></div>
         <div class="greet-meta" id="greetMeta"></div>
         <div class="greet-time" id="greetTime"></div>
-        <div class="greet-msg" id="greetMsg"></div>
-        <div class="greet-countdown" id="greetCountdown"></div>
+        <p class="greet-msg" id="greetMsg"></p>
+        <details class="greet-diagnostics" id="greetDiagnostics">
+            <summary>Technical details</summary>
+            <dl>
+                <div><dt>Score</dt><dd id="greetScore">Not available</dd></div>
+                <div><dt>Threshold</dt><dd id="greetThreshold">Not available</dd></div>
+            </dl>
+        </details>
+        <div class="greet-dismissal" aria-live="polite">
+            <div class="greet-progress" aria-hidden="true"><span id="greetProgress"></span></div>
+            <span id="greetCountdown"></span>
+        </div>
     </div>
 </div>
 

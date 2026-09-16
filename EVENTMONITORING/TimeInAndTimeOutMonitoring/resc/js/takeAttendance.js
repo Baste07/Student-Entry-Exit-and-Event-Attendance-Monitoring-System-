@@ -25,6 +25,13 @@ const greetAvatar    = document.getElementById('greetAvatar');
 const greetName      = document.getElementById('greetName');
 const greetMsg       = document.getElementById('greetMsg');
 const greetCountdown = document.getElementById('greetCountdown');
+const greetClose     = document.getElementById('greetClose');
+const greetBadge     = document.getElementById('greetBadge');
+const greetPerson    = document.getElementById('greetPerson');
+const greetProgress  = document.getElementById('greetProgress');
+const greetDiagnostics = document.getElementById('greetDiagnostics');
+const greetScore     = document.getElementById('greetScore');
+const greetThreshold = document.getElementById('greetThreshold');
 
 let isBooting = false; 
 let isEngineOnline = false;
@@ -35,6 +42,10 @@ let _prevRebuildSummaryTs = null;
 
 let greetTimer = null;
 let greetCountdownInterval = null;
+let greetRemaining = 5;
+let greetPaused = false;
+let greetPreviousFocus = null;
+let lastGreetingEventId = null;
 
 let ongoingEvents = [];
 
@@ -46,6 +57,7 @@ function showGreeting(name, message, isSpoof = false, details = {}) {
     clearInterval(greetCountdownInterval);
 
     greetName.textContent = name || '';
+    greetPerson.textContent = name || '';
     greetMsg.textContent = message || '';
 
     const metaParts = [];
@@ -64,35 +76,89 @@ function showGreeting(name, message, isSpoof = false, details = {}) {
         timeEl.style.display = 'none';
     }
 
-    if (isSpoof) {
-        greetCard.classList.add('spoof');
-        greetAvatar.textContent = '❌';
-    } else {
-        greetCard.classList.remove('spoof');
-        greetAvatar.textContent = details.type === 'time_out' ? '👋' : '✅';
-    }
+    const state = isSpoof ? 'spoof' : (details.type === 'already_recorded' ? 'warning' :
+        (details.type === 'error' || details.type === 'not_participant' ? 'error' : 'success'));
+    const stateContent = {
+        success: { badge: details.type === 'time_out' ? 'TIME-OUT RECORDED' : 'ATTENDANCE CONFIRMED', icon: 'fa-circle-check' },
+        warning: { badge: 'ALREADY RECORDED', icon: 'fa-circle-exclamation' },
+        error: { badge: 'ATTENDANCE NOTICE', icon: 'fa-triangle-exclamation' },
+        spoof: { badge: 'LIVENESS CHECK FAILED', icon: 'fa-shield-halved' }
+    }[state];
+    greetCard.className = `greet-card ${state}`;
+    greetBadge.textContent = stateContent.badge;
+    greetName.textContent = state === 'spoof' ? 'Face verification unsuccessful' :
+        (state === 'success' ? 'Attendance recorded' : stateContent.badge.toLowerCase());
+    greetAvatar.innerHTML = `<i class="fa-solid ${stateContent.icon}" aria-hidden="true"></i>`;
+    greetDiagnostics.hidden = !isSpoof;
+    greetScore.textContent = details.score ?? 'Not available';
+    greetThreshold.textContent = details.threshold ?? 'Not available';
 
-    let remaining = 4;
-    greetCountdown.textContent = `Auto-dismiss in ${remaining}s`;
+    greetPreviousFocus = document.activeElement;
+    greetRemaining = 5;
+    greetPaused = false;
+    updateGreetingCountdown();
     greetCountdownInterval = setInterval(() => {
-        remaining--;
-        greetCountdown.textContent = remaining > 0 ? `Auto-dismiss in ${remaining}s` : '';
-        if (remaining <= 0) clearInterval(greetCountdownInterval);
-    }, 1000);
+        if (greetPaused) return;
+        greetRemaining -= 0.1;
+        updateGreetingCountdown();
+        if (greetRemaining <= 0) dismissGreeting();
+    }, 100);
 
+    greetOverlay.hidden = false;
     greetOverlay.classList.add('on');
-    greetTimer = setTimeout(dismissGreeting, 4000);
+    requestAnimationFrame(() => greetClose.focus());
+}
+
+function updateGreetingCountdown() {
+    const seconds = Math.max(0, Math.ceil(greetRemaining));
+    greetCountdown.textContent = seconds > 0 ? `Auto-dismiss in ${seconds}s` : '';
+    greetProgress.style.transform = `scaleX(${Math.max(0, greetRemaining / 5)})`;
 }
 
 function dismissGreeting() {
     clearTimeout(greetTimer);
     clearInterval(greetCountdownInterval);
     greetOverlay.classList.remove('on');
+    greetOverlay.hidden = true;
+    if (greetPreviousFocus && typeof greetPreviousFocus.focus === 'function') {
+        greetPreviousFocus.focus();
+    }
+    greetPreviousFocus = null;
 }
 
-// Close greeting on click outside
+function getGreetingFocusableElements() {
+    return [...greetCard.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+        .filter(element => !element.disabled && element.offsetParent !== null);
+}
+
+// Close greeting on click outside and keep keyboard focus inside the dialog.
 greetOverlay.addEventListener('click', e => {
     if (e.target === greetOverlay) dismissGreeting();
+});
+greetClose.addEventListener('click', dismissGreeting);
+greetCard.addEventListener('mouseenter', () => { greetPaused = true; });
+greetCard.addEventListener('mouseleave', () => { greetPaused = false; });
+greetCard.addEventListener('focusin', () => { greetPaused = true; });
+greetCard.addEventListener('focusout', () => { greetPaused = false; });
+document.addEventListener('keydown', event => {
+    if (greetOverlay.hidden) return;
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        dismissGreeting();
+        return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = getGreetingFocusableElements();
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
 });
 
 // ══════════════════════════════════════════════════
@@ -585,8 +651,14 @@ function handleRecognitionEvent(d) {
         type: d.type || 'greeting'
     };
 
-    if (d.type === 'spoof' || message.includes('SPOOF')) {
-        showGreeting(name, d.reason || 'Liveness check failed.', true);
+    if (d.type === 'spoof') {
+        if (d.event_id && d.event_id === lastGreetingEventId) return;
+        lastGreetingEventId = d.event_id || null;
+        showGreeting(name, d.user_message || 'We couldn’t verify that this is a live face. Please face the camera directly, improve lighting, and try again.', true, {
+            type: 'spoof',
+            score: d.score,
+            threshold: d.threshold
+        });
         showToast('Spoof detected — please use a real face', 'red', 4000);
         return;
     }
