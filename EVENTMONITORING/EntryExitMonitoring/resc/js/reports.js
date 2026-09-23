@@ -12,8 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const today   = new Date();
     const monday  = new Date(today);
     monday.setDate(today.getDate() - today.getDay() + 1);
-    document.getElementById('reportFrom').value = monday.toLocaleDateString('en-CA');
-    document.getElementById('reportTo').value   = today.toLocaleDateString('en-CA');
+    document.getElementById('reportFrom').value = toLocalIsoDate(monday);
+    document.getElementById('reportTo').value   = toLocalIsoDate(today);
 });
 
 async function generateReport() {
@@ -24,6 +24,19 @@ async function generateReport() {
 
     if (!from || !to) { showToast('Please select a date range.'); return; }
     if (from > to)    { showToast('Date From must be before Date To.'); return; }
+
+    if (!supabaseClient) {
+        showReportError('The database client is unavailable. Please sign in again and reload the page.');
+        console.error('[reports] Supabase client is unavailable.');
+        return;
+    }
+
+    const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+    console.info('[reports] Supabase session state', {
+        authenticated: Boolean(sessionData?.session),
+        sessionError: sessionError?.message || null
+    });
+    console.info('[reports] Generating report', { type, from, to });
 
     document.getElementById('emptyState').style.display   = 'none';
     document.getElementById('analyticsPanel').style.display = 'none';
@@ -43,7 +56,19 @@ async function generateReport() {
             .lte('log_date', to)
             .order('log_date', { ascending: true });
 
-        if (error) throw error;
+        console.info('[reports] entry_exit_logs query result', {
+            from,
+            to,
+            rowCount: logs?.length ?? 0,
+            firstRow: logs?.[0] ?? null,
+            error: error ?? null
+        });
+
+        if (error) {
+            showReportError(`Unable to load report data: ${error.message || 'Unknown database error.'}`);
+            console.error('[reports] entry_exit_logs query error:', error);
+            return;
+        }
 
         if (!logs || logs.length === 0) {
             document.getElementById('emptyState').style.display = 'block';
@@ -59,7 +84,7 @@ async function generateReport() {
         }
     } catch (e) {
         console.error('[reports] generateReport error:', e);
-        showToast('Error generating report.');
+        showReportError(`Unable to generate report: ${e.message || 'Unexpected error.'}`);
     }
 }
 
@@ -67,10 +92,10 @@ async function generateReport() {
 function buildDailyReport(logs, from, to) {
     const days = {};
     // Populate all days in range
-    const cur = new Date(from);
-    const end = new Date(to);
+    const cur = new Date(`${from}T00:00:00`);
+    const end = new Date(`${to}T00:00:00`);
     while (cur <= end) {
-        const d = cur.toLocaleDateString('en-CA');
+        const d = toLocalIsoDate(cur);
         days[d] = { entries: 0, exits: 0, studentIds: new Set() };
         cur.setDate(cur.getDate() + 1);
     }
@@ -308,4 +333,18 @@ function showToast(msg) {
     if (!t || !m) return;
     m.textContent = msg; t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function toLocalIsoDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function showReportError(message) {
+    const emptyState = document.getElementById('emptyState');
+    emptyState.style.display = 'block';
+    emptyState.querySelector('p').textContent = message;
+    showToast('Error generating report. See the message above and browser console.');
 }

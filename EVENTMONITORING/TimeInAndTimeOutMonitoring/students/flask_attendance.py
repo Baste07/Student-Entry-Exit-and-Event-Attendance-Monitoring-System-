@@ -71,6 +71,7 @@ else:
 from flask import Flask, Response, request, jsonify
 from flask_cors import CORS
 from supabase import create_client, Client
+from sms_notifications import generate_attendance_sms, resolve_guardian_phone, send_sms
 
 warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -88,6 +89,7 @@ FACE_CACHE_FILE = os.path.join(script_dir, "face_encodings_cache.npz")
 FACE_CACHE_VERSION = 2   # ← bumped to 2 so old v1 caches are auto-discarded
 FORCE_FACE_CACHE_REBUILD = os.getenv("FORCE_FACE_CACHE_REBUILD", "0") == "1"
 MAX_IMAGES_PER_PERSON = int(os.getenv("MAX_IMAGES_PER_PERSON", "1"))
+DEBUG_SCAN_LOGS = os.getenv("DEBUG_SCAN_LOGS", "0") == "1"
 REBUILD_SECRET = os.getenv("REBUILD_SECRET", "")
 REBUILD_MIN_INTERVAL = float(os.getenv("REBUILD_MIN_INTERVAL", "3.0"))
 AUTO_REBUILD_POLL_SECONDS = float(os.getenv("AUTO_REBUILD_POLL_SECONDS", "12.0"))
@@ -477,6 +479,10 @@ thread_pool = ThreadPoolExecutor(max_workers=3)
 email_status_lock = threading.Lock()
 email_status_log = []  # List of recent email send attempts
 MAX_EMAIL_LOG = 50
+sms_status_lock = threading.Lock()
+sms_status_log = []
+sms_notification_keys = set()
+MAX_SMS_LOG = 50
 
 def _log_email_status(student_id, event_id, email_type, success, message, details=None):
     """Log email send result for UI display."""
@@ -495,6 +501,124 @@ def _log_email_status(student_id, event_id, email_type, success, message, detail
             email_status_log.pop()
     status_emoji = "✓" if success else "✗"
     print(f"  {status_emoji} Email {email_type} | {message}")
+
+def _log_sms_status(student_id, attendance_type, notification_type, success, message, details=None, audit=None):
+    details = details or {}
+    audit = audit or {}
+    result = audit.get("result") or ("SUCCESS_QUEUED" if success else "FAILED")
+    entry = {
+        "timestamp": audit.get("timestamp") or datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "student_id": str(student_id),
+        "attendance_type": attendance_type,
+        "type": notification_type,
+        "success": bool(success),
+        "message": str(message),
+        "notification_type": notification_type,
+        "recipient_phone_masked": details.get("recipient_phone_masked"),
+        "message_length": details.get("message_length", 0),
+        "sms_provider": details.get("sms_provider"),
+        "request_attempted": bool(audit.get("request_attempted", False)),
+        "http_status": audit.get("http_status"),
+        "provider_status": audit.get("provider_status"),
+        "provider_message": audit.get("provider_message"),
+        "provider_message_id": audit.get("provider_message_id") or audit.get("message_id"),
+        "result": result,
+        "failure_reason": audit.get("failure_reason"),
+        "attendance_record_id": details.get("attendance_record_id"),
+        "details": details,
+    }
+    with sms_status_lock:
+        sms_status_log.insert(0, entry)
+        if len(sms_status_log) > MAX_SMS_LOG:
+            sms_status_log.pop()
+    status_emoji = "✓" if success else "✗"
+    print("SMS_NOTIFICATION")
+    print(f"timestamp={entry['timestamp']}")
+    print(f"student_id={entry['student_id']}")
+    print(f"attendance_type={entry['attendance_type']}")
+    print(f"notification_type={entry['notification_type']}")
+    print(f"recipient={entry['recipient_phone_masked'] or 'null'}")
+    print(f"message_length={entry['message_length']}")
+    print(f"sms_provider={entry['sms_provider'] if entry['sms_provider'] is not None else 'null'}")
+    print(f"request_attempted={str(entry['request_attempted']).lower()}")
+    print(f"http_status={entry['http_status'] if entry['http_status'] is not None else 'null'}")
+    print(f"provider_status={entry['provider_status'] if entry['provider_status'] is not None else 'null'}")
+    print(f"provider_message={entry['provider_message'] or 'null'}")
+    print(f"provider_message_id={entry['provider_message_id'] or 'null'}")
+    print(f"result={entry['result']}")
+    print(f"failure_reason={entry['failure_reason'] or 'null'}")
+    print(f"attendance_record_id={entry['attendance_record_id'] or 'null'}")
+
+def _attendance_timestamp_label(timestamp_iso):
+    try:
+        parsed = datetime.datetime.fromisoformat(str(timestamp_iso).replace("Z", "+00:00"))
+        return parsed.strftime("%I:%M %p on %B %d, %Y").replace(" 0", " ")
+    except Exception:
+        return str(timestamp_iso)
+
+def _send_attendance_sms(student_id, notification_type, timestamp_iso, meta, event_name=None, notification_key=None, attendance_record_id=None):
+    attendance_type = "event" if event_name else "school"
+    provider_value = os.getenv("IPROG_SMS_PROVIDER", "0")
+    if notification_key:
+        with sms_status_lock:
+            if notification_key in sms_notification_keys:
+                duplicate = True
+            else:
+                duplicate = False
+                sms_notification_keys.add(notification_key)
+        if duplicate:
+            _log_sms_status(
+                student_id, attendance_type, notification_type, False,
+                "Duplicate SMS suppressed",
+                details={"sms_provider": provider_value, "attendance_record_id": attendance_record_id},
+                audit={"result": "NOT_ATTEMPTED", "failure_reason": "DUPLICATE_NOTIFICATION"},
+            )
+            return
+
+    try:
+        guardian = resolve_guardian_phone(supabase, str(student_id))
+        phone_number = guardian.get("phone_number")
+        if not phone_number:
+            _log_sms_status(
+                student_id, attendance_type, notification_type, False,
+                "No guardian phone number on file",
+                details={"sms_provider": provider_value, "attendance_record_id": attendance_record_id},
+                audit={"result": "NOT_ATTEMPTED", "failure_reason": "GUARDIAN_PHONE_NOT_FOUND"},
+            )
+            return
+
+        message = generate_attendance_sms(
+            notification_type,
+            meta.get("name", "Student"),
+            _attendance_timestamp_label(timestamp_iso),
+            event_name=event_name,
+        )
+        result = send_sms(phone_number, message)
+        _log_sms_status(
+            student_id,
+            "event" if event_name else "school",
+            notification_type,
+            result.get("success", False),
+            result.get("message", "SMS request failed"),
+            {
+                "recipient_phone_masked": mask_phone_for_log(phone_number),
+                "message_length": len(message),
+                "sms_provider": provider_value,
+                "attendance_record_id": attendance_record_id,
+            },
+            audit=result,
+        )
+    except Exception as exc:
+        _log_sms_status(
+            student_id, attendance_type, notification_type, False,
+            "SMS processing failed",
+            details={"sms_provider": provider_value, "attendance_record_id": attendance_record_id},
+            audit={"result": "NOT_ATTEMPTED", "failure_reason": "SMS_PROCESSING_ERROR"},
+        )
+
+def mask_phone_for_log(phone_number):
+    digits = "".join(ch for ch in str(phone_number or "") if ch.isdigit())
+    return f"{'*' * max(0, len(digits) - 4)}{digits[-4:]}" if len(digits) >= 4 else "****"
 
 def _hash_payload(obj) -> str:
     payload = json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str)
@@ -1330,7 +1454,9 @@ def get_guide_bounds(frame_shape):
 
 def _handle_recognition(meta):
     """Called by the recognition worker when a known face passes liveness."""
-    thread_pool.submit(_record_gate_log, meta)
+    mode = _get_scanner_mode()
+    if mode == "entry_exit":
+        thread_pool.submit(_record_gate_log, meta)
 
     _push({
         "message": f"RECOGNIZED {meta['name']}",
@@ -1357,9 +1483,8 @@ def _handle_recognition(meta):
         })
         return
 
-    # Always evaluate event attendance in the background. Entry-Exit logging
-    # consumes the neutral recognition event independently.
-    thread_pool.submit(_record_event_attendance, meta["id"], meta)
+    if mode == "event_attendance":
+        thread_pool.submit(_record_event_attendance, meta["id"], meta)
 
 
 def _record_gate_log(meta):
@@ -1388,7 +1513,17 @@ def _record_gate_log(meta):
             "log_timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "is_late": False,
         }
-        supabase.table("entry_exit_logs").insert(payload).execute()
+        insert_result = supabase.table("entry_exit_logs").insert(payload).execute()
+        notification_key = f"gate:{person_id}:{log_type}:{payload['log_timestamp']}"
+        if role == "student":
+            thread_pool.submit(
+                _send_attendance_sms,
+                person_id,
+                "school_time_in" if log_type == "entry" else "school_time_out",
+                payload["log_timestamp"],
+                meta,
+                notification_key=notification_key,
+            )
         _push({
             "message": f"GATE {log_type.upper()} {meta.get('name', '')}",
             "name": meta.get("name"),
@@ -1487,7 +1622,7 @@ def _record_event_attendance(student_id, meta):
             row = att_res.data[0] if att_res.data else None
 
             if not row:
-                supabase.table("event_attendance").insert({
+                attendance_insert = supabase.table("event_attendance").insert({
                     "event_id": ev_id,
                     "student_id": student_id,
                     "time_in": now.isoformat(),
@@ -1500,6 +1635,15 @@ def _record_event_attendance(student_id, meta):
                     _send_attendance_email,
                     student_id, ev_id, now.isoformat(), meta, ev,
                     email_type="time_in"
+                )
+                thread_pool.submit(
+                    _send_attendance_sms,
+                    student_id,
+                    "event_time_in",
+                    now.isoformat(),
+                    meta,
+                    event_name=ev.get("event_name"),
+                    notification_key=f"event:{ev_id}:{student_id}:time_in",
                 )
                 _push({
                     "message": f"TIME IN {meta['name']}",
@@ -1575,6 +1719,15 @@ def _record_event_attendance(student_id, meta):
                         email_type="time_out",
                         time_in_recorded=time_in_iso,
                         duration_minutes=duration
+                    )
+                    thread_pool.submit(
+                        _send_attendance_sms,
+                        student_id,
+                        "event_time_out",
+                        now.isoformat(),
+                        meta,
+                        event_name=ev.get("event_name"),
+                        notification_key=f"event:{ev_id}:{student_id}:time_out",
                     )
                     _push({
                         "message": f"TIME OUT {meta['name']}",
@@ -1655,39 +1808,44 @@ def recognition_worker():
         small = cv2.resize(roi, (0, 0), fx=0.25, fy=0.25)
         resize_ms = (time.time() - t_resize0) * 1000.0
         small_h, small_w = small.shape[:2]
-        print(f"[OPENCV-RESIZE] scan#{scan_count:05d}  roi={roi_w}x{roi_h}px -> scaled={small_w}x{small_h}px "
-              f"(scale=0.25x)  resize_time={resize_ms:.1f}ms")
+        if DEBUG_SCAN_LOGS:
+            print(f"[OPENCV-RESIZE] scan#{scan_count:05d}  roi={roi_w}x{roi_h}px -> scaled={small_w}x{small_h}px "
+                f"(scale=0.25x)  resize_time={resize_ms:.1f}ms")
 
         # ── ANALYTICS: OpenCV preprocessing — color conversion ──
         t_color0 = time.time()
         rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
         color_ms = (time.time() - t_color0) * 1000.0
-        print(f"[OPENCV-COLOR]  scan#{scan_count:05d}  channel_order: BGR (camera native) -> RGB "
-              f"(required by dlib/face_recognition)  convert_time={color_ms:.1f}ms")
+        if DEBUG_SCAN_LOGS:
+            print(f"[OPENCV-COLOR]  scan#{scan_count:05d}  channel_order: BGR (camera native) -> RGB "
+                f"(required by dlib/face_recognition)  convert_time={color_ms:.1f}ms")
 
         # ── ANALYTICS: dlib HOG+SVM face detection (via face_recognition.face_locations) ──
         t_det0 = time.time()
         locs = face_recognition.face_locations(rgb, model="hog")
         det_ms = (time.time() - t_det0) * 1000.0
         if not locs:
-            print(f"[HOG+SVM] scan#{scan_count:05d}  no face in ROI  scan_time={det_ms:.1f}ms")
+            if DEBUG_SCAN_LOGS:
+                print(f"[HOG+SVM] scan#{scan_count:05d}  no face in ROI  scan_time={det_ms:.1f}ms")
             with result_lock:
                 recognition_result.update({"locations": [], "labels": [], "colors": []})
             continue
-        print(f"[HOG+SVM] scan#{scan_count:05d}  faces_found={len(locs)}  scan_time={det_ms:.1f}ms")
-        for i, (t, r, b, l) in enumerate(locs):
-            full_t, full_r, full_b, full_l = t * 4 + y1, r * 4 + x1, b * 4 + y1, l * 4 + x1
-            print(f"[OPENCV-UPSCALE] scan#{scan_count:05d}  face#{i+1}  "
-                  f"bbox_on_small=[x:{l}, y:{t}, w:{r-l}, h:{b-t}]  "
-                  f"mapped_to_full_frame=[x:{full_l}, y:{full_t}, w:{full_r-full_l}, h:{full_b-full_t}]  "
-                  f"(×4 scale-back)")
+        if DEBUG_SCAN_LOGS:
+            print(f"[HOG+SVM] scan#{scan_count:05d}  faces_found={len(locs)}  scan_time={det_ms:.1f}ms")
+            for i, (t, r, b, l) in enumerate(locs):
+                full_t, full_r, full_b, full_l = t * 4 + y1, r * 4 + x1, b * 4 + y1, l * 4 + x1
+                print(f"[OPENCV-UPSCALE] scan#{scan_count:05d}  face#{i+1}  "
+                      f"bbox_on_small=[x:{l}, y:{t}, w:{r-l}, h:{b-t}]  "
+                      f"mapped_to_full_frame=[x:{full_l}, y:{full_t}, w:{full_r-full_l}, h:{full_b-full_t}]  "
+                      f"(×4 scale-back)")
 
         # ── ANALYTICS: 128-d face encoding generation (dlib ResNet, via face_recognition) ──
         t_enc0 = time.time()
         encs = face_recognition.face_encodings(rgb, locs, num_jitters=1)
         enc_ms = (time.time() - t_enc0) * 1000.0
-        print(f"[ENCODE]  scan#{scan_count:05d}  generated {len(encs)} x 128-d encoding(s)  "
-              f"encode_time={enc_ms:.1f}ms")
+        if DEBUG_SCAN_LOGS:
+            print(f"[ENCODE]  scan#{scan_count:05d}  generated {len(encs)} x 128-d encoding(s)  "
+                f"encode_time={enc_ms:.1f}ms")
 
         new_locs, new_labels, new_colors = [], [], []
         for i, ((top, right, bottom, left), enc) in enumerate(zip(locs, encs)):
@@ -2306,6 +2464,23 @@ def email_status_latest():
     if latest:
         return jsonify({"success": True, "log": latest})
     return jsonify({"success": False, "message": "No email activity yet"})
+
+@app.route('/sms_status', methods=['GET'])
+def sms_status():
+    """Return recent token-free SMS request status for diagnostics."""
+    limit = request.args.get('limit', 20, type=int)
+    with sms_status_lock:
+        logs = list(sms_status_log[:limit])
+    return jsonify({"success": True, "count": len(logs), "logs": logs})
+
+@app.route('/sms_status/latest', methods=['GET'])
+def sms_status_latest():
+    """Return the latest token-free SMS request status."""
+    with sms_status_lock:
+        latest = sms_status_log[0] if sms_status_log else None
+    if latest:
+        return jsonify({"success": True, "log": latest})
+    return jsonify({"success": False, "message": "No SMS activity yet"})
 
 if __name__ == '__main__':
     threading.Thread(target=load_all_faces, kwargs={"force_rebuild": FORCE_FACE_CACHE_REBUILD}, daemon=True).start()
