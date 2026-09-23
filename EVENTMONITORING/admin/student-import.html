@@ -219,6 +219,7 @@
                     <li><strong>Student ID</strong> — Format: K-0001, 1-0001, 10-0001 (Grade-Serial)</li>
                     <li><strong>First Name</strong> — Student's first name</li>
                     <li><strong>Last Name</strong> — Student's last name</li>
+                    <li><strong>Birth Date</strong> — YYYY-MM-DD; student must be at least 1 year old</li>
                 </ul>
             </div>
             <div class="info-col">
@@ -226,7 +227,6 @@
                 <ul>
                     <li><strong>Middle Name</strong> — May be left blank</li>
                     <li><strong>Suffix</strong> — e.g. Jr., Sr., III — May be left blank</li>
-                    <li><strong>Birth Date</strong> — YYYY-MM-DD (if available)</li>
                     <li><strong>Gender</strong> — male, female, or other</li>
                     <li><strong>Email</strong> — Optional, only used for QR notification</li>
                 </ul>
@@ -419,7 +419,9 @@
                             </div>
                             <div class="col-md-4">
                                 <label for="singleYearLevel" class="form-label">Birth Date <span class="text-danger">*</span></label>
-                                <input type="date" id="singleYearLevel" class="form-control" required>
+                                <input type="date" id="singleYearLevel" class="form-control" aria-describedby="singleBirthDateHelp singleYearLevelFeedback" required>
+                                <div class="form-text" id="singleBirthDateHelp">Student must be at least 1 year old.</div>
+                                <div class="invalid-feedback" id="singleYearLevelFeedback" aria-live="polite"></div>
                             </div>
                             <div class="col-md-4">
                                 <label for="singleSection" class="form-label">Gender <span class="text-danger">*</span></label>
@@ -644,7 +646,9 @@
                         </div>
                         <div class="col-md-4">
                             <label for="editYearLevel" class="form-label">Birth Date <span class="text-danger">*</span></label>
-                            <input type="date" id="editYearLevel" class="form-control" required>
+                            <input type="date" id="editYearLevel" class="form-control" aria-describedby="editBirthDateHelp editYearLevelFeedback" required>
+                            <div class="form-text" id="editBirthDateHelp">Student must be at least 1 year old.</div>
+                            <div class="invalid-feedback" id="editYearLevelFeedback" aria-live="polite"></div>
                         </div>
                         <div class="col-md-4">
                             <label for="editSection" class="form-label">Gender <span class="text-danger">*</span></label>
