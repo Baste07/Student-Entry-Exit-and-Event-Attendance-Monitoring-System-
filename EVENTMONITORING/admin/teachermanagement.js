@@ -3,6 +3,8 @@ let currentUser = null;
 let isUserSuperAdmin = false;
 let teacherModal = null;
 let duplicateRowsModal = null;
+const pendingTeacherStatusChanges = new Set();
+let savingTeacher = false;
 
 // Bulk import variables
 let parsedRows = [];
@@ -89,7 +91,7 @@ async function loadTeachers() {
 
     } catch (error) {
         console.error('Error loading employees:', error);
-        alert('Failed to load employees. Please try again.');
+        UIFeedback.error('Employees could not be loaded. Please try again.', 'Load failed');
     }
 }
 
@@ -182,7 +184,15 @@ function updateStatistics() {
 // ==================== ACTIONS ====================
 
 async function suspendTeacher(teacherId, teacherName) {
-    if (!confirm(`Are you sure you want to suspend "${teacherName}"?\n\nTheir account will be disabled but all data will be retained.`)) {
+    if (pendingTeacherStatusChanges.has(teacherId)) return;
+    pendingTeacherStatusChanges.add(teacherId);
+    if (!await UIFeedback.confirm({
+        title: 'Suspend Employee',
+        message: `Suspend "${teacherName}"? Their account will be disabled but all data will be retained.`,
+        confirmText: 'Suspend',
+        type: 'warning'
+    })) {
+        pendingTeacherStatusChanges.delete(teacherId);
         return;
     }
 
@@ -193,16 +203,26 @@ async function suspendTeacher(teacherId, teacherName) {
             .eq('employee_id', teacherId);
 
         if (error) throw error;
-        alert(`"${teacherName}" has been suspended.`);
+        UIFeedback.success(`"${teacherName}" has been suspended.`, 'Account suspended');
         await loadTeachers();
     } catch (error) {
         console.error('Error suspending employee:', error);
-        alert('Failed to suspend employee. Please try again.');
+        UIFeedback.error('The employee could not be suspended. Please try again.', 'Suspend failed');
+    } finally {
+        pendingTeacherStatusChanges.delete(teacherId);
     }
 }
 
 async function reactivateTeacher(teacherId, teacherName) {
-    if (!confirm(`Reactivate "${teacherName}"? Their account will be restored to active status.`)) {
+    if (pendingTeacherStatusChanges.has(teacherId)) return;
+    pendingTeacherStatusChanges.add(teacherId);
+    if (!await UIFeedback.confirm({
+        title: 'Reactivate Employee',
+        message: `Reactivate "${teacherName}"? Their account will be restored to active status.`,
+        confirmText: 'Reactivate',
+        type: 'info'
+    })) {
+        pendingTeacherStatusChanges.delete(teacherId);
         return;
     }
 
@@ -213,11 +233,13 @@ async function reactivateTeacher(teacherId, teacherName) {
             .eq('employee_id', teacherId);
 
         if (error) throw error;
-        alert(`"${teacherName}" has been reactivated.`);
+        UIFeedback.success(`"${teacherName}" has been reactivated.`, 'Account reactivated');
         await loadTeachers();
     } catch (error) {
         console.error('Error reactivating employee:', error);
-        alert('Failed to reactivate employee. Please try again.');
+        UIFeedback.error('The employee could not be reactivated. Please try again.', 'Reactivation failed');
+    } finally {
+        pendingTeacherStatusChanges.delete(teacherId);
     }
 }
 
@@ -270,6 +292,7 @@ function openTeacherModal(teacherId = null) {
     const emailInput = document.getElementById('teacherEmail');
     
     form.reset();
+    UIFeedback.clearFormErrors(form);
     document.getElementById('teacherId').value = '';
     editMode.value = 'false';
     
@@ -310,6 +333,8 @@ function openTeacherModal(teacherId = null) {
 
 async function submitTeacherForm(e) {
     e.preventDefault();
+    if (savingTeacher) return;
+    UIFeedback.clearFormErrors(e.currentTarget);
     
     const isEdit = document.getElementById('teacherEditMode').value === 'true';
     const teacherId = document.getElementById('teacherId').value;
@@ -324,12 +349,16 @@ async function submitTeacherForm(e) {
     const faculty = document.getElementById('teacherFaculty').value.trim();
     const role = document.getElementById('teacherRole').value || 'teacher';
     
-    if (!employeeId) { alert('Required field should not be left blank'); return; }
-    if (!lastName) { alert('Required field should not be left blank'); return; }
-    if (!firstName) { alert('Required field should not be left blank'); return; }
-    if (!email) { alert('Required field should not be left blank'); return; }
-    if (!faculty) { alert('Required field should not be left blank'); return; }
+    if (!employeeId) { UIFeedback.fieldError(document.getElementById('teacherEmployeeId'), 'Employee ID is required.'); return; }
+    if (!lastName) { UIFeedback.fieldError(document.getElementById('teacherLastName'), 'Last name is required.'); return; }
+    if (!firstName) { UIFeedback.fieldError(document.getElementById('teacherFirstName'), 'First name is required.'); return; }
+    if (!email) { UIFeedback.fieldError(document.getElementById('teacherEmail'), 'Email is required.'); return; }
+    if (!faculty) { UIFeedback.fieldError(document.getElementById('teacherFaculty'), 'Faculty is required.'); return; }
     
+    let savedMessage = '';
+    savingTeacher = true;
+    const submitButton = document.getElementById('teacherSubmitBtn');
+    if (submitButton) submitButton.disabled = true;
     try {
         if (!supabaseClient) throw new Error('Database connection not available');
 
@@ -345,7 +374,7 @@ async function submitTeacherForm(e) {
             const { data: existingPhone, error: phoneError } = await phoneQuery.maybeSingle();
             if (phoneError) throw phoneError;
             if (existingPhone) {
-                alert('Mobile number already registered.');
+                UIFeedback.fieldError(document.getElementById('teacherPhone'), 'Mobile number is already registered.');
                 return;
             }
         }
@@ -369,7 +398,7 @@ async function submitTeacherForm(e) {
                 .eq('employee_id', teacherId);
                 
             if (error) throw error;
-            alert('Employee updated successfully!');
+            savedMessage = 'Employee updated successfully.';
         } else {
             const { data: existing } = await supabaseClient
                 .from('employees')
@@ -378,8 +407,8 @@ async function submitTeacherForm(e) {
                 .maybeSingle();
                 
             if (existing) {
-                if (existing.email === email) alert('An employee with this email already exists.');
-                else alert('An employee with this Employee ID already exists.');
+                if (existing.email === email) UIFeedback.fieldError(document.getElementById('teacherEmail'), 'An employee with this email already exists.');
+                else UIFeedback.fieldError(document.getElementById('teacherEmployeeId'), 'An employee with this Employee ID already exists.');
                 return;
             }
             
@@ -400,16 +429,20 @@ async function submitTeacherForm(e) {
             }]);
             
             if (insertError) throw insertError;
-            alert('Employee created successfully!');
+            savedMessage = 'Employee created successfully.';
         }
         
         if (teacherModal) teacherModal.hide();
         document.getElementById('teacherForm').reset();
+        UIFeedback.success(savedMessage, isEdit ? 'Employee updated' : 'Employee created');
         await loadTeachers();
         
     } catch (error) {
         console.error('Error saving employee:', error);
-        alert(`Failed to save employee: ${error.message}`);
+        UIFeedback.toast({ type: 'error', title: 'Save failed', message: 'The employee could not be saved. Please try again.' });
+    } finally {
+        savingTeacher = false;
+        if (submitButton) submitButton.disabled = false;
     }
 }
 

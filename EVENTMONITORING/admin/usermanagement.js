@@ -3,6 +3,8 @@ let currentUser = null;
 let isUserSuperAdmin = false;
 let adminModal = null;
 const pendingAdminDeletions = new Set();
+const pendingAdminStatusChanges = new Set();
+let savingAdmin = false;
 
 function initializeUserSession() {
     const userStr = sessionStorage.getItem('user');
@@ -65,7 +67,7 @@ async function loadAdmins() {
 
     } catch (error) {
         console.error('Error loading admins:', error);
-        alert('Failed to load admins. Please try again.');
+        UIFeedback.error('Administrators could not be loaded. Please try again.', 'Load failed');
     }
 }
 
@@ -180,12 +182,12 @@ function normalizeStatus(status, fallback = 'active') {
 
 async function deleteAdmin(adminId) {
     if (!isUserSuperAdmin || !currentUser?.id) {
-        alert('Only Super Admins can delete admin accounts.');
+        UIFeedback.warning('Only Super Admins can delete administrator accounts.', 'Access denied');
         return;
     }
 
     if (adminId === currentUser.id) {
-        alert('You cannot delete your own account.');
+        UIFeedback.warning('You cannot delete your own account.', 'Action unavailable');
         return;
     }
 
@@ -193,11 +195,16 @@ async function deleteAdmin(adminId) {
 
     const admin = allAdmins.find(item => item.id === adminId);
     if (!admin) {
-        alert('This admin is no longer in the list. Refresh the page and try again.');
+        UIFeedback.warning('This administrator is no longer in the list. Refresh and try again.', 'Account unavailable');
         return;
     }
 
-    if (!confirm(`Permanently delete "${admin.name}" (${admin.email})?\n\nThis removes their admin profile and sign-in account. This action cannot be undone.`)) {
+    if (!await UIFeedback.confirm({
+        title: 'Delete Administrator',
+        message: `Permanently delete "${admin.name}" (${admin.email})?\n\nThis removes their admin profile and sign-in account. This action cannot be undone.`,
+        confirmText: 'Delete',
+        type: 'danger'
+    })) {
         return;
     }
 
@@ -236,10 +243,10 @@ async function deleteAdmin(adminId) {
         allAdmins = allAdmins.filter(item => item.id !== adminId);
         updateStatistics();
         applyFilters();
-        alert(`"${admin.name}" has been deleted.`);
+        UIFeedback.success(`"${admin.name}" has been deleted.`, 'Administrator deleted');
     } catch (error) {
         console.error('Error deleting admin:', error);
-        alert(error.message || 'Failed to delete admin. Please try again.');
+        UIFeedback.error('The administrator could not be deleted. Please check your session and try again.', 'Delete failed');
     } finally {
         pendingAdminDeletions.delete(adminId);
         applyFilters();
@@ -247,17 +254,25 @@ async function deleteAdmin(adminId) {
 }
 
 async function suspendAdmin(adminId, adminName) {
+    if (pendingAdminStatusChanges.has(adminId)) return;
     if (adminId === currentUser?.id) {
-        alert('You cannot suspend your own account.');
+        UIFeedback.warning('You cannot suspend your own account.', 'Action unavailable');
         return;
     }
     
     if (!isUserSuperAdmin) {
-        alert('Only Super Admins can suspend admin accounts.');
+        UIFeedback.warning('Only Super Admins can suspend administrator accounts.', 'Access denied');
         return;
     }
 
-    if (!confirm(`Are you sure you want to suspend "${adminName}"?\n\nTheir account will be disabled but all data will be retained.`)) {
+    pendingAdminStatusChanges.add(adminId);
+    if (!await UIFeedback.confirm({
+        title: 'Suspend Administrator',
+        message: `Suspend "${adminName}"? Their account will be disabled but all data will be retained.`,
+        confirmText: 'Suspend',
+        type: 'warning'
+    })) {
+        pendingAdminStatusChanges.delete(adminId);
         return;
     }
 
@@ -268,21 +283,31 @@ async function suspendAdmin(adminId, adminName) {
             .eq('admin_id', adminId);
 
         if (error) throw error;
-        alert(`"${adminName}" has been suspended.`);
+        UIFeedback.success(`"${adminName}" has been suspended.`, 'Account suspended');
         await loadAdmins();
     } catch (error) {
         console.error('Error suspending admin:', error);
-        alert('Failed to suspend admin. Please try again.');
+        UIFeedback.error('The administrator could not be suspended. Please try again.', 'Suspend failed');
+    } finally {
+        pendingAdminStatusChanges.delete(adminId);
     }
 }
 
 async function reactivateAdmin(adminId, adminName) {
+    if (pendingAdminStatusChanges.has(adminId)) return;
     if (!isUserSuperAdmin) {
-        alert('Only Super Admins can reactivate admin accounts.');
+        UIFeedback.warning('Only Super Admins can reactivate administrator accounts.', 'Access denied');
         return;
     }
 
-    if (!confirm(`Reactivate "${adminName}"? Their account will be restored to active status.`)) {
+    pendingAdminStatusChanges.add(adminId);
+    if (!await UIFeedback.confirm({
+        title: 'Reactivate Administrator',
+        message: `Reactivate "${adminName}"? Their account will be restored to active status.`,
+        confirmText: 'Reactivate',
+        type: 'info'
+    })) {
+        pendingAdminStatusChanges.delete(adminId);
         return;
     }
 
@@ -293,11 +318,13 @@ async function reactivateAdmin(adminId, adminName) {
             .eq('admin_id', adminId);
 
         if (error) throw error;
-        alert(`"${adminName}" has been reactivated.`);
+        UIFeedback.success(`"${adminName}" has been reactivated.`, 'Account reactivated');
         await loadAdmins();
     } catch (error) {
         console.error('Error reactivating admin:', error);
-        alert('Failed to reactivate admin. Please try again.');
+        UIFeedback.error('The administrator could not be reactivated. Please try again.', 'Reactivation failed');
+    } finally {
+        pendingAdminStatusChanges.delete(adminId);
     }
 }
 
@@ -360,6 +387,7 @@ function openAdminModal(adminId = null) {
     const confirmPasswordField = document.getElementById('confirmPasswordField');
     
     form.reset();
+    UIFeedback.clearFormErrors(form);
     document.getElementById('adminId').value = '';
     editMode.value = 'false';
     
@@ -368,7 +396,7 @@ function openAdminModal(adminId = null) {
         if (!admin) return;
         
         if (admin.level === 'super_admin' && !isUserSuperAdmin) {
-            alert('Only Super Admins can edit other Super Admins.');
+            UIFeedback.warning('Only Super Admins can edit other Super Admins.', 'Access denied');
             return;
         }
         
@@ -401,6 +429,8 @@ function openAdminModal(adminId = null) {
 
 async function submitAdminForm(e) {
     e.preventDefault();
+    if (savingAdmin) return;
+    UIFeedback.clearFormErrors(e.currentTarget);
     
     const isEdit = document.getElementById('adminEditMode').value === 'true';
     const adminId = document.getElementById('adminId').value;
@@ -410,23 +440,27 @@ async function submitAdminForm(e) {
     const faculty = document.getElementById('adminFaculty').value.trim();
     const level = document.getElementById('adminLevel').value;
     
-    if (!name) { alert('Admin Name is required.'); return; }
-    if (!email) { alert('Email is required.'); return; }
-    if (!faculty) { alert('Faculty is required.'); return; }
-    if (!level) { alert('Admin Level is required.'); return; }
+    if (!name) { UIFeedback.fieldError(document.getElementById('adminName'), 'Admin name is required.'); return; }
+    if (!email) { UIFeedback.fieldError(document.getElementById('adminEmail'), 'Email is required.'); return; }
+    if (!faculty) { UIFeedback.fieldError(document.getElementById('adminFaculty'), 'Faculty is required.'); return; }
+    if (!level) { UIFeedback.fieldError(document.getElementById('adminLevel'), 'Admin level is required.'); return; }
     
     if (level === 'super_admin' && !isUserSuperAdmin) {
-        alert('Only Super Admins can create or promote to Super Admin.');
+        UIFeedback.toast({ type: 'warning', title: 'Access denied', message: 'Only Super Admins can create or promote to Super Admin.' });
         return;
     }
     
+    let savedMessage = '';
+    savingAdmin = true;
+    const submitButton = document.getElementById('adminSubmitBtn');
+    if (submitButton) submitButton.disabled = true;
     try {
         if (!supabaseClient) throw new Error('Database connection not available');
         
         if (isEdit) {
             const targetAdmin = allAdmins.find(a => a.id === adminId);
             if (targetAdmin?.level === 'super_admin' && !isUserSuperAdmin) {
-                alert('Only Super Admins can modify Super Admin accounts.');
+                UIFeedback.toast({ type: 'warning', title: 'Access denied', message: 'Only Super Admins can modify Super Admin accounts.' });
                 return;
             }
             
@@ -444,14 +478,14 @@ async function submitAdminForm(e) {
                 .eq('admin_id', adminId);
                 
             if (error) throw error;
-            alert('Admin updated successfully!');
+            savedMessage = 'Administrator updated successfully.';
         } else {
             const password = document.getElementById('adminPassword').value;
             const passwordConfirm = document.getElementById('adminPasswordConfirm').value;
             
-            if (!password) { alert('Password is required.'); return; }
-            if (password.length < 8) { alert('Password must be at least 8 characters.'); return; }
-            if (password !== passwordConfirm) { alert('Passwords do not match.'); return; }
+            if (!password) { UIFeedback.fieldError(document.getElementById('adminPassword'), 'Password is required.'); return; }
+            if (password.length < 8) { UIFeedback.fieldError(document.getElementById('adminPassword'), 'Password must be at least 8 characters.'); return; }
+            if (password !== passwordConfirm) { UIFeedback.fieldError(document.getElementById('adminPasswordConfirm'), 'Passwords do not match.'); return; }
             
             const { data: existing } = await supabaseClient
                 .from('admins')
@@ -459,7 +493,7 @@ async function submitAdminForm(e) {
                 .eq('email', email)
                 .maybeSingle();
                 
-            if (existing) { alert('An admin with this email already exists.'); return; }
+            if (existing) { UIFeedback.fieldError(document.getElementById('adminEmail'), 'An administrator with this email already exists.'); return; }
             
             const { data: authData, error: authError } = await supabaseClient.auth.signUp({
                 email: email,
@@ -482,16 +516,20 @@ async function submitAdminForm(e) {
             }]);
             
             if (insertError) throw insertError;
-            alert('Admin created successfully!');
+            savedMessage = 'Administrator created successfully.';
         }
         
         if (adminModal) adminModal.hide();
         document.getElementById('adminForm').reset();
+        UIFeedback.success(savedMessage, isEdit ? 'Administrator updated' : 'Administrator created');
         await loadAdmins();
         
     } catch (error) {
         console.error('Error saving admin:', error);
-        alert(`Failed to save admin: ${error.message}`);
+        UIFeedback.toast({ type: 'error', title: 'Save failed', message: 'The administrator could not be saved. Please try again.' });
+    } finally {
+        savingAdmin = false;
+        if (submitButton) submitButton.disabled = false;
     }
 }
 
