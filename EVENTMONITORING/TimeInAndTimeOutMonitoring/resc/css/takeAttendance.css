@@ -840,19 +840,188 @@ nav a.active {
 }
 .cred-note i { color: var(--blue-bright); margin-right: 4px; }
 
-.greet-meta {
-    font-size: 0.95rem;
-    color: #0b4e78;
-    font-weight: 600;
-    margin-bottom: 4px;
-    font-family: 'DM Sans', sans-serif;
+/* ── Recognition result dialog ───────────────────────────── */
+.greet-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(10, 20, 30, .66);
+    backdrop-filter: blur(8px);
 }
-.greet-time {
-    font-size: 1.15rem;
-    font-weight: 700;
+
+.greet-overlay[hidden] { display: none; }
+
+.greet-card {
+    position: relative;
+    width: min(92vw, 460px);
+    max-height: min(80vh, 560px);
+    overflow-y: auto;
+    padding: 38px 34px 26px;
+    border: 1.5px solid var(--border);
+    border-top: 5px solid var(--blue-dark);
+    border-radius: 18px;
+    background: var(--white);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .28);
+    text-align: center;
+    animation: greetPop .3s cubic-bezier(.34, 1.56, .64, 1);
+}
+
+.greet-card.success { border-top-color: #15803d; }
+.greet-card.warning { border-top-color: #b45309; }
+.greet-card.error,
+.greet-card.spoof { border-top-color: #dc2626; }
+
+@keyframes greetPop {
+    from { opacity: 0; transform: scale(.94) translateY(16px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.greet-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 17px;
+}
+
+.greet-close:hover,
+.greet-close:focus-visible { background: var(--surface); color: var(--text-dark); }
+
+.greet-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 68px;
+    height: 68px;
+    margin: 0 auto 14px;
+    border: 2px solid #86efac;
+    border-radius: 50%;
+    background: #f0fdf4;
+    color: #15803d;
+    font-size: 28px;
+}
+
+.greet-card.warning .greet-avatar { border-color: #fcd34d; background: #fffbeb; color: #b45309; }
+.greet-card.error .greet-avatar,
+.greet-card.spoof .greet-avatar { border-color: #fca5a5; background: #fff1f2; color: #dc2626; }
+
+.greet-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 25px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #f0fdf4;
     color: #166534;
-    margin-bottom: 10px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .8px;
+}
+
+.greet-card.warning .greet-badge { background: #fffbeb; color: #92400e; }
+.greet-card.error .greet-badge,
+.greet-card.spoof .greet-badge { background: #fff1f2; color: #b91c1c; }
+
+.greet-name {
+    margin: 12px 0 5px;
+    color: var(--text-dark);
+    font-family: 'Syne', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.greet-person {
+    color: var(--text-muted);
+    font-size: .95rem;
+    font-weight: 700;
+}
+
+.greet-card.error .greet-name,
+.greet-card.spoof .greet-name { color: #991b1b; }
+
+.greet-meta,
+.greet-time {
+    color: var(--text-muted);
     font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    font-weight: 600;
+}
+
+.greet-time { margin-top: 3px; color: #166534; }
+
+.greet-msg {
+    margin: 18px 0 16px;
+    color: var(--text-body);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    line-height: 1.55;
+}
+
+.greet-card.error .greet-msg,
+.greet-card.spoof .greet-msg { color: #7f1d1d; }
+
+.greet-diagnostics {
+    margin: 0 auto 18px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: .78rem;
+    text-align: left;
+}
+
+.greet-diagnostics summary {
+    padding: 10px 0;
+    cursor: pointer;
+    font-weight: 700;
+    text-align: center;
+}
+
+.greet-diagnostics dl { margin: 0; padding: 0 10px 8px; }
+.greet-diagnostics dl div { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; }
+.greet-diagnostics dt { font-weight: 600; }
+.greet-diagnostics dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+.greet-dismissal { color: var(--text-muted); font-size: .75rem; }
+
+.greet-progress {
+    height: 4px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--border);
+}
+
+.greet-progress span {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--blue-bright);
+    transform-origin: left center;
+}
+
+.greet-card.error .greet-progress span,
+.greet-card.spoof .greet-progress span { background: #ef4444; }
+
+@media (max-width: 480px) {
+    .greet-card { padding: 34px 20px 22px; }
+    .greet-avatar { width: 58px; height: 58px; font-size: 24px; }
+    .greet-name { font-size: 1.2rem; }
+    .greet-msg { font-size: .92rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .greet-card { animation: none; }
 }
 
 

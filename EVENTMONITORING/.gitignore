@@ -66,3 +66,8 @@ camera_owner.json
 # XML logs and audit trails (per-machine runtime data)
 *.xml
 
+# Ignore attendance tracking configurations
+# Per-machine attendance engine launchers
+TimeInAndTimeOutMonitoring/students/trigger_attendance.php
+TimeInAndTimeOutMonitoring/students/START_ATTENDANCE.bat
+

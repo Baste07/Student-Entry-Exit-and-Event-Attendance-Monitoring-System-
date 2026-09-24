@@ -438,14 +438,32 @@
 </div>
 
 <!-- ══ GREETING OVERLAY ══ -->
-<div class="greet-overlay" id="greetOverlay" onclick="if(event.target===this)dismissGreeting()">
-    <div class="greet-card" id="greetCard">
-        <div class="greet-avatar" id="greetAvatar">👋</div>
-        <div class="greet-name" id="greetName"></div>
+<div class="greet-overlay" id="greetOverlay" hidden>
+    <div class="greet-card success" id="greetCard"
+         role="dialog" aria-modal="true" aria-labelledby="greetTitle" aria-describedby="greetMsg" tabindex="-1">
+        <button class="greet-close" id="greetClose" type="button" aria-label="Close notification">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+        <div class="greet-avatar" id="greetAvatar" aria-hidden="true">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div class="greet-badge" id="greetBadge">ATTENDANCE CONFIRMED</div>
+        <h2 class="greet-name" id="greetTitle"></h2>
+        <div class="greet-person" id="greetPerson"></div>
         <div class="greet-meta" id="greetMeta"></div>
         <div class="greet-time" id="greetTime"></div>
-        <div class="greet-msg" id="greetMsg"></div>
-        <div class="greet-countdown" id="greetCountdown"></div>
+        <p class="greet-msg" id="greetMsg"></p>
+        <details class="greet-diagnostics" id="greetDiagnostics">
+            <summary>Technical details</summary>
+            <dl>
+                <div><dt>Score</dt><dd id="greetScore">Not available</dd></div>
+                <div><dt>Threshold</dt><dd id="greetThreshold">Not available</dd></div>
+            </dl>
+        </details>
+        <div class="greet-dismissal" aria-live="polite">
+            <div class="greet-progress" aria-hidden="true"><span id="greetProgress"></span></div>
+            <span id="greetCountdown"></span>
+        </div>
     </div>
 </div>
 

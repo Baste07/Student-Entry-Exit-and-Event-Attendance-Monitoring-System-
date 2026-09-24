@@ -1930,6 +1930,7 @@ def recognition_worker():
                         print(f"[ANTI-SPOOF] -> BLOCKED: liveness check failed for {meta['name']}, "
                               f"attendance NOT recorded")
                         spoof_reason = f"Liveness check failed (score={score_txt}, threshold={ANTI_SPOOF_THRESHOLD:.2f}). Please face the camera directly and try again."
+                        spoof_event_id = f"spoof-{key}-{time.time_ns()}"
                         threading.Thread(
                             target=_record_spoof_attempt,
                             args=(meta, spoof_reason, score),
@@ -1939,7 +1940,11 @@ def recognition_worker():
                             "message": "SPOOF DETECTED",
                             "name": meta["name"],
                             "type": "spoof",
+                            "event_id": spoof_event_id,
+                            "user_message": "We couldn't verify that this is a live face. Please face the camera directly, improve lighting, and try again.",
                             "reason": spoof_reason,
+                            "score": score,
+                            "threshold": ANTI_SPOOF_THRESHOLD,
                         })
                         new_locs.append((top, right, bottom, left))
                         new_labels.append(label)
