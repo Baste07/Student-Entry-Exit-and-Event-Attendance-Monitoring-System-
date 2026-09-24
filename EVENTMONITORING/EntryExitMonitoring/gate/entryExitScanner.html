@@ -236,6 +236,17 @@
     </div>
 </div>
 
+<!-- MULTIPLE FACES: scanning pauses until only one face remains -->
+<div class="overlay-backdrop" id="multiFaceOverlay" role="alertdialog" aria-modal="true" aria-labelledby="multiFaceTitle" aria-describedby="multiFaceMessage">
+    <div class="overlay-box multi-face-box">
+        <div class="overlay-icon multi-face-icon"><i class="fa-solid fa-users"></i></div>
+        <div class="overlay-badge multi-face-badge">SCAN PAUSED</div>
+        <h2 class="overlay-name" id="multiFaceTitle">Multiple faces detected</h2>
+        <p class="overlay-reason" id="multiFaceMessage">Only one face is allowed in the scan area. Please scan one person at a time.</p>
+        <button class="multi-face-dismiss" type="button" onclick="dismissMultiFaceOverlay()">Got it</button>
+    </div>
+</div>
+
 <!-- MANUAL ACCESS MODAL -->
 <div class="modal-backdrop" id="manualAccessModal">
     <div class="modal-box access-modal-box">

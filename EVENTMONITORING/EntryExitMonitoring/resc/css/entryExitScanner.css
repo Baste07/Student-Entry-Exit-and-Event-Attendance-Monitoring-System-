@@ -392,6 +392,7 @@ nav a:hover { color: var(--white); background: rgba(255,255,255,0.10); }
 /* Info overlay — dark neutral */
 #infoOverlay  { background: rgba(10, 20, 40, 0.80); }
 #gateResultOverlay { background: rgba(5, 35, 28, 0.78); }
+#multiFaceOverlay { background: rgba(55, 32, 7, 0.82); }
 
 .overlay-box {
     background: var(--white); border-radius: 20px;
@@ -415,6 +416,8 @@ nav a:hover { color: var(--white); background: rgba(255,255,255,0.10); }
 .info-icon.emp  { background: #ede9fe; color: var(--purple); border-color: #c4b5fd; }
 .gate-result-icon { background: #dcfce7; color: #166534; border: 3px solid #86efac; }
 .gate-result-box { border: 2px solid #86efac; }
+.multi-face-box { border: 2px solid #fbbf24; }
+.multi-face-icon { background: #fef3c7; color: #92400e; border: 3px solid #fbbf24; }
 
 .overlay-badge {
     display: inline-flex; align-items: center; gap: 6px;
@@ -426,6 +429,14 @@ nav a:hover { color: var(--white); background: rgba(255,255,255,0.10); }
 .spoof-badge { background: #fee2e2; color: var(--red); }
 .info-badge  { background: #dbeafe; color: var(--blue-dark); }
 .gate-result-badge { background: #dcfce7; color: #166534; }
+.multi-face-badge { background: #fef3c7; color: #92400e; }
+
+.multi-face-dismiss {
+    border: 0; border-radius: 8px; background: #92400e; color: #fff;
+    padding: 10px 24px; font: inherit; font-weight: 700; cursor: pointer;
+}
+.multi-face-dismiss:hover { background: #78350f; }
+.multi-face-dismiss:focus-visible { outline: 3px solid #fbbf24; outline-offset: 3px; }
 
 .overlay-name {
     font-family: 'Syne', sans-serif;
