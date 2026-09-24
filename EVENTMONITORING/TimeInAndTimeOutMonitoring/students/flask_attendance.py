@@ -1782,6 +1782,8 @@ def _record_event_attendance(student_id, meta):
 
 def recognition_worker():
     global latest_frame
+    multiple_faces_visible = False
+    clear_face_streak = 0
     scan_count = 0  # ── ADDED: rolling scan counter, purely for analytics/log labeling ──
     while True:
         time.sleep(0.05)
@@ -1824,6 +1826,34 @@ def recognition_worker():
         t_det0 = time.time()
         locs = face_recognition.face_locations(rgb, model="hog")
         det_ms = (time.time() - t_det0) * 1000.0
+        if len(locs) > 1:
+            # Detection is enough to reject this frame. Skip the slower encoding,
+            # matching, liveness, and attendance work until only one face remains.
+            clear_face_streak = 0
+            if not multiple_faces_visible:
+                multiple_faces_visible = True
+                _push({
+                    "type": "multiple_faces",
+                    "message": "Only one face is allowed in the scan area. Please scan one person at a time."
+                })
+            with result_lock:
+                recognition_result.update({
+                    "locations": [(top * 4 + y1, right * 4 + x1,
+                                   bottom * 4 + y1, left * 4 + x1)
+                                  for top, right, bottom, left in locs],
+                    "labels": ["One face only"] * len(locs),
+                    "colors": [(0, 0, 255)] * len(locs),
+                })
+            continue
+        if multiple_faces_visible:
+            # Wait for two clear scans to avoid flicker if the detector briefly
+            # misses a second face.
+            clear_face_streak += 1
+            if clear_face_streak < 2:
+                continue
+            multiple_faces_visible = False
+            clear_face_streak = 0
+            _push({"type": "multiple_faces_cleared"})
         if not locs:
             if DEBUG_SCAN_LOGS:
                 print(f"[HOG+SVM] scan#{scan_count:05d}  no face in ROI  scan_time={det_ms:.1f}ms")
@@ -2398,11 +2428,23 @@ let timer=null,cd=null,remaining=0;
 function connectSSE(){const es=new EventSource('/attendee_stream');es.onmessage=e=>show(JSON.parse(e.data));es.onerror=()=>{es.close();setTimeout(connectSSE,500);};}
 connectSSE();
 function show(data){
+  if(data.type==='multiple_faces_cleared'){dismiss();return;}
   clearInterval(cd);clearTimeout(timer);
   const card=document.getElementById('card');
   const av=document.getElementById('av');
   const msgEl=document.getElementById('cardMsg');
   const nameEl=document.getElementById('cardName');
+
+  if(data.type==='multiple_faces'){
+    av.className='avatar av-err';av.textContent='!';
+    card.className='red';
+    nameEl.textContent='Multiple faces detected';
+    msgEl.textContent=data.message||'Only one face is allowed in the scan area.';
+    msgEl.className='me';
+    document.getElementById('overlay').classList.add('on');
+    document.getElementById('countdown').textContent='';
+    return;
+  }
 
   if(data.message && data.message.startsWith('HELLO')){
     av.className='avatar av-ok';av.textContent='👋';

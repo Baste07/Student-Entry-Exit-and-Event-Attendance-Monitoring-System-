@@ -17,6 +17,25 @@ const sessionState  = document.getElementById('sessionState');
 const streamState   = document.getElementById('streamState');
 const outputBox     = document.getElementById('outputBox');
 const toast         = document.getElementById('toast');
+const multiFaceOverlay = document.getElementById('multiFaceOverlay');
+const multiFaceDismissBtn = document.getElementById('multiFaceDismissBtn');
+
+function dismissMultiFaceModal() {
+    multiFaceOverlay.classList.remove('on');
+    multiFaceOverlay.setAttribute('aria-hidden', 'true');
+}
+
+function showMultiFaceModal() {
+    if (stopBtn.style.display === 'none' || multiFaceOverlay.classList.contains('on')) return;
+    multiFaceOverlay.classList.add('on');
+    multiFaceOverlay.setAttribute('aria-hidden', 'false');
+    multiFaceDismissBtn.focus();
+}
+
+multiFaceDismissBtn.addEventListener('click', dismissMultiFaceModal);
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') dismissMultiFaceModal();
+});
 
 // Greeting overlay elements
 const greetOverlay   = document.getElementById('greetOverlay');
@@ -625,6 +644,7 @@ stopBtn.addEventListener('click', () => {
 });
 
 function stopAttendanceSession() {
+    dismissMultiFaceModal();
     videoWrap.style.display = 'none';
     videoStream.src = "";
     stopBtn.style.display = 'none';
@@ -638,6 +658,14 @@ function stopAttendanceSession() {
 // SSE — GREETING STREAM
 // ══════════════════════════════════════════════════
 function handleRecognitionEvent(d) {
+    if (d.type === 'multiple_faces') {
+        showMultiFaceModal();
+        return;
+    }
+    if (d.type === 'multiple_faces_cleared') {
+        dismissMultiFaceModal();
+        return;
+    }
     if (d.recognition_only || d.type === 'gate_recorded') return;
 
     const name = d.name || '';

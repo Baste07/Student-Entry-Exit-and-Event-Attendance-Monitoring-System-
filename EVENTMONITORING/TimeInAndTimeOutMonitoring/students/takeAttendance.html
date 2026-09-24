@@ -191,6 +191,116 @@
 
 .cred-note i { color: #0b4e78; margin-right: 4px; }
 
+/* ── Greeting Overlay ── */
+.greet-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 20, 15, 0.75);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+}
+.greet-overlay.on { display: flex; }
+
+.greet-card {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 48px 40px 36px;
+    max-width: 420px;
+    width: 92%;
+    text-align: center;
+    box-shadow: 0 24px 80px rgba(0,0,0,.35);
+    animation: greetPop .4s cubic-bezier(.34,1.56,.64,1);
+    border: 2px solid #166534;
+}
+
+@keyframes greetPop {
+    from { opacity: 0; transform: scale(.7) translateY(30px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.greet-avatar {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px;
+    background: #dcfce7;
+    border: 3px solid #166534;
+}
+
+.greet-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #0f2419;
+    margin-bottom: 8px;
+}
+
+.greet-msg {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.1rem;
+    color: #1a4731;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+.greet-countdown {
+    font-size: .8rem;
+    color: #64748b;
+    font-family: 'DM Sans', sans-serif;
+}
+
+/* Spoof variant */
+.greet-card.spoof {
+    border-color: #7f1d1d;
+}
+.greet-card.spoof .greet-avatar {
+    background: #fef2f2;
+    border-color: #7f1d1d;
+}
+.greet-card.spoof .greet-name {
+    color: #7f1d1d;
+}
+.greet-card.spoof .greet-msg {
+    color: #991b1b;
+}
+
+.multi-face-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    align-items: flex-start;
+    justify-content: center;
+    padding: min(12vh, 100px) 20px 20px;
+    background: rgba(15, 23, 42, .32);
+}
+.multi-face-overlay.on { display: flex; }
+.multi-face-box {
+    width: min(100%, 440px);
+    padding: 28px;
+    border-radius: 16px;
+    border: 2px solid #dc2626;
+    background: #fff;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, .25);
+    text-align: center;
+    font-family: 'DM Sans', sans-serif;
+}
+.multi-face-box i { color: #dc2626; font-size: 32px; }
+.multi-face-box h3 { margin: 14px 0 8px; color: #991b1b; font-size: 20px; }
+.multi-face-box p { margin: 0 0 18px; color: #334155; line-height: 1.5; }
+.multi-face-box button {
+    border: 0;
+    border-radius: 8px;
+    padding: 9px 22px;
+    background: #0b4e78;
+    color: #fff;
+    font: 600 14px 'DM Sans', sans-serif;
+    cursor: pointer;
+}
 </style>
 </head>
 <body>
@@ -316,6 +426,16 @@
 
 <!-- TOAST -->
 <div id="toast"></div>
+
+<div class="multi-face-overlay" id="multiFaceOverlay" role="alertdialog" aria-modal="true"
+     aria-labelledby="multiFaceTitle" aria-describedby="multiFaceMessage" aria-hidden="true">
+    <div class="multi-face-box">
+        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+        <h3 id="multiFaceTitle">Multiple faces detected</h3>
+        <p id="multiFaceMessage">Only one face is allowed in the scan area. Please scan one person at a time.</p>
+        <button type="button" id="multiFaceDismissBtn">Got it</button>
+    </div>
+</div>
 
 <!-- ══ GREETING OVERLAY ══ -->
 <div class="greet-overlay" id="greetOverlay" hidden>

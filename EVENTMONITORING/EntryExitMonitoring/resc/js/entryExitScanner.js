@@ -27,6 +27,7 @@ let isFaceDbReady = false;
 let previousFaceDbPhase = null;
 let previousRebuildSummaryTimestamp = null;
 let gateSyncModalTimer = null;
+let multiFaceActive = false;
 
 /* ══════════════════════════════════════════════════
    CLOCK
@@ -273,6 +274,8 @@ function stopScanner() {
     stream.src = ''; stream.style.display = 'none';
     document.getElementById('faceStreamOff').style.display = 'flex';
     if (sseSource) { sseSource.close(); sseSource = null; }
+    multiFaceActive = false;
+    dismissMultiFaceOverlay();
 
     if (qrScanner) { qrScanner.stop().catch(() => {}); qrScanner = null; }
 
@@ -336,6 +339,20 @@ async function startFaceMode() {
             const data = JSON.parse(event.data);
             if (!data || !data.type) return;
 
+            // Scanner-wide warnings have no person ID and must bypass the cooldown.
+            if (data.type === 'multiple_faces') {
+                showMultiFaceOverlay(data.message);
+                return;
+            }
+            if (data.type === 'multiple_faces_cleared') {
+                if (multiFaceActive) {
+                    multiFaceActive = false;
+                    dismissMultiFaceOverlay();
+                    setStatus('faceStatus', 'scanning', '<i class="fa-solid fa-spinner fa-spin"></i> Scanning for face...');
+                }
+                return;
+            }
+
             const cooldownKey = data.name || data.student_id || data.employee_id || 'unknown';
             if (isInCooldown(cooldownKey)) return;
 
@@ -398,6 +415,8 @@ async function startFaceMode() {
     };
 
     sseSource.onerror = () => {
+        multiFaceActive = false;
+        dismissMultiFaceOverlay();
         setStatus('faceStatus', 'offline',
             '<i class="fa-solid fa-triangle-exclamation"></i> Lost connection to face engine');
     };
@@ -861,6 +880,20 @@ async function manualLogEmployee(emp) {
 /* ══════════════════════════════════════════════════
    OVERLAYS
 ══════════════════════════════════════════════════ */
+function showMultiFaceOverlay(message) {
+    if (multiFaceActive) return;
+    multiFaceActive = true;
+    clearOverlayTimer();
+    document.getElementById('multiFaceMessage').textContent =
+        message || 'Only one face is allowed in the scan area. Please scan one person at a time.';
+    document.getElementById('multiFaceOverlay').classList.add('show');
+    setStatus('faceStatus', 'error', '<i class="fa-solid fa-users"></i> Multiple faces detected — scan one person at a time');
+}
+
+function dismissMultiFaceOverlay() {
+    dismissOverlay('multiFaceOverlay');
+}
+
 function showSpoofOverlay(name, reason) {
     clearOverlayTimer();
     const el = document.getElementById('spoofOverlay');

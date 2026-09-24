@@ -27,6 +27,11 @@
 /* User Management Page Styles */
 /* Inherits base styles from admin-specific.css */
 
+.btn-delete-admin:disabled {
+    opacity: 0.45;
+    cursor: wait;
+}
+
 .page-header {
     display: flex;
     align-items: center;
