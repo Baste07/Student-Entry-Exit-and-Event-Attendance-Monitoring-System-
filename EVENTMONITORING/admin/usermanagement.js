@@ -2,6 +2,7 @@ let allAdmins = [];
 let currentUser = null;
 let isUserSuperAdmin = false;
 let adminModal = null;
+const pendingAdminDeletions = new Set();
 
 function initializeUserSession() {
     const userStr = sessionStorage.getItem('user');
@@ -58,7 +59,7 @@ async function loadAdmins() {
             rawData: admin
         }));
 
-        displayAdmins(allAdmins);
+        applyFilters();
         updateStatistics();
         applyRoleBasedRestrictions();
 
@@ -145,6 +146,15 @@ function displayAdmins(admins) {
                 `);
             }
             
+            if (isUserSuperAdmin && currentUser?.id && admin.id !== currentUser.id) {
+                buttons.push(`
+                    <button type="button" class="btn-icon danger btn-delete-admin" title="Delete Admin" aria-label="Delete Admin"
+                        ${pendingAdminDeletions.has(admin.id) ? 'disabled' : ''}>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M5 6l1 14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-14M10 10v7M14 10v7"/></svg>
+                    </button>
+                `);
+            }
+
             actionButtonsHtml = `<div class="action-buttons">${buttons.join('')}</div>`;
         }
 
@@ -157,6 +167,7 @@ function displayAdmins(admins) {
             <td>${actionButtonsHtml}</td>
         `;
 
+        row.querySelector('.btn-delete-admin')?.addEventListener('click', () => deleteAdmin(admin.id));
         tbody.appendChild(row);
     });
 }
@@ -165,6 +176,74 @@ function normalizeStatus(status, fallback = 'active') {
     const normalized = String(status || '').trim().toLowerCase();
     if (['active', 'inactive', 'suspended'].includes(normalized)) return normalized;
     return fallback;
+}
+
+async function deleteAdmin(adminId) {
+    if (!isUserSuperAdmin || !currentUser?.id) {
+        alert('Only Super Admins can delete admin accounts.');
+        return;
+    }
+
+    if (adminId === currentUser.id) {
+        alert('You cannot delete your own account.');
+        return;
+    }
+
+    if (pendingAdminDeletions.has(adminId)) return;
+
+    const admin = allAdmins.find(item => item.id === adminId);
+    if (!admin) {
+        alert('This admin is no longer in the list. Refresh the page and try again.');
+        return;
+    }
+
+    if (!confirm(`Permanently delete "${admin.name}" (${admin.email})?\n\nThis removes their admin profile and sign-in account. This action cannot be undone.`)) {
+        return;
+    }
+
+    pendingAdminDeletions.add(adminId);
+    applyFilters();
+
+    try {
+        if (!supabaseClient) throw new Error('Database connection not available.');
+
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error) throw error;
+        const session = data?.session;
+        if (!session?.access_token || session.user?.id !== currentUser.id) {
+            throw new Error('Please sign in again before deleting an admin.');
+        }
+
+        const response = await fetch('delete-admin.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ adminId })
+        });
+        let result;
+        try {
+            result = await response.json();
+        } catch {
+            throw new Error('The account deletion service could not be reached. Please try again.');
+        }
+
+        if (!response.ok || result?.success !== true) {
+            throw new Error(result?.message || 'Failed to delete admin. Please try again.');
+        }
+
+        allAdmins = allAdmins.filter(item => item.id !== adminId);
+        updateStatistics();
+        applyFilters();
+        alert(`"${admin.name}" has been deleted.`);
+    } catch (error) {
+        console.error('Error deleting admin:', error);
+        alert(error.message || 'Failed to delete admin. Please try again.');
+    } finally {
+        pendingAdminDeletions.delete(adminId);
+        applyFilters();
+    }
 }
 
 async function suspendAdmin(adminId, adminName) {

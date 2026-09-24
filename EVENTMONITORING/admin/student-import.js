@@ -22,6 +22,7 @@ const EMAIL_LIKE_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STUD_ID_PATTERN = /^([Kk]|[1-9]|10)-\d{1,4}$/;
 
 document.addEventListener('DOMContentLoaded', async () => {
+    setupStudentBirthDateValidation();
     checkSupabaseConnection();
     await loadDepartments();
     setupEventListeners();
@@ -584,6 +585,67 @@ function parseCSV(text) {
     });
 }
 
+function formatStudentDate(year, month, day) {
+    return [String(year).padStart(4, '0'), String(month).padStart(2, '0'), String(day).padStart(2, '0')].join('-');
+}
+
+function getLatestStudentBirthDate(today = new Date()) {
+    const year = today.getFullYear() - 1;
+    const month = today.getMonth();
+    // Clamp February 29 to February 28 when the previous year is not a leap year.
+    const day = Math.min(today.getDate(), new Date(year, month + 1, 0).getDate());
+    return formatStudentDate(year, month + 1, day);
+}
+
+function getStudentBirthDateError(value, today = new Date()) {
+    const birthDate = String(value ?? '').trim();
+    if (!birthDate) return 'Birth Date is required.';
+
+    const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthDate);
+    const invalidDateMessage = 'Birth Date must be a valid date (YYYY-MM-DD).';
+    if (!parts) return invalidDateMessage;
+
+    const [, year, month, day] = parts.map(Number);
+    const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (year < 1 || month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) {
+        return invalidDateMessage;
+    }
+
+    const currentDate = formatStudentDate(today.getFullYear(), today.getMonth() + 1, today.getDate());
+    if (birthDate >= currentDate) return 'Birth Date cannot be today or in the future.';
+
+    const latestBirthDate = getLatestStudentBirthDate(today);
+    if (birthDate > latestBirthDate) {
+        return `Students must be at least 1 year old. Birth Date must be on or before ${latestBirthDate}.`;
+    }
+    return '';
+}
+
+function updateStudentBirthDateInput(input, showError = true) {
+    if (!input) return 'Birth Date is required.';
+    const today = new Date();
+    const error = getStudentBirthDateError(input.value, today);
+    input.max = getLatestStudentBirthDate(today);
+    input.setCustomValidity(error);
+    input.classList.toggle('is-invalid', showError && Boolean(error));
+    input.setAttribute('aria-invalid', String(showError && Boolean(error)));
+    const feedback = document.getElementById(`${input.id}Feedback`);
+    if (feedback) feedback.textContent = showError ? error : '';
+    return error;
+}
+
+function setupStudentBirthDateValidation() {
+    ['singleYearLevel', 'editYearLevel'].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        updateStudentBirthDateInput(input, false);
+        input.addEventListener('focus', () => { input.max = getLatestStudentBirthDate(); });
+        input.addEventListener('input', () => updateStudentBirthDateInput(input));
+        input.addEventListener('change', () => updateStudentBirthDateInput(input));
+    });
+}
+
 function validateRow(row, index) {
     const errors = [];
     const warnings = [];
@@ -598,9 +660,8 @@ function validateRow(row, index) {
     if (!row.firstName) errors.push('First Name is required');
     if (!row.lastName) errors.push('Last Name is required');
 
-    if (row.birthDate && Number.isNaN(Date.parse(row.birthDate))) {
-        errors.push('Birth Date must be valid (YYYY-MM-DD)');
-    }
+    const birthDateError = getStudentBirthDateError(row.birthDate);
+    if (birthDateError) errors.push(birthDateError);
 
     const normalizedGender = String(row.gender || '').trim().toLowerCase();
     if (normalizedGender && !['male', 'female', 'other'].includes(normalizedGender)) {
@@ -758,6 +819,23 @@ async function startImport() {
 
     if (validRows.length === 0) {
         showImportAlert('No valid rows to import.', 'warning');
+        return;
+    }
+
+    // Recheck before saving instead of relying only on the earlier preview.
+    let hasInvalidBirthDate = false;
+    validRows.forEach(row => {
+        const error = getStudentBirthDateError(row.birthDate);
+        if (error) {
+            row.errors = [...new Set([...(row.errors || []), error])];
+            row.status = 'error';
+            hasInvalidBirthDate = true;
+        }
+    });
+    if (hasInvalidBirthDate) {
+        renderPreview();
+        showStep('preview');
+        showImportAlert('Fix the Birth Date errors before importing. Students must be at least 1 year old.', 'warning');
         return;
     }
 
@@ -1354,6 +1432,7 @@ function openEditStudentModal(studId) {
     document.getElementById('editLastName').value = student.last_name || '';
     document.getElementById('editSuffix').value = student.suffix || '';
     document.getElementById('editYearLevel').value = student.birth_date || '';
+    updateStudentBirthDateInput(document.getElementById('editYearLevel'), false);
     document.getElementById('editSection').value = (student.gender || '').toLowerCase();
     document.getElementById('editEmail').value = student.email || '';
     document.getElementById('editStatus').value = student.status || 'inactive';
@@ -1382,8 +1461,10 @@ async function submitEditStudentForm(event) {
         return;
     }
 
-    if (Number.isNaN(Date.parse(birthDate))) {
-        showImportAlert('Birth Date must be valid.', 'warning');
+    const birthDateError = updateStudentBirthDateInput(document.getElementById('editYearLevel'));
+    if (birthDateError) {
+        showImportAlert(birthDateError, 'warning');
+        document.getElementById('editYearLevel').focus();
         return;
     }
 
@@ -1602,6 +1683,7 @@ async function openSingleStudentModal() {
     document.getElementById('singleLastName').value = '';
     document.getElementById('singleSuffix').value = '';
     document.getElementById('singleYearLevel').value = '';
+    updateStudentBirthDateInput(document.getElementById('singleYearLevel'), false);
     document.getElementById('singleSection').value = '';
     document.getElementById('singleEmail').value = '';
     document.getElementById('singleAddress').value = '';
@@ -1699,8 +1781,10 @@ function proceedToGuardianStep(e) {
         showImportAlert('Required field should not be left blank', 'warning');
         return;
     }
-    if (Number.isNaN(Date.parse(birthDate))) {
-        showImportAlert('Birth Date must be valid.', 'warning');
+    const birthDateError = updateStudentBirthDateInput(document.getElementById('singleYearLevel'));
+    if (birthDateError) {
+        showImportAlert(birthDateError, 'warning');
+        document.getElementById('singleYearLevel').focus();
         return;
     }
     if (!['male', 'female', 'other'].includes(gender)) {
@@ -1861,8 +1945,11 @@ async function submitSingleStudentForm(event) {
         showImportAlert('Student ID format: K-####, 1-####, ..., 10-####', 'warning');
         return;
     }
-    if (Number.isNaN(Date.parse(birthDate))) {
-        showImportAlert('Birth Date must be valid.', 'warning');
+    const birthDateError = updateStudentBirthDateInput(document.getElementById('singleYearLevel'));
+    if (birthDateError) {
+        goBackToStudentStep();
+        showImportAlert(birthDateError, 'warning');
+        document.getElementById('singleYearLevel').focus();
         return;
     }
     if (!['male', 'female', 'other'].includes(gender)) {
