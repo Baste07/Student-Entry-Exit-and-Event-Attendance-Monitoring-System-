@@ -259,6 +259,35 @@ textarea.form-control { resize: vertical; font-family: inherit; }
 .feature-info label { display: block; font-weight: 500; color: var(--text-main); margin-bottom: 0.25rem; cursor: pointer; }
 .feature-info small { display: block; color: var(--text-muted); font-size: 0.85rem; }
 
+.sms-toggle {
+    width: 2.75rem;
+    height: 1.5rem;
+    flex: none;
+    margin-left: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: #aab9c5;
+    cursor: pointer;
+    appearance: none;
+    position: relative;
+    transition: background-color 0.2s;
+}
+.sms-toggle::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+}
+.sms-toggle:checked { background: var(--blue-btn); }
+.sms-toggle:checked::before { transform: translateX(1.2rem); }
+.sms-toggle:focus-visible { outline: 3px solid var(--blue-active); outline-offset: 3px; }
+.sms-toggle:disabled { cursor: wait; opacity: 0.6; }
+
 .form-check-input {
     width: 2.5rem;
     height: 1.5rem;
@@ -291,7 +320,7 @@ textarea.form-control { resize: vertical; font-family: inherit; }
     .settings-header h2 { font-size: 1.1rem; }
 
     .feature-item { flex-direction: column; align-items: flex-start; gap: 1rem; }
-    .form-check-input { margin-left: 0; }
+    .form-check-input, .sms-toggle { margin-left: 0; }
     .settings-container { gap: 1.5rem; }
 
     .semester-preview .row > div { margin-bottom: 0.75rem; }

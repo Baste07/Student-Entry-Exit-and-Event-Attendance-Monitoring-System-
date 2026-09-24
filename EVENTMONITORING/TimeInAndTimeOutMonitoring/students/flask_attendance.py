@@ -556,9 +556,31 @@ def _attendance_timestamp_label(timestamp_iso):
     except Exception:
         return str(timestamp_iso)
 
+def _sms_notifications_enabled():
+    """Read the shared switch for both event attendance and school gate SMS."""
+    try:
+        result = supabase.table("system_settings").select("value") \
+            .eq("key", "sms_enabled").limit(1).execute()
+        rows = result.data or []
+        # No saved preference preserves the previous behavior: SMS is on.
+        return (not rows or str(rows[0].get("value", "true")).strip().lower() != "false"), None
+    except Exception as exc:
+        # Do not send SMS when the administrator's saved choice cannot be read.
+        print(f"[SMS] Could not read system setting: {exc}")
+        return False, "SMS_SETTINGS_UNAVAILABLE"
+
 def _send_attendance_sms(student_id, notification_type, timestamp_iso, meta, event_name=None, notification_key=None, attendance_record_id=None):
     attendance_type = "event" if event_name else "school"
     provider_value = os.getenv("IPROG_SMS_PROVIDER", "0")
+    sms_enabled, setting_error = _sms_notifications_enabled()
+    if not sms_enabled:
+        _log_sms_status(
+            student_id, attendance_type, notification_type, False,
+            "SMS setting unavailable" if setting_error else "SMS disabled in System Settings",
+            details={"sms_provider": provider_value, "attendance_record_id": attendance_record_id},
+            audit={"result": "NOT_ATTEMPTED", "failure_reason": setting_error or "SMS_DISABLED"},
+        )
+        return
     if notification_key:
         with sms_status_lock:
             if notification_key in sms_notification_keys:

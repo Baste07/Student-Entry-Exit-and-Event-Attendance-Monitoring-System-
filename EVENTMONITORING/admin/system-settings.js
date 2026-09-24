@@ -1,9 +1,11 @@
 let allSchoolYears = [];
+let savedSmsEnabled = true;
+const SMS_SETTING_KEY = 'sms_enabled';
 
 document.addEventListener('DOMContentLoaded', async () => {
     checkSupabaseConnection();
     setupEventListeners();
-    await loadSchoolYears();
+    await Promise.all([loadSchoolYears(), loadSmsSetting()]);
 });
 
 function setupEventListeners() {
@@ -11,10 +13,62 @@ function setupEventListeners() {
     document.getElementById('setActiveSchoolYearBtn')?.addEventListener('click', handleSetActiveClick);
     document.getElementById('inactivateSchoolYearBtn')?.addEventListener('click', handleInactivateClick);
     document.getElementById('existingSchoolYearSelect')?.addEventListener('change', handleSelectChange);
+    document.getElementById('attendanceSmsToggle')?.addEventListener('change', saveSmsSetting);
 
     document.querySelectorAll('.cal-tab').forEach(tab => {
         tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
+}
+
+function renderSmsSetting(enabled) {
+    const toggle = document.getElementById('attendanceSmsToggle');
+    const status = document.getElementById('attendanceSmsStatus');
+    if (toggle) toggle.checked = enabled;
+    if (status) status.textContent = enabled
+        ? 'On — guardian SMS is sent for event attendance and school entry/exit.'
+        : 'Off — guardian SMS is paused for new scans.';
+}
+
+async function loadSmsSetting() {
+    const toggle = document.getElementById('attendanceSmsToggle');
+    try {
+        if (!supabaseClient) throw new Error('Supabase is not available');
+        const { data, error } = await supabaseClient
+            .from('system_settings')
+            .select('value')
+            .eq('key', SMS_SETTING_KEY)
+            .maybeSingle();
+        if (error) throw error;
+        savedSmsEnabled = data ? String(data.value).toLowerCase() !== 'false' : true;
+        renderSmsSetting(savedSmsEnabled);
+        if (toggle) toggle.disabled = false;
+    } catch (error) {
+        console.error('Could not load SMS setting:', error);
+        if (toggle) toggle.disabled = true;
+        const status = document.getElementById('attendanceSmsStatus');
+        if (status) status.textContent = 'SMS setting unavailable. Refresh to try again.';
+    }
+}
+
+async function saveSmsSetting(event) {
+    const toggle = event.target;
+    const enabled = toggle.checked;
+    toggle.disabled = true;
+    try {
+        const { error } = await supabaseClient
+            .from('system_settings')
+            .upsert({ key: SMS_SETTING_KEY, value: String(enabled) }, { onConflict: 'key' });
+        if (error) throw error;
+        savedSmsEnabled = enabled;
+        renderSmsSetting(enabled);
+        showAlert(`Attendance SMS ${enabled ? 'enabled' : 'disabled'}.`, 'success');
+    } catch (error) {
+        console.error('Could not save SMS setting:', error);
+        renderSmsSetting(savedSmsEnabled);
+        showAlert('Could not save SMS setting. Please try again.', 'danger');
+    } finally {
+        toggle.disabled = false;
+    }
 }
 
 function switchTab(tabName) {

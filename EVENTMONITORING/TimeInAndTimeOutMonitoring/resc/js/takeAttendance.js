@@ -41,7 +41,7 @@ document.addEventListener('keydown', event => {
 const greetOverlay   = document.getElementById('greetOverlay');
 const greetCard      = document.getElementById('greetCard');
 const greetAvatar    = document.getElementById('greetAvatar');
-const greetName      = document.getElementById('greetName');
+const greetTitle     = document.getElementById('greetTitle');
 const greetMsg       = document.getElementById('greetMsg');
 const greetCountdown = document.getElementById('greetCountdown');
 const greetClose     = document.getElementById('greetClose');
@@ -75,7 +75,6 @@ function showGreeting(name, message, isSpoof = false, details = {}) {
     clearTimeout(greetTimer);
     clearInterval(greetCountdownInterval);
 
-    greetName.textContent = name || '';
     greetPerson.textContent = name || '';
     greetMsg.textContent = message || '';
 
@@ -105,7 +104,7 @@ function showGreeting(name, message, isSpoof = false, details = {}) {
     }[state];
     greetCard.className = `greet-card ${state}`;
     greetBadge.textContent = stateContent.badge;
-    greetName.textContent = state === 'spoof' ? 'Face verification unsuccessful' :
+    greetTitle.textContent = state === 'spoof' ? 'Face verification unsuccessful' :
         (state === 'success' ? 'Attendance recorded' : stateContent.badge.toLowerCase());
     greetAvatar.innerHTML = `<i class="fa-solid ${stateContent.icon}" aria-hidden="true"></i>`;
     greetDiagnostics.hidden = !isSpoof;
