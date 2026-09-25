@@ -328,8 +328,7 @@ cameraContainer.addEventListener('click', e => { if (e.target === cameraContaine
 // ═══════════════════════════════════════════
 studentScanBtn.addEventListener('click', async () => {
     if (!studentIdInput.value.trim()) {
-        alert('Required field should not be left blank');
-        studentIdInput.focus();
+        UIFeedback.fieldError(studentIdInput, 'Student ID is required.');
         return;
     }
     if (!studentData || !isEngineOnline) return;
@@ -365,7 +364,7 @@ studentScanBtn.addEventListener('click', async () => {
         const message = err.message === 'REGISTRATION FAILED, INTERNET REQUIRED'
             ? err.message
             : "❌ Registration Error: " + err.message;
-        alert(message);
+        UIFeedback.error(message, 'Registration error');
     } finally {
         btn.disabled = false;
     }
@@ -383,7 +382,7 @@ function startProgressPolling() {
                     registrationErrorShown = true;
                     captureStatus.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color:#ff4757"></i> REGISTRATION FAILED, INTERNET REQUIRED';
                     closeCameraUI();
-                    alert(data.error_message);
+                    UIFeedback.error(data.error_message, 'Registration error');
                     updateScanButtonsState();
                 }
                 return;
@@ -623,8 +622,7 @@ async function fillProfessorFields(data) {
 // ═══════════════════════════════════════════
 professorScanBtn.addEventListener('click', async () => {
     if (!empIdInput.value.trim()) {
-        alert('Required field should not be left blank');
-        empIdInput.focus();
+        UIFeedback.fieldError(empIdInput, 'Employee ID is required.');
         return;
     }
     if (!professorData || !isEngineOnline) return;
@@ -660,7 +658,7 @@ professorScanBtn.addEventListener('click', async () => {
         const message = err.message === 'REGISTRATION FAILED, INTERNET REQUIRED'
             ? err.message
             : "❌ Registration Error: " + err.message;
-        alert(message);
+        UIFeedback.error(message, 'Registration error');
     } finally {
         btn.disabled = false;
     }
@@ -766,7 +764,7 @@ async function bootRegistrationEngine() {
 }
 
 async function stopEngine() {
-    const confirmed = confirm('Are you sure you want to stop the engine?');
+    const confirmed = await UIFeedback.confirm({ title: 'Stop registration engine?', message: 'Stop the face registration engine?', confirmText: 'Stop engine', type: 'warning' });
     if (!confirmed) return;
 
     isBooting = false; 

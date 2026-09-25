@@ -258,22 +258,29 @@ document.getElementById('labForm').addEventListener('submit', async function (e)
 });
 
 // ── Delete ────────────────────────────────────────────────────
+const pendingLabDeletes = new Set();
 async function deleteLab(labId, labCode) {
-    if (!confirm(`Delete ${labCode}?\n\nThis will also remove all associated schedules and attendance records.`)) return;
+    if (pendingLabDeletes.has(labId)) return;
+    if (!await UIFeedback.confirm({ title: 'Delete laboratory?', message: `Delete ${labCode} and its associated schedules and attendance records?`, confirmText: 'Delete laboratory', type: 'danger' }) || pendingLabDeletes.has(labId)) return;
 
-    const { error } = await supabaseClient
-        .from('laboratory_rooms')
-        .delete()
-        .eq('lab_id', labId);
+    pendingLabDeletes.add(labId);
+    try {
+        const { error } = await supabaseClient
+            .from('laboratory_rooms')
+            .delete()
+            .eq('lab_id', labId);
 
-    if (error) {
-        console.error(error);
-        showToast('Failed to delete: ' + error.message, true);
-        return;
+        if (error) {
+            console.error(error);
+            showToast('Failed to delete: ' + error.message, true);
+            return;
+        }
+
+        showToast(`${labCode} deleted.`);
+        await loadLabs();
+    } finally {
+        pendingLabDeletes.delete(labId);
     }
-
-    showToast(`${labCode} deleted.`);
-    await loadLabs();
 }
 // ── Report Modal ──────────────────────────────────────────────
 let existingReportsToday = []; // Stores objects: { name, dataString }
@@ -401,7 +408,7 @@ function closeReportModal() {
 }
 
 // ── Smart Duplicate Check Helper ──
-function checkDuplicateWarning(exportType) {
+async function checkDuplicateWarning(exportType) {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const reportName = `Laboratory Rooms Report — ${dateStr} (${exportType})`;
     const currentDataString = JSON.stringify(REPORT);
@@ -412,14 +419,14 @@ function checkDuplicateWarning(exportType) {
     );
     
     if (isExactDuplicate) {
-        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+        return UIFeedback.confirm({ title: 'Duplicate report', message: `A ${exportType} report with this exact data has already been saved today. Generate another?`, confirmText: 'Generate duplicate', type: 'warning' });
     }
     return true; 
 }
 
 // ── Save to Reports (Manual Button) ───────────────────────────
 async function saveReport() {
-    if (!checkDuplicateWarning('Manual Save')) return;
+    if (!await checkDuplicateWarning('Manual Save')) return;
 
     const btn = document.querySelector('.rm-btn[onclick="saveReport()"]');
     if (btn) {
@@ -469,7 +476,7 @@ async function autoSaveReport(exportType) {
     }
 }
 async function printReport() {
-    if (!checkDuplicateWarning('Print')) return;
+    if (!await checkDuplicateWarning('Print')) return;
 
     // ✅ Call getDeptLogos() BEFORE the HTML string
     const { deptLogo, deptName } = getDeptLogos();
@@ -545,7 +552,7 @@ async function printReport() {
     await autoSaveReport('Print');
 }
 async function downloadPDF() {
-    if (!checkDuplicateWarning('PDF')) return;
+    if (!await checkDuplicateWarning('PDF')) return;
 
     const { jsPDF } = window.jspdf;
     const doc    = new jsPDF('landscape');
@@ -644,7 +651,7 @@ const [plpData, ccsData] = await Promise.all([
 
 // ── Excel ─────────────────────────────────────────────────────
 async function exportExcel() {
-    if (!checkDuplicateWarning('Excel')) return;
+    if (!await checkDuplicateWarning('Excel')) return;
 
     if (!window.XLSX) {
         showToast('Excel library not loaded. Please refresh the page.', true);

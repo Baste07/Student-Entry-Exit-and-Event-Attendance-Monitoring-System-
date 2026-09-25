@@ -1,9 +1,12 @@
 let allSchoolYears = [];
+let savedSmsEnabled = true;
+let creatingSchoolYear = false;
+const SMS_SETTING_KEY = 'sms_enabled';
 
 document.addEventListener('DOMContentLoaded', async () => {
     checkSupabaseConnection();
     setupEventListeners();
-    await loadSchoolYears();
+    await Promise.all([loadSchoolYears(), loadSmsSetting()]);
 });
 
 function setupEventListeners() {
@@ -11,10 +14,62 @@ function setupEventListeners() {
     document.getElementById('setActiveSchoolYearBtn')?.addEventListener('click', handleSetActiveClick);
     document.getElementById('inactivateSchoolYearBtn')?.addEventListener('click', handleInactivateClick);
     document.getElementById('existingSchoolYearSelect')?.addEventListener('change', handleSelectChange);
+    document.getElementById('attendanceSmsToggle')?.addEventListener('change', saveSmsSetting);
 
     document.querySelectorAll('.cal-tab').forEach(tab => {
         tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
+}
+
+function renderSmsSetting(enabled) {
+    const toggle = document.getElementById('attendanceSmsToggle');
+    const status = document.getElementById('attendanceSmsStatus');
+    if (toggle) toggle.checked = enabled;
+    if (status) status.textContent = enabled
+        ? 'On — guardian SMS is sent for event attendance and school entry/exit.'
+        : 'Off — guardian SMS is paused for new scans.';
+}
+
+async function loadSmsSetting() {
+    const toggle = document.getElementById('attendanceSmsToggle');
+    try {
+        if (!supabaseClient) throw new Error('Supabase is not available');
+        const { data, error } = await supabaseClient
+            .from('system_settings')
+            .select('value')
+            .eq('key', SMS_SETTING_KEY)
+            .maybeSingle();
+        if (error) throw error;
+        savedSmsEnabled = data ? String(data.value).toLowerCase() !== 'false' : true;
+        renderSmsSetting(savedSmsEnabled);
+        if (toggle) toggle.disabled = false;
+    } catch (error) {
+        console.error('Could not load SMS setting:', error);
+        if (toggle) toggle.disabled = true;
+        const status = document.getElementById('attendanceSmsStatus');
+        if (status) status.textContent = 'SMS setting unavailable. Refresh to try again.';
+    }
+}
+
+async function saveSmsSetting(event) {
+    const toggle = event.target;
+    const enabled = toggle.checked;
+    toggle.disabled = true;
+    try {
+        const { error } = await supabaseClient
+            .from('system_settings')
+            .upsert({ key: SMS_SETTING_KEY, value: String(enabled) }, { onConflict: 'key' });
+        if (error) throw error;
+        savedSmsEnabled = enabled;
+        renderSmsSetting(enabled);
+        showAlert(`Attendance SMS ${enabled ? 'enabled' : 'disabled'}.`, 'success');
+    } catch (error) {
+        console.error('Could not save SMS setting:', error);
+        renderSmsSetting(savedSmsEnabled);
+        showAlert('Could not save SMS setting. Please try again.', 'danger');
+    } finally {
+        toggle.disabled = false;
+    }
 }
 
 function switchTab(tabName) {
@@ -78,7 +133,7 @@ async function loadSchoolYears() {
         populateExistingSchoolYearsDropdown();
     } catch (error) {
         console.error('Error loading school years:', error);
-        showAlert('Error loading school years: ' + error.message, 'danger');
+        showAlert('School years could not be loaded. Please try again.', 'danger');
     }
 }
 
@@ -163,7 +218,12 @@ async function handleSetActiveClick() {
         return;
     }
 
-    if (!confirm(`Set "${chosen.name}" as the active school year? This will deactivate the current active year.`)) {
+    if (!await UIFeedback.confirm({
+        title: 'Activate School Year',
+        message: `Set "${chosen.name}" as the active school year? This will deactivate the current active year.`,
+        confirmText: 'Activate',
+        type: 'warning'
+    })) {
         return;
     }
 
@@ -180,7 +240,7 @@ async function handleSetActiveClick() {
         renderDetailsCard(selectedId);
     } catch (error) {
         console.error('Error activating school year:', error);
-        showAlert('Error activating school year: ' + error.message, 'danger');
+        showAlert('The school year could not be activated. Please try again.', 'danger');
     } finally {
         if (activateBtn) activateBtn.textContent = 'Activate School Year';
     }
@@ -197,7 +257,12 @@ async function handleInactivateClick() {
         return;
     }
 
-    if (!confirm(`Inactivate "${chosen.name}"? No school year will be marked active until you activate one.`)) {
+    if (!await UIFeedback.confirm({
+        title: 'Inactivate School Year',
+        message: `Inactivate "${chosen.name}"? No school year will be marked active until you activate one.`,
+        confirmText: 'Inactivate',
+        type: 'warning'
+    })) {
         return;
     }
 
@@ -220,13 +285,17 @@ async function handleInactivateClick() {
         renderDetailsCard(selectedId);
     } catch (error) {
         console.error('Error inactivating school year:', error);
-        showAlert('Error inactivating school year: ' + error.message, 'danger');
+        showAlert('The school year could not be inactivated. Please try again.', 'danger');
     } finally {
         if (inactivateBtn) inactivateBtn.textContent = 'Inactivate School Year';
     }
 }
 
 async function createSchoolYear() {
+    if (creatingSchoolYear) return;
+    creatingSchoolYear = true;
+    const createButton = document.getElementById('createSchoolYearBtn');
+    if (createButton) createButton.disabled = true;
     try {
         if (!supabaseClient) {
             showAlert('Database connection not initialized.', 'danger');
@@ -238,20 +307,20 @@ async function createSchoolYear() {
         const activate = document.getElementById('activateOnCreate')?.checked;
 
         if (!name) {
-            showAlert('Please enter a school year.', 'warning');
+            UIFeedback.fieldError(input, 'Please enter a school year.');
             return;
         }
 
         const match = name.match(/^(\d{4})-(\d{4})$/);
         if (!match) {
-            showAlert('School year must be in format YYYY-YYYY (example: 2027-2028).', 'warning');
+            UIFeedback.fieldError(input, 'Use YYYY-YYYY (example: 2027-2028).');
             return;
         }
 
         const startYear = Number(match[1]);
         const endYear = Number(match[2]);
         if (endYear !== startYear + 1) {
-            showAlert('School year must be consecutive (example: 2027-2028).', 'warning');
+            UIFeedback.fieldError(input, 'School years must be consecutive (example: 2027-2028).');
             return;
         }
 
@@ -263,7 +332,7 @@ async function createSchoolYear() {
 
         if (existingError) throw existingError;
         if (existing) {
-            showAlert('This school year already exists.', 'warning');
+            UIFeedback.fieldError(input, 'This school year already exists.');
             return;
         }
 
@@ -301,7 +370,10 @@ async function createSchoolYear() {
         }
     } catch (error) {
         console.error('Error creating school year:', error);
-        showAlert('Error creating school year: ' + error.message, 'danger');
+        showAlert('The school year could not be saved. Please try again.', 'danger');
+    } finally {
+        creatingSchoolYear = false;
+        if (createButton) createButton.disabled = false;
     }
 }
 
@@ -328,10 +400,24 @@ function formatDate(dateStr) {
 }
 
 function showAlert(message, type = 'info') {
+    if (type === 'success') {
+        UIFeedback.success(message);
+        return;
+    }
+    if (type === 'danger') {
+        UIFeedback.error(message, 'Action failed');
+        return;
+    }
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
     alertDiv.setAttribute('role', 'alert');
-    alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    alertDiv.textContent = message;
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'btn-close';
+    closeButton.setAttribute('data-bs-dismiss', 'alert');
+    closeButton.setAttribute('aria-label', 'Close');
+    alertDiv.appendChild(closeButton);
     const mainContent = document.querySelector('.main-content');
     if (mainContent) {
         mainContent.insertBefore(alertDiv, mainContent.firstChild);

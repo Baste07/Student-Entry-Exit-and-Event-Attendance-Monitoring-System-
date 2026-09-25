@@ -155,25 +155,35 @@ function renderTable() {
 // ────────────────────────────────────────────
 // 2. LOG DELETIONS
 // ────────────────────────────────────────────
+const pendingReportDeletes = new Set();
 window.deleteReport = async function(id) {
-    if (!confirm("Are you sure you want to delete this log entry?")) return;
+    if (pendingReportDeletes.has(id)) return;
+    if (!await UIFeedback.confirm({ title: 'Delete export log?', message: 'Delete this log entry?', confirmText: 'Delete log', type: 'danger' }) || pendingReportDeletes.has(id)) return;
+    pendingReportDeletes.add(id);
     try {
-        await supabaseClient.from('las_reports').delete().eq('report_id', id);
+        const { error } = await supabaseClient.from('las_reports').delete().eq('report_id', id);
+        if (error) throw error;
         showToast('Log deleted.');
         await loadReportsData();
     } catch (err) { showToast('Error deleting log.', 'error'); }
+    finally { pendingReportDeletes.delete(id); }
 }
 
 window.openDelAllModal = function() { document.getElementById('delAllModal').classList.add('on'); }
 window.closeDelAllModal = function() { document.getElementById('delAllModal').classList.remove('on'); }
 
+let clearingReportLogs = false;
 window.executeDeleteAll = async function() {
+    if (clearingReportLogs) return;
+    clearingReportLogs = true;
     try {
-        await supabaseClient.from('las_reports').delete().neq('report_id', 0);
+        const { error } = await supabaseClient.from('las_reports').delete().neq('report_id', 0);
+        if (error) throw error;
         document.getElementById('delAllModal').classList.remove('on');
         showToast('All export logs cleared.');
         await loadReportsData();
     } catch (err) { showToast('Error clearing logs.', 'error'); }
+    finally { clearingReportLogs = false; }
 }
 
 // ────────────────────────────────────────────

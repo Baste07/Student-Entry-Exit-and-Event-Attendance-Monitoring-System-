@@ -1291,7 +1291,7 @@ function getYearSectionDisplay(row) {
     return formatYearSection(row?.year_level, row?.student_section, row?.class_section);
 }
 
-function checkDuplicateWarning(exportType) {
+async function checkDuplicateWarning(exportType) {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const filterDate = document.getElementById('filterDate').value || 'All Dates';
     const reportName = `Attendance Report [${filterDate}] — ${dateStr} (${exportType})`;
@@ -1302,7 +1302,7 @@ function checkDuplicateWarning(exportType) {
     );
     
     if (isExactDuplicate) {
-        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+        return UIFeedback.confirm({ title: 'Duplicate report', message: `A ${exportType} report with this exact data has already been saved today. Generate another?`, confirmText: 'Generate duplicate', type: 'warning' });
     }
     return true; 
 }
@@ -1335,8 +1335,8 @@ async function autoSaveReport(exportType) {
 
 // ── PRINT ──────────────────────────────────────────────────
 window.printReport = async function() {
-    if (filteredAttendance.length === 0) { alert("No records to print."); return; }
-    if (!checkDuplicateWarning('Print')) return;
+    if (filteredAttendance.length === 0) { UIFeedback.toast({ type: 'info', message: 'No records to print.' }); return; }
+    if (!await checkDuplicateWarning('Print')) return;
 
     // Dynamically retrieve department data
     const { deptLogo, deptName, deptCode } = getDeptLogos();
@@ -1481,11 +1481,11 @@ window.printReport = async function() {
 
 // ── PDF ────────────────────────────────────────────────────
 window.downloadPDF = async function() {
-    if (filteredAttendance.length === 0) { alert("No records to export."); return; }
-    if (!checkDuplicateWarning('PDF')) return;
+    if (filteredAttendance.length === 0) { UIFeedback.toast({ type: 'info', message: 'No records to export.' }); return; }
+    if (!await checkDuplicateWarning('PDF')) return;
 
     if (!window.jspdf) {
-        alert('PDF library not loaded yet. Please try again.');
+        UIFeedback.toast({ type: 'error', message: 'PDF library not loaded yet. Please try again.' });
         return;
     }
 
@@ -1603,17 +1603,17 @@ window.downloadPDF = async function() {
 
     } catch (err) {
         console.error('PDF generation error:', err);
-        alert('There was an error generating the PDF. Check the console.');
+        UIFeedback.error('There was an error generating the PDF. Please try again.');
     }
 };
 
 // ── EXCEL ────────────────────────────────────────────────────
 window.exportExcel = async function() {
-    if (filteredAttendance.length === 0) { alert("No records to export."); return; }
-    if (!checkDuplicateWarning('Excel')) return;
+    if (filteredAttendance.length === 0) { UIFeedback.toast({ type: 'info', message: 'No records to export.' }); return; }
+    if (!await checkDuplicateWarning('Excel')) return;
 
     if (!window.XLSX) {
-        alert('Excel library not loaded. Please refresh the page.');
+        UIFeedback.toast({ type: 'error', message: 'Excel library not loaded. Please refresh the page.' });
         return;
     }
 

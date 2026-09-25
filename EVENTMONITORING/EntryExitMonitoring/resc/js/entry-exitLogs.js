@@ -42,7 +42,8 @@ async function loadLogs() {
         applyFilters();
     } catch (e) {
         console.error('[entryExitLogs] load error:', e);
-        tbody.innerHTML = `<tr><td colspan="9" class="loading-cell">Failed to load logs. Check console.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="loading-cell">Failed to load logs. Please try again.</td></tr>`;
+        UIFeedback.error('Entry and exit logs could not be loaded. Please try again.', 'Load failed');
     }
 }
 

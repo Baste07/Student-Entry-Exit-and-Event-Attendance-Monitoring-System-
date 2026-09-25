@@ -242,7 +242,7 @@ async function sendSelectedStudents() {
         return;
     }
 
-    const confirmed = confirm(`Send QR codes to ${targets.length} student(s)?`);
+    const confirmed = await UIFeedback.confirm({ title: 'Send QR codes?', message: `Send QR codes to ${targets.length} student(s)?`, confirmText: 'Send QR codes', type: 'info' });
     if (!confirmed) return;
 
     openBulkSendModal(targets);
@@ -250,7 +250,7 @@ async function sendSelectedStudents() {
 }
 
 async function sendOneStudent(student, buttonEl = null) {
-    const confirmed = confirm(`Send a QR code to ${student.full_name || formatStudentId(student.id_number)}?`);
+    const confirmed = await UIFeedback.confirm({ title: 'Send QR code?', message: `Send a QR code to ${student.full_name || formatStudentId(student.id_number)}?`, confirmText: 'Send QR code', type: 'info' });
     if (!confirmed) return;
 
     if (buttonEl) setButtonLoading(buttonEl, true, 'Sending...');
@@ -732,7 +732,7 @@ function showToast(message, isError = false) {
     const toast = document.getElementById('toast');
     const toastMsg = document.getElementById('toastMsg');
     if (!toast || !toastMsg) {
-        alert(message);
+        UIFeedback.toast({ type: isError ? 'error' : 'success', message });
         return;
     }
 

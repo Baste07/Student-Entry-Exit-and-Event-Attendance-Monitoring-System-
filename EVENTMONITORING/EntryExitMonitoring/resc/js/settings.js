@@ -16,6 +16,8 @@ const DEFAULTS = {
     emailEnabled:     false,
     notifyEntryOnly:false
 };
+let savingSettings = false;
+let resettingSettings = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!supabaseClient) { console.error('Supabase not initialised.'); return; }
@@ -54,6 +56,10 @@ function applyToForm(s) {
 }
 
 async function saveSettings() {
+    if (savingSettings) return;
+    savingSettings = true;
+    const saveButton = document.querySelector('.btn-save');
+    if (saveButton) saveButton.disabled = true;
     const settings = {
         gateOpen:        document.getElementById('gateOpen').value,
         gateClose:       document.getElementById('gateClose').value,
@@ -72,29 +78,48 @@ async function saveSettings() {
             .from('gate_settings')
             .upsert(upserts, { onConflict: 'key' });
         if (error) throw error;
-        showToast('Settings saved!');
+        UIFeedback.success('Gate settings were saved.', 'Settings saved');
     } catch (e) {
         // Fallback: localStorage
         console.warn('[settings] Supabase write failed, saving to localStorage:', e.message);
-        localStorage.setItem('gate_settings', JSON.stringify(settings));
-        showToast('Settings saved locally (DB unavailable).');
+        try {
+            localStorage.setItem('gate_settings', JSON.stringify(settings));
+            UIFeedback.toast({
+                type: 'warning',
+                title: 'Saved on this device',
+                message: 'The database is unavailable. These settings were saved locally.'
+            });
+        } catch (storageError) {
+            console.error('Gate settings could not be saved:', storageError);
+            UIFeedback.error('Gate settings could not be saved. Please try again.', 'Save failed');
+        }
+    } finally {
+        savingSettings = false;
+        if (saveButton) saveButton.disabled = false;
     }
 }
 
-function resetSettings() {
-    if (!confirm('Reset all settings to defaults?')) return;
-    applyToForm(DEFAULTS);
-    showToast('Defaults restored. Click Save to apply.');
+async function resetSettings() {
+    if (resettingSettings) return;
+    resettingSettings = true;
+    try {
+        if (!await UIFeedback.confirm({
+            title: 'Reset Gate Settings',
+            message: 'Restore the default values in this form? Click Save to apply them.',
+            confirmText: 'Reset defaults',
+            type: 'warning'
+        })) return;
+        applyToForm(DEFAULTS);
+        UIFeedback.toast({
+            type: 'info',
+            title: 'Defaults restored',
+            message: 'Click Save to apply these settings.'
+        });
+    } finally {
+        resettingSettings = false;
+    }
 }
 
 function setInput(id, val) { const e = document.getElementById(id); if (e) e.value = val ?? ''; }
 function setCheck(id, val) { const e = document.getElementById(id); if (e) e.checked = !!val; }
 function toBool(v) { return v === true || v === 'true'; }
-
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    const m = document.getElementById('toastMsg');
-    if (!t || !m) return;
-    m.textContent = msg; t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
-}

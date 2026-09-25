@@ -403,7 +403,7 @@ function closeReportModal() {
     document.getElementById('rmOverlay').classList.remove('on');
 }
 
-function checkDuplicateWarning(exportType) {
+async function checkDuplicateWarning(exportType) {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const reportName = `Professors Report — ${dateStr} (${exportType})`;
     const currentDataString = JSON.stringify(reportRows);
@@ -411,13 +411,13 @@ function checkDuplicateWarning(exportType) {
     const isExactDuplicate = existingReportsToday.some(r => r.name === reportName && r.dataString === currentDataString);
     
     if (isExactDuplicate) {
-        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+        return UIFeedback.confirm({ title: 'Duplicate report', message: `A ${exportType} report with this exact data has already been saved today. Generate another?`, confirmText: 'Generate duplicate', type: 'warning' });
     }
     return true; 
 }
 
 async function saveReport() {
-    if (!checkDuplicateWarning('Manual Save')) return;
+    if (!await checkDuplicateWarning('Manual Save')) return;
     const btn = document.querySelector('.rm-btn[onclick="saveReport()"]');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
     await autoSaveReport('Manual Save');
@@ -435,7 +435,7 @@ async function autoSaveReport(exportType) {
         
         if (exportType === 'Manual Save') {
             if (typeof showToast === 'function') showToast('Report saved successfully!', true);
-            else alert('Report saved successfully!');
+            else UIFeedback.success('Report saved successfully!');
         }
         
         existingReportsToday.push({ name: payload.report_name, dataString: payload.report_data }); 
@@ -445,7 +445,7 @@ async function autoSaveReport(exportType) {
 }
 
 async function printReport() {
-    if (!checkDuplicateWarning('Print')) return;
+    if (!await checkDuplicateWarning('Print')) return;
 
     const { deptLogo, deptName } = getDeptLogos(); // ✅ dynamic department info
 
@@ -514,8 +514,8 @@ async function printReport() {
 }
 
 async function downloadPDF() {
-    if (!checkDuplicateWarning('PDF')) return;
-    if (!window.jspdf) { alert('PDF library not loaded yet. Please try again.'); return; }
+    if (!await checkDuplicateWarning('PDF')) return;
+    if (!window.jspdf) { UIFeedback.toast({ type: 'error', message: 'PDF library not loaded yet. Please try again.' }); return; }
 
     try {
         const { deptLogo, deptName } = getDeptLogos(); // ✅ dynamic department info
@@ -589,11 +589,11 @@ async function downloadPDF() {
 
 // ── Excel ──────────────────────────────────────────────────
 async function exportExcel() {
-    if (!checkDuplicateWarning('Excel')) return;
+    if (!await checkDuplicateWarning('Excel')) return;
 
     if (!window.XLSX) {
         if (typeof showToast === 'function') showToast('Excel library not loaded. Please refresh the page.', true);
-        else alert('Excel library not loaded.');
+        else UIFeedback.toast({ type: 'error', message: 'Excel library not loaded.' });
         return; 
     }
     

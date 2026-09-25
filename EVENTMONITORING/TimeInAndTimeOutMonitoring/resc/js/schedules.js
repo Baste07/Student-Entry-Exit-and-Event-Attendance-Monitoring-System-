@@ -629,7 +629,7 @@ document.getElementById('scheduleForm').addEventListener('submit', async functio
     const st = document.getElementById('startTime').value;
     const et = document.getElementById('endTime').value;
     if (et <= st) {
-        alert('End time must be after start time.');
+        UIFeedback.fieldError(document.getElementById('endTime'), 'End time must be after start time.');
         return;
     }
 
@@ -664,7 +664,7 @@ document.getElementById('scheduleForm').addEventListener('submit', async functio
         closeSchedModal('scheduleModal');
         await loadSchedulesData();
     } catch (err) {
-        alert("Error saving: " + err.message);
+        UIFeedback.error("Error saving schedule: " + err.message);
     } finally {
         btn.disabled = false; btn.innerHTML = ogText;
     }
@@ -720,15 +720,20 @@ async function autoEnrollStudents(scheduleId, sectionString) {
 }
 
 
+const pendingScheduleDeletes = new Set();
 async function deleteSchedule(id, info) {
-    if (!confirm(`Delete schedule for: ${info}?\n\nWarning: Associated sessions and enrollments may be deleted.`)) return;
+    if (pendingScheduleDeletes.has(id)) return;
+    if (!await UIFeedback.confirm({ title: 'Delete schedule?', message: `Delete the schedule for ${info}? Associated sessions and enrollments may also be deleted.`, confirmText: 'Delete schedule', type: 'danger' }) || pendingScheduleDeletes.has(id)) return;
+    pendingScheduleDeletes.add(id);
     try {
         const { error } = await supabaseClient.from('lab_schedules').delete().eq('schedule_id', id);
         if (error) throw error;
         showToast("Schedule removed.");
         await loadSchedulesData();
     } catch(err) {
-        alert("Error deleting: " + err.message);
+        UIFeedback.error("Error deleting schedule: " + err.message);
+    } finally {
+        pendingScheduleDeletes.delete(id);
     }
 }
 
@@ -849,7 +854,7 @@ function escapeHtml(str) {
 let existingReportsToday = []; // Tracks reports to prevent exact duplicates
 
 // ── Smart Duplicate Check Helper ──
-function checkDuplicateWarning(exportType) {
+async function checkDuplicateWarning(exportType) {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const reportName = `Schedules Report — ${dateStr} (${exportType})`;
     const currentDataString = JSON.stringify(allSchedules);
@@ -859,7 +864,7 @@ function checkDuplicateWarning(exportType) {
     );
     
     if (isExactDuplicate) {
-        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+        return UIFeedback.confirm({ title: 'Duplicate report', message: `A ${exportType} report with this exact data has already been saved today. Generate another?`, confirmText: 'Generate duplicate', type: 'warning' });
     }
     return true; 
 }
@@ -915,7 +920,7 @@ async function autoSaveReport(exportType) {
     }
 }
 async function printReport() {
-    if (!checkDuplicateWarning('Print')) return;
+    if (!await checkDuplicateWarning('Print')) return;
 
     if (existingReportsToday.length === 0) await fetchTodayReports();
 
@@ -1006,11 +1011,11 @@ async function printReport() {
 }
 
 async function downloadPDF() {
-    if (!checkDuplicateWarning('PDF')) return;
+    if (!await checkDuplicateWarning('PDF')) return;
 
     if (!window.jspdf) {
         if (typeof showToast === 'function') showToast('PDF library not loaded yet. Please try again.', true);
-        else alert('PDF library not loaded yet. Please try again.');
+        else UIFeedback.toast({ type: 'error', message: 'PDF library not loaded yet. Please try again.' });
         return;
     }
 
@@ -1154,7 +1159,7 @@ async function downloadPDF() {
 
 // ── CSV ────────────────────────────────────────────────────
 async function exportCSV() {
-    if (!checkDuplicateWarning('CSV')) return;
+    if (!await checkDuplicateWarning('CSV')) return;
 
     const cols = ['#','Schedule ID','Professor','Employee ID','Subject Code','Subject Name','Section','Day','Start Time','End Time','Laboratory','Lab Name','Semester','School Year','Status','Enrolled','Sessions Done'];
     const lines = [
@@ -1174,7 +1179,7 @@ async function exportCSV() {
 
 // ── Excel ──────────────────────────────────────────────────
 async function exportExcel() {
-    if (!checkDuplicateWarning('Excel')) return;
+    if (!await checkDuplicateWarning('Excel')) return;
 
     if (!window.XLSX) {
         return exportCSV(); // Fallback to CSV if SheetJS is missing

@@ -6,14 +6,28 @@
 let chartInstance = null;
 let reportData    = [];
 let currentReportType = 'daily';
+function escapeReportHtml(value) {
+    return String(value ?? '—').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (document.body?.dataset.gateReportsVersion !== '20260925d') {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('gate_reports_version') !== '20260925d') {
+            url.searchParams.set('gate_reports_version', '20260925d');
+            sessionStorage.setItem('allowed_admin_route', url.pathname);
+            window.location.replace(url.href);
+        } else {
+            document.body.insertAdjacentHTML('afterbegin', '<p role="alert" style="padding:16px;background:#fff2f2;color:#991b1b">The old reports page is cached. Reload this tab with Ctrl+Shift+R.</p>');
+        }
+        return;
+    }
     // Default: current week
-    const today   = new Date();
-    const monday  = new Date(today);
-    monday.setDate(today.getDate() - today.getDay() + 1);
-    document.getElementById('reportFrom').value = toLocalIsoDate(monday);
-    document.getElementById('reportTo').value   = toLocalIsoDate(today);
+    const today = GateAnalytics.manilaDate();
+    const monday = new Date(`${today}T00:00:00Z`);
+    monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+    document.getElementById('reportFrom').value = monday.toISOString().slice(0, 10);
+    document.getElementById('reportTo').value = today;
 });
 
 async function generateReport() {
@@ -22,8 +36,11 @@ async function generateReport() {
     const to   = document.getElementById('reportTo').value;
     currentReportType = type;
 
-    if (!from || !to) { showToast('Please select a date range.'); return; }
-    if (from > to)    { showToast('Date From must be before Date To.'); return; }
+    if (type === 'analytics') return generateGateAnalyticsReport();
+
+    if (!from) { UIFeedback.fieldError(document.getElementById('reportFrom'), 'Start date is required.'); return; }
+    if (!to) { UIFeedback.fieldError(document.getElementById('reportTo'), 'End date is required.'); return; }
+    if (from > to) { UIFeedback.fieldError(document.getElementById('reportTo'), 'End date must be on or after the start date.'); return; }
 
     if (!supabaseClient) {
         showReportError('The database client is unavailable. Please sign in again and reload the page.');
@@ -31,49 +48,22 @@ async function generateReport() {
         return;
     }
 
-    const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
-    console.info('[reports] Supabase session state', {
-        authenticated: Boolean(sessionData?.session),
-        sessionError: sessionError?.message || null
-    });
-    console.info('[reports] Generating report', { type, from, to });
-
     document.getElementById('emptyState').style.display   = 'none';
+    reportData = [];
     document.getElementById('analyticsPanel').style.display = 'none';
     document.getElementById('chartPanel').style.display   = 'none';
     document.getElementById('tablePanel').style.display   = 'none';
 
     try {
-        const { data: logs, error } = await supabaseClient
-            .from('entry_exit_logs')
-            .select(`
-                log_type, scan_method, log_date, log_timestamp,
-                students ( stud_id, first_name, last_name, section_id,
-                    sections ( grade_level, section_name )
-                )
-            `)
-            .gte('log_date', from)
-            .lte('log_date', to)
-            .order('log_date', { ascending: true });
-
-        console.info('[reports] entry_exit_logs query result', {
-            from,
-            to,
-            rowCount: logs?.length ?? 0,
-            firstRow: logs?.[0] ?? null,
-            error: error ?? null
-        });
-
-        if (error) {
-            showReportError(`Unable to load report data: ${error.message || 'Unknown database error.'}`);
-            console.error('[reports] entry_exit_logs query error:', error);
-            return;
-        }
+        const raw = await GateAnalytics.fetchLogs(supabaseClient, { from, to });
+        const logs = raw.filter(row => row.log_timestamp).map(row => ({
+            ...row, log_date: GateAnalytics.manilaDate(new Date(row.log_timestamp))
+        }));
 
         if (!logs || logs.length === 0) {
             document.getElementById('emptyState').style.display = 'block';
             document.getElementById('emptyState').querySelector('p').textContent = 'No data found for selected range.';
-            showToast('No records found.'); return;
+            UIFeedback.toast({ type: 'info', title: 'No records', message: 'No records were found for this date range.' }); return;
         }
 
         switch (type) {
@@ -84,7 +74,7 @@ async function generateReport() {
         }
     } catch (e) {
         console.error('[reports] generateReport error:', e);
-        showReportError(`Unable to generate report: ${e.message || 'Unexpected error.'}`);
+        showReportError('Unable to generate the report. Please try again.');
     }
 }
 
@@ -92,12 +82,12 @@ async function generateReport() {
 function buildDailyReport(logs, from, to) {
     const days = {};
     // Populate all days in range
-    const cur = new Date(`${from}T00:00:00`);
-    const end = new Date(`${to}T00:00:00`);
+    const cur = new Date(`${from}T00:00:00Z`);
+    const end = new Date(`${to}T00:00:00Z`);
     while (cur <= end) {
-        const d = toLocalIsoDate(cur);
+        const d = cur.toISOString().slice(0, 10);
         days[d] = { entries: 0, exits: 0, studentIds: new Set() };
-        cur.setDate(cur.getDate() + 1);
+        cur.setUTCDate(cur.getUTCDate() + 1);
     }
     logs.forEach(l => {
         if (!days[l.log_date]) days[l.log_date] = { entries: 0, exits: 0, studentIds: new Set() };
@@ -151,7 +141,7 @@ function updateDailyAnalytics(rows) {
 function buildWeeklyReport(logs) {
     const weeks = {};
     logs.forEach(l => {
-        const d   = new Date(l.log_date);
+        const d   = new Date(`${l.log_date}T00:00:00Z`);
         const wk  = getISOWeek(d);
         const key = `Week ${wk.week} (${wk.year})`;
         if (!weeks[key]) weeks[key] = { entries: 0, exits: 0 };
@@ -181,6 +171,7 @@ function buildWeeklyReport(logs) {
 function buildStudentReport(logs) {
     const students = {};
     logs.forEach(l => {
+        if (!l.student_id) return;
         const s   = l.students || {};
         const section = s.sections || {};
         const key = s.stud_id || 'unknown';
@@ -208,6 +199,7 @@ function buildStudentReport(logs) {
 function buildGradeReport(logs) {
     const grades = {};
     logs.forEach(l => {
+        if (!l.student_id) return;
         const g = l.students?.sections?.grade_level || 'Unknown';
         if (!grades[g]) grades[g] = { entries: 0, exits: 0 };
         if (l.log_type === 'entry') grades[g].entries++;
@@ -218,8 +210,14 @@ function buildGradeReport(logs) {
         .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
         .map(([grade, v]) => ({ grade, ...v }));
 
+    if (!reportData.length) {
+        document.getElementById('chartPanel').style.display = 'none';
+        renderTable(['Grade', 'Entries', 'Exits', 'Total'], [], 'Per-Grade Summary');
+        return;
+    }
+
     renderChart(
-        reportData.map(r => `Grade ${r.grade}`),
+        reportData.map(r => r.grade),
         [
             { label: 'Entries', data: reportData.map(r => r.entries), backgroundColor: 'rgba(16,185,129,.7)', borderColor: '#059669', borderWidth: 2 },
             { label: 'Exits',   data: reportData.map(r => r.exits),   backgroundColor: 'rgba(239,68,68,.6)',  borderColor: '#dc2626', borderWidth: 2 }
@@ -229,7 +227,7 @@ function buildGradeReport(logs) {
 
     renderTable(
         ['Grade', 'Entries', 'Exits', 'Total'],
-        reportData.map(r => [`Grade ${r.grade}`, r.entries, r.exits, r.entries + r.exits]),
+        reportData.map(r => [r.grade, r.entries, r.exits, r.entries + r.exits]),
         'Per-Grade Summary'
     );
 }
@@ -257,11 +255,13 @@ function renderTable(headers, rows, title) {
         `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
     document.getElementById('reportTableBody').innerHTML = rows.length === 0
         ? `<tr><td colspan="${headers.length}" style="text-align:center;padding:24px;color:#6a8092;">No data.</td></tr>`
-        : rows.map(r => `<tr>${r.map(c => `<td>${c ?? '—'}</td>`).join('')}</tr>`).join('');
+        : rows.map(r => `<tr>${r.map(c => `<td>${escapeReportHtml(c)}</td>`).join('')}</tr>`).join('');
 }
 
 function exportCSV() {
-    if (!reportData || reportData.length === 0) { showToast('Generate a report first.'); return; }
+    if (document.getElementById('reportType').value === 'analytics') return exportGateAnalyticsCSV();
+    if (!reportData || reportData.length === 0) { UIFeedback.toast({ type: 'info', message: 'Generate a report first.' }); return; }
+    try {
     const type = document.getElementById('reportType').value;
     let headers, rows;
     if (type === 'student') {
@@ -269,7 +269,7 @@ function exportCSV() {
         rows = reportData.map(r => [r.stud_id, r.name, r.grade, r.section, r.entries, r.exits, r.entries + r.exits]);
     } else if (type === 'grade') {
         headers = ['Grade','Entries','Exits','Total'];
-        rows = reportData.map(r => [`Grade ${r.grade}`, r.entries, r.exits, r.entries + r.exits]);
+        rows = reportData.map(r => [r.grade, r.entries, r.exits, r.entries + r.exits]);
     } else if (type === 'weekly') {
         headers = ['Week','Entries','Exits','Total'];
         rows = reportData.map(r => [r.week, r.entries, r.exits, r.entries + r.exits]);
@@ -283,11 +283,18 @@ function exportCSV() {
     const a    = document.createElement('a'); a.href = url;
     a.download = `report_${type}_${new Date().toLocaleDateString('en-CA')}.csv`;
     a.click(); URL.revokeObjectURL(url);
-    showToast('CSV exported!');
+    UIFeedback.success('CSV exported.', 'Export complete');
+    } catch (error) {
+        console.error('CSV export failed:', error);
+        UIFeedback.error('The CSV could not be exported. Please try again.', 'Export failed');
+    }
 }
 
 function exportPDF() {
-    if (!reportData || reportData.length === 0) { showToast('Generate a report first.'); return; }
+    if (document.getElementById('reportType').value === 'analytics') return exportGateAnalyticsPDF();
+    if (!reportData || reportData.length === 0) { UIFeedback.toast({ type: 'info', message: 'Generate a report first.' }); return; }
+    if (!window.jspdf) { UIFeedback.error('PDF export is unavailable. Please reload the page and try again.', 'Export unavailable'); return; }
+    try {
     const { jsPDF } = window.jspdf;
     const doc  = new jsPDF();
     const type = document.getElementById('reportType').value;
@@ -306,7 +313,7 @@ function exportPDF() {
         body = reportData.map(r => [r.stud_id, r.name, r.grade, r.section, r.entries, r.exits, r.entries + r.exits]);
     } else if (type === 'grade') {
         head = [['Grade','Entries','Exits','Total']];
-        body = reportData.map(r => [`Grade ${r.grade}`, r.entries, r.exits, r.entries + r.exits]);
+        body = reportData.map(r => [r.grade, r.entries, r.exits, r.entries + r.exits]);
     } else if (type === 'weekly') {
         head = [['Week','Entries','Exits','Total']];
         body = reportData.map(r => [r.week, r.entries, r.exits, r.entries + r.exits]);
@@ -317,34 +324,23 @@ function exportPDF() {
 
     doc.autoTable({ head, body, startY: 38, styles: { fontSize: 9 }, headStyles: { fillColor: [11,78,120] } });
     doc.save(`report_${type}_${new Date().toLocaleDateString('en-CA')}.pdf`);
-    showToast('PDF exported!');
+    UIFeedback.success('PDF exported.', 'Export complete');
+    } catch (error) {
+        console.error('PDF export failed:', error);
+        UIFeedback.error('The PDF could not be exported. Please try again.', 'Export failed');
+    }
 }
 
 function getISOWeek(date) {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     return { week: Math.ceil((((d - yearStart) / 86400000) + 1) / 7), year: d.getUTCFullYear() };
-}
-
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    const m = document.getElementById('toastMsg');
-    if (!t || !m) return;
-    m.textContent = msg; t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
-}
-
-function toLocalIsoDate(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
 }
 
 function showReportError(message) {
     const emptyState = document.getElementById('emptyState');
     emptyState.style.display = 'block';
     emptyState.querySelector('p').textContent = message;
-    showToast('Error generating report. See the message above and browser console.');
+    UIFeedback.error(message, 'Report failed');
 }

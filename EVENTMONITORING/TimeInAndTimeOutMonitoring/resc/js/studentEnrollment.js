@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function notifyUser(message, isError = false) {
     const toast = document.getElementById('toast');
     if (!toast) {
-        alert(message);
+        UIFeedback.toast({ type: isError ? 'error' : 'success', message });
         return;
     }
 
@@ -436,7 +436,7 @@ window.closeReportModal = function() { document.getElementById('rmOverlay').clas
 let existingReportsToday = []; // Tracks reports to prevent exact duplicates
 
 // ── Smart Duplicate Check Helper ──
-function checkDuplicateWarning(exportType) {
+async function checkDuplicateWarning(exportType) {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const reportName = `Enrollment Report — ${dateStr} (${exportType})`;
     const currentDataString = JSON.stringify(reportRows);
@@ -446,7 +446,7 @@ function checkDuplicateWarning(exportType) {
     );
     
     if (isExactDuplicate) {
-        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+        return UIFeedback.confirm({ title: 'Duplicate report', message: `A ${exportType} report with this exact data has already been saved today. Generate another?`, confirmText: 'Generate duplicate', type: 'warning' });
     }
     return true; 
 }
@@ -504,7 +504,7 @@ window.fetchTodayReports = async function() {
 
 // ── Print ──────────────────────────────────────────────────
 window.printReport = async function() {
-    if (!checkDuplicateWarning('Print')) return;
+    if (!await checkDuplicateWarning('Print')) return;
 
     // Dynamically retrieve department data
     const { deptLogo, deptName, deptCode } = getDeptLogos();
@@ -597,11 +597,11 @@ window.printReport = async function() {
 
 // ── PDF ────────────────────────────────────────────────────
 window.downloadPDF = async function() {
-    if (!checkDuplicateWarning('PDF')) return;
+    if (!await checkDuplicateWarning('PDF')) return;
 
     if (!window.jspdf) {
         if (typeof showToast === 'function') showToast('PDF library not loaded yet. Please try again.', true);
-        else alert('PDF library not loaded yet. Please try again.');
+        else UIFeedback.toast({ type: 'error', message: 'PDF library not loaded yet. Please try again.' });
         return;
     }
 
@@ -739,7 +739,7 @@ window.downloadPDF = async function() {
 
 // ── CSV ────────────────────────────────────────────────────
 window.exportCSV = async function() {
-    if (!checkDuplicateWarning('CSV')) return;
+    if (!await checkDuplicateWarning('CSV')) return;
 
     const cols = ['#','Student ID','Last Name','First Name','Middle Name','Course','Year','Section','Email','Face Status','Enrolled Subjects','Subject Codes'];
     const lines = [
@@ -761,7 +761,7 @@ window.exportCSV = async function() {
 
 // ── Excel ──────────────────────────────────────────────────
 window.exportExcel = async function() {
-    if (!checkDuplicateWarning('Excel')) return;
+    if (!await checkDuplicateWarning('Excel')) return;
 
     if (!window.XLSX) {
         return window.exportCSV(); // Fallback

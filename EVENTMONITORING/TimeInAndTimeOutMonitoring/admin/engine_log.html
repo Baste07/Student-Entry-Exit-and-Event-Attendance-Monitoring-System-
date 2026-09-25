@@ -430,6 +430,7 @@
       .log-table tbody td::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 800; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
     }
   </style>
+  <link rel="stylesheet" href="../../shared/ui-feedback.css">
 </head>
 <body>
   <div id="header-container"></div>
@@ -525,6 +526,7 @@
     </div>
   </main>
 
+  <script src="../../shared/ui-feedback.js"></script>
   <script src="../includes/sidebar.js"></script>
   <script>
     const RECENT_LIMIT = 8;
@@ -958,7 +960,7 @@
         </html>`;
 
       const w = window.open('', '_blank');
-      if (!w) { alert('Unable to open print window (popup blocked)'); return; }
+      if (!w) { UIFeedback.toast({ type: 'error', message: 'Unable to open print window. Allow popups for this site.' }); return; }
       w.document.write(html);
       w.document.close();
       // allow a short time for the content to render
@@ -1046,25 +1048,35 @@
         if (data.ok) {
           loadLogs();
         } else {
-          alert('Could not delete log: ' + (data.error || 'Unknown error'));
+          UIFeedback.error('Could not delete log: ' + (data.error || 'Unknown error'));
         }
       } catch (e) {
         console.error(e);
-        alert('Error deleting log entry');
+        UIFeedback.error('Error deleting log entry.');
       }
     }
 
-    function confirmDelete(index) {
+    const pendingLogDeletes = new Set();
+    async function confirmDelete(index) {
       const entry = allEntries[index];
-      if (!entry) return alert('Log entry not found');
-      if (!confirm('Delete this log entry? This action cannot be undone.')) return;
-      deleteEntryByTs(entry.ts);
+      if (!entry) { UIFeedback.toast({ type: 'warning', message: 'Log entry not found.' }); return; }
+      if (pendingLogDeletes.has(entry.ts)) return;
+      if (!await UIFeedback.confirm({ title: 'Delete log entry?', message: 'This action cannot be undone.', confirmText: 'Delete entry', type: 'danger' }) || pendingLogDeletes.has(entry.ts)) return;
+      pendingLogDeletes.add(entry.ts);
+      try {
+        await deleteEntryByTs(entry.ts);
+      } finally {
+        pendingLogDeletes.delete(entry.ts);
+      }
     }
 
     // Delete all entries
+    let clearingEngineLogs = false;
     async function deleteAllEntries() {
+      if (clearingEngineLogs) return;
+      clearingEngineLogs = true;
       try {
-        if (!confirm('Delete ALL log entries? This will clear the engine log file.')) return;
+        if (!await UIFeedback.confirm({ title: 'Delete all engine logs?', message: 'This will clear the engine log file.', confirmText: 'Delete all logs', type: 'danger' })) return;
         const form = new URLSearchParams();
         form.append('all', '1');
         const res = await fetch('../students/delete_engine_log.php', { method: 'POST', body: form });
@@ -1072,11 +1084,13 @@
         if (data.ok) {
           loadLogs();
         } else {
-          alert('Could not clear logs: ' + (data.error || 'Unknown error'));
+          UIFeedback.error('Could not clear logs: ' + (data.error || 'Unknown error'));
         }
       } catch (e) {
         console.error(e);
-        alert('Error clearing logs');
+        UIFeedback.error('Error clearing logs.');
+      } finally {
+        clearingEngineLogs = false;
       }
     }
 
@@ -1141,12 +1155,12 @@
       }
     }
 
-    function checkDuplicateWarning(exportType, entries) {
+    async function checkDuplicateWarning(exportType, entries) {
       const { reportName, dataString } = getEngineLogsReportState(exportType, entries);
       const isExactDuplicate = existingReportsToday.some((item) => item.name === reportName && item.dataString === dataString);
 
       if (isExactDuplicate) {
-        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+        return UIFeedback.confirm({ title: 'Duplicate report', message: `A ${exportType} report with this exact data has already been saved today. Generate another?`, confirmText: 'Generate duplicate', type: 'warning' });
       }
 
       return true;
@@ -1209,11 +1223,11 @@
 
     async function downloadFilteredPdf() {
       const entries = getFilteredEntries();
-      if (!entries.length) return alert('No log entries match the current filters');
-      if (!checkDuplicateWarning('PDF', entries)) return;
+      if (!entries.length) { UIFeedback.toast({ type: 'info', message: 'No log entries match the current filters.' }); return; }
+      if (!await checkDuplicateWarning('PDF', entries)) return;
 
       if (!window.jspdf) {
-        alert('PDF library not loaded yet. Please try again.');
+        UIFeedback.toast({ type: 'error', message: 'PDF library not loaded yet. Please try again.' });
         return;
       }
 
@@ -1324,13 +1338,13 @@
         await autoSaveReport('PDF', entries);
       } catch (error) {
         console.error('PDF generation error:', error);
-        alert('There was an error generating the PDF. Check the console.');
+        UIFeedback.error('There was an error generating the PDF. Please try again.');
       }
     }
 
     function printAllEntries() {
       const entries = getFilteredEntries();
-      if (!entries.length) return alert('No log entries match the current filters');
+      if (!entries.length) { UIFeedback.toast({ type: 'info', message: 'No log entries match the current filters.' }); return; }
 
       const { deptLogo, deptName } = getDeptLogos();
       const rowsHtml = entries.map(entry => {
@@ -1375,7 +1389,7 @@
         </html>`;
 
       const w = window.open('', '_blank');
-      if (!w) { alert('Unable to open window (popup blocked)'); return; }
+      if (!w) { UIFeedback.toast({ type: 'error', message: 'Unable to open print window. Allow popups for this site.' }); return; }
       w.document.write(html);
       w.document.close();
       setTimeout(() => { w.print(); }, 300);

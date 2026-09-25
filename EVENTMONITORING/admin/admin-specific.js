@@ -55,8 +55,8 @@ function requireAdmin() {
     }
     
     if (!isAdmin()) {
-        alert('Access denied. This page is restricted to Administrators only.');
-        window.location.href = '../portal/portal.html';
+        UIFeedback.warning('This page is restricted to Administrators.', 'Access denied')
+            .then(() => { window.location.href = '../portal/portal.html'; });
         return false;
     }
     return true;
@@ -73,8 +73,8 @@ function requireSuperAdmin() {
     }
     
     if (!isSuperAdmin()) {
-        alert('Access denied. This page is restricted to Super Administrators only.');
-        window.location.href = '../portal/portal.html';
+        UIFeedback.warning('This page is restricted to Super Administrators.', 'Access denied')
+            .then(() => { window.location.href = '../portal/portal.html'; });
         return false;
     }
     return true;

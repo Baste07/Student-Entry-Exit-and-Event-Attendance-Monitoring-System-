@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Attendance Trends | Laboratory Attendance System</title>
+    <title>Event Attendance Analytics | Monitoring System</title>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="../shared/global.css">
+    <link rel="stylesheet" href="../../shared/global.css">
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
-    <link rel="stylesheet" href="../resc/css/eventAttendanceTrends.css">
+    <link rel="stylesheet" href="../resc/css/eventAttendanceTrends.css?v=20260925c">
+    <link rel="stylesheet" href="../../shared/ui-feedback.css">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
     <link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
@@ -17,7 +18,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
-<body>
+<body data-event-analytics-version="20260925c">
     <div id="header-container"></div>
     <div id="sidebar-container"></div>
 
@@ -25,57 +26,70 @@
         <div class="container">
             <div class="page-header">
                 <div class="header-titles">
-                    <h1><i class="fa-solid fa-chart-line"></i> Event Attendance Trends</h1>
-                    <p>Analyze actual event check-ins over time and compare participation across events.</p>
+                    <h1><i class="fa-solid fa-chart-line"></i> Event Attendance Analytics</h1>
+                    <p>Understand participation, punctuality, and time-out completion from recorded event attendance.</p>
                 </div>
                 <div class="page-actions">
-                    <button class="btn-report excel" id="btnExportExcel" disabled><i class="fa-solid fa-file-excel"></i> Excel</button>
-                    <button class="btn-report pdf" id="btnExportPdf" disabled><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                    <button type="button" class="btn-report excel" id="btnExportExcel" disabled><i class="fa-solid fa-file-excel"></i> Excel</button>
+                    <button type="button" class="btn-report pdf" id="btnExportPdf" disabled><i class="fa-solid fa-file-pdf"></i> PDF</button>
                 </div>
             </div>
-            <hr>
 
-            <section class="controls-card" aria-label="Trend filters">
-                <div class="controls-header"><h2><i class="fa-solid fa-sliders-h"></i> Analytics Filters</h2></div>
+            <section class="controls-card" aria-label="Analytics filters">
+                <div class="section-heading"><h2><i class="fa-solid fa-sliders-h"></i> Filters</h2><span id="rangeHint">The last 12 months are shown by default. Clear the dates to include all history.</span></div>
                 <div class="filter-grid">
+                    <div class="control-group"><label for="trendEvent">Event</label><select id="trendEvent"><option value="">All Events</option></select></div>
+                    <div class="control-group"><label for="trendGrade">Grade</label><select id="trendGrade"><option value="">All Grades</option></select></div>
+                    <div class="control-group"><label for="trendSection">Section</label><select id="trendSection"><option value="">All Sections</option></select></div>
                     <div class="control-group"><label for="trendDateFrom">Date From</label><input type="date" id="trendDateFrom"></div>
                     <div class="control-group"><label for="trendDateTo">Date To</label><input type="date" id="trendDateTo"></div>
-                    <div class="control-group"><label for="trendEventType">Event Type</label><select id="trendEventType"><option value="">All Event Types</option></select></div>
-                    <div class="control-group"><label for="trendEvent">Event</label><select id="trendEvent"><option value="">All Events</option></select></div>
-                    <div class="control-group"><label for="trendGrouping">Grouping</label><select id="trendGrouping"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
-                    <div class="control-group action-group"><label>&nbsp;</label><button class="btn-generate" id="btnApplyTrends"><i class="fa-solid fa-chart-column"></i> Apply</button></div>
+                    <div class="control-group"><label for="trendEventType">Event Type</label><select id="trendEventType"><option value="">All Types</option></select></div>
+                    <div class="control-group"><label for="trendStatus">Event Status</label><select id="trendStatus"><option value="">All Non-Cancelled Statuses</option><option value="completed">Completed</option><option value="ongoing">Ongoing</option><option value="upcoming">Upcoming</option></select></div>
+                    <div class="control-group"><label for="trendGrouping">Trend Grouping</label><select id="trendGrouping"><option value="event">Each Event</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
                 </div>
+                <div class="filter-actions"><button type="button" class="btn-generate" id="btnApplyTrends"><i class="fa-solid fa-chart-column"></i> Apply Filters</button><button type="button" class="btn-reset" id="btnResetTrends">Reset</button></div>
             </section>
 
-            <section class="trend-loading" id="trendLoading" hidden><i class="fa-solid fa-spinner fa-spin"></i><span>Loading event attendance analytics…</span></section>
-            <section class="trend-message error" id="trendError" hidden></section>
-            <section class="trend-message empty" id="trendEmpty" hidden><i class="fa-solid fa-chart-line"></i><p>No event attendance data available for the selected period.</p></section>
+            <section class="trend-loading" id="trendLoading" role="status" hidden><i class="fa-solid fa-spinner fa-spin"></i> Loading attendance analytics…</section>
+            <section class="trend-message error" id="trendError" role="alert" hidden></section>
+            <section class="trend-message empty" id="trendEmpty" hidden><i class="fa-solid fa-chart-line"></i><p>No events match these filters. Adjust the filters or date range to see analytics.</p></section>
 
-            <section id="trendResults" hidden>
-                <div class="stats-grid">
-                    <article class="stat-card"><i class="fa-solid fa-user-check blue"></i><div><span>Total Attendance</span><strong id="statTotalAttendance">0</strong><small>Unique student-event check-ins</small></div></article>
-                    <article class="stat-card"><i class="fa-solid fa-calendar-days green"></i><div><span>Total Events</span><strong id="statTotalEvents">0</strong><small>Events matching the filters</small></div></article>
-                    <article class="stat-card"><i class="fa-solid fa-users purple"></i><div><span>Total Participants</span><strong id="statTotalParticipants">—</strong><small>Registered participant slots</small></div></article>
-                    <article class="stat-card"><i class="fa-solid fa-chart-simple amber"></i><div><span>Average per Event</span><strong id="statAverageAttendance">0</strong><small>Unique check-ins per selected event</small></div></article>
+            <div id="trendResults" hidden>
+                <div class="context-strip"><strong id="viewTitle">All selected events</strong><span id="viewSubtitle"></span></div>
+                <div class="stats-grid" aria-label="Attendance metrics">
+                    <article class="stat-card"><i class="fa-solid fa-users blue"></i><div><span>Expected Participants</span><strong id="statExpected">0</strong><small>Student-event roster slots</small></div></article>
+                    <article class="stat-card"><i class="fa-solid fa-user-check green"></i><div><span>Attended</span><strong id="statAttended">0</strong><small>Roster members with Time-In</small></div></article>
+                    <article class="stat-card"><i class="fa-solid fa-percent purple"></i><div><span>Attendance Rate</span><strong id="statAttendanceRate">0%</strong><small id="attendanceRateNote">Attended ÷ expected</small></div></article>
+                    <article class="stat-card"><i class="fa-solid fa-user-xmark amber"></i><div><span>No Shows</span><strong id="statNoShows">0</strong><small id="noShowNote">Completed events only</small></div></article>
+                    <article class="stat-card"><i class="fa-solid fa-clock green"></i><div><span>On Time</span><strong id="statOnTime">0</strong><small id="onTimeRate">0% of attendees</small></div></article>
+                    <article class="stat-card"><i class="fa-solid fa-hourglass-half amber"></i><div><span>Late</span><strong id="statLate">0</strong><small id="lateRate">0% of attendees</small></div></article>
+                    <article class="stat-card"><i class="fa-solid fa-right-left blue"></i><div><span id="completionLabel">Time-Out Completion</span><strong id="statCompletion">0%</strong><small id="completionNote">Timed out ÷ timed in</small></div></article>
+                    <article class="stat-card"><i class="fa-solid fa-stopwatch purple"></i><div><span>Average Lateness</span><strong id="statAverageLate">N/A</strong><small>Among late arrivals only</small></div></article>
                 </div>
 
-                <div class="chart-card trend-chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-chart-line"></i> Attendance Trend Over Time</h2><p id="trendSubtitle"></p></div><div class="chart-wrap"><canvas id="attendanceTrendChart"></canvas></div></div>
+                <div class="analytics-note" id="analyticsNote"></div>
+                <div class="chart-card trend-chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-chart-line"></i> Attendance Trend</h2><p>Chronological attendance rate; grouped rates use total attended ÷ total expected.</p></div><div class="chart-wrap"><canvas id="attendanceTrendChart" aria-label="Attendance rate over time"></canvas><div class="chart-empty" id="trendChartEmpty" hidden>No roster data for this chart.</div></div></div>
                 <div class="chart-grid">
-                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-chart-bar"></i> Attendance by Event</h2><p>Unique students with a recorded check-in</p></div><div class="chart-wrap event-chart-wrap"><canvas id="attendanceByEventChart"></canvas></div></div>
-                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-right-left"></i> Check-In vs Time-Out</h2><p>Missing time-outs are not treated as absences.</p></div><div class="chart-wrap event-chart-wrap"><canvas id="checkInOutChart"></canvas></div></div>
+                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-school"></i> Attendance by Grade / Section</h2><p>Rate compares groups fairly; hover for expected and attended counts.</p></div><div class="chart-wrap"><canvas id="sectionChart" aria-label="Attendance rate by grade and section"></canvas><div class="chart-empty" id="sectionChartEmpty" hidden>No section data for these filters.</div></div></div>
+                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-chart-pie"></i> Attendance Status</h2><p>Roster slots appear in one category each.</p></div><div class="chart-wrap"><canvas id="statusChart" aria-label="On-time, late, no-show and pending composition"></canvas><div class="chart-empty" id="statusChartEmpty" hidden>No participants for these filters.</div></div></div>
+                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-clock"></i> Arrival Relative to Event Start</h2><p>Time-In compared with each event's scheduled start, in Manila time.</p></div><div class="chart-wrap"><canvas id="arrivalChart" aria-label="Arrival time distribution"></canvas><div class="chart-empty" id="arrivalChartEmpty" hidden>No arrivals with a scheduled start.</div></div></div>
+                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-chart-bar"></i> Event Comparison</h2><p>Attendance rate by event; hover for raw participant counts.</p></div><div class="chart-wrap"><canvas id="attendanceByEventChart" aria-label="Attendance rate by event"></canvas><div class="chart-empty" id="eventChartEmpty" hidden>No events with a participant roster.</div></div></div>
+                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-right-left"></i> Time-In / Time-Out Completion</h2><p>Awaiting Time-Out is separate from No Show. Ongoing events are in progress.</p></div><div class="chart-wrap"><canvas id="checkInOutChart" aria-label="Time-out completion"></canvas><div class="chart-empty" id="completionChartEmpty" hidden>No Time-In records for these filters.</div></div></div>
                 </div>
 
-                <div class="table-card"><div class="chart-card-head"><h2><i class="fa-solid fa-table"></i> Event Participation Summary</h2><p>Participation rate is calculated only when a participant roster exists.</p></div><div class="table-scroll"><table><thead><tr><th>Event</th><th>Event Date</th><th>Check-Ins</th><th>Time-Outs</th><th>Registered Participants</th><th>Calculated Participation Rate</th><th>Late Check-Ins</th></tr></thead><tbody id="eventTrendTableBody"></tbody></table></div></div>
-            </section>
+                <section class="table-card"><div class="chart-card-head"><h2><i class="fa-solid fa-table"></i> Event Participation Summary</h2><p>Each row counts unique roster members for one event. Events are ordered by date.</p></div><div class="table-scroll"><table><thead><tr><th>Event</th><th>Date</th><th>Status</th><th>Expected</th><th>Attended</th><th>Rate</th><th>On Time</th><th>Late</th><th>No Shows</th><th>Timed Out</th><th>Completion</th></tr></thead><tbody id="eventTrendTableBody"></tbody></table></div></section>
+
+                <section class="table-card detail-card"><div class="section-heading"><div><h2><i class="fa-solid fa-list"></i> Participant Details</h2><p>Completed-event no-shows and missing time-outs are listed separately.</p></div><label class="detail-search">Search details <input id="detailSearch" type="search" placeholder="Student or event…"></label></div><div class="detail-tabs" role="tablist" aria-label="Participant detail lists"><button type="button" class="detail-tab active" id="tabLate" data-detail="late" role="tab" aria-selected="true">Late <span id="lateCount">0</span></button><button type="button" class="detail-tab" id="tabNoShow" data-detail="noShow" role="tab" aria-selected="false">No Shows <span id="noShowCount">0</span></button><button type="button" class="detail-tab" id="tabMissing" data-detail="missing" role="tab" aria-selected="false">Missing Time-Out <span id="missingCount">0</span></button></div><div class="table-scroll"><table><thead id="detailTableHead"></thead><tbody id="detailTableBody"></tbody></table></div><small id="detailLimitNote"></small></section>
+            </div>
         </div>
     </main>
 
-    <div class="toast" id="toast"><i class="fa-solid fa-circle-check"></i><span id="toastMsg">Done!</span></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../config/.env.js"></script>
     <script src="../../config/config.js"></script>
     <script src="../includes/sidebar.js"></script>
-    <script src="../resc/js/eventAttendanceTrends.js"></script>
+    <script src="../../shared/ui-feedback.js"></script>
+    <script src="../resc/js/eventAttendanceTrends.js?v=20260925c"></script>
     <script src="../../shared/logout-modal.js"></script>
     <script>loadHeader(); loadSidebar('event-attendance-trends');</script>
 </body>
