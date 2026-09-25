@@ -11,7 +11,7 @@
 
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
-    <link rel="stylesheet" href="../resc/css/reports.css">
+    <link rel="stylesheet" href="../resc/css/reports.css?v=20260925d">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
     <link rel="stylesheet" href="../../shared/ui-feedback.css">
 
@@ -21,7 +21,7 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
-<body>
+<body data-gate-reports-version="20260925d">
 
     <div id="header-container"></div>
     <div id="sidebar-container"></div>
@@ -31,8 +31,8 @@
 
             <div class="page-header">
                 <div class="header-titles">
-                    <h1><i class="fa-solid fa-file-lines"></i> Reports</h1>
-                    <p>Generate and export entry-exit attendance summaries</p>
+                    <h1><i class="fa-solid fa-file-lines"></i> Reports &amp; Analytics</h1>
+                    <p>Explore gate traffic, visit patterns, and existing attendance summaries</p>
                 </div>
             </div>
             <hr>
@@ -46,6 +46,7 @@
                     <div class="control-group">
                         <label><i class="fa-solid fa-file-chart-column"></i> Report Type</label>
                         <select id="reportType">
+                            <option value="analytics">Gate Analytics</option>
                             <option value="daily">Daily Summary</option>
                             <option value="weekly">Weekly Summary</option>
                             <option value="student">Per-Student Summary</option>
@@ -72,7 +73,42 @@
                         </button>
                     </div>
                 </div>
+                <div class="analytics-filters" id="analyticsFilters">
+                    <div class="control-group"><label for="personTypeFilter">Person Type</label><select id="personTypeFilter"><option value="">All People</option><option value="student">Students</option><option value="employee">Employees</option></select></div>
+                    <div class="control-group"><label for="gradeFilter">Grade</label><select id="gradeFilter"><option value="">All Grades</option></select></div>
+                    <div class="control-group"><label for="sectionFilter">Section</label><select id="sectionFilter"><option value="">All Sections</option></select></div>
+                    <div class="control-group"><label for="actionFilter">Action</label><select id="actionFilter"><option value="">Entry and Exit</option><option value="entry">Entry</option><option value="exit">Exit</option></select></div>
+                    <div class="control-group"><label for="methodFilter">Scan Method</label><select id="methodFilter"><option value="">All Methods</option><option value="face">Face</option><option value="qr">QR</option><option value="manual">Manual</option></select></div>
+                    <div class="control-group"><label>&nbsp;</label><button type="button" class="btn-generate" id="resetAnalyticsFilters">Reset Filters</button></div>
+                </div>
             </div>
+
+            <div class="report-loading" id="reportLoading" role="status" hidden>Loading gate records…</div>
+            <section id="gateAnalyticsPanel" hidden>
+                <div class="analytics-grid gate-kpis">
+                    <div class="analytics-card"><span class="analytics-label">Entries</span><strong id="gateEntries">0</strong><small>Recorded Entry actions</small></div>
+                    <div class="analytics-card"><span class="analytics-label">Exits</span><strong id="gateExits">0</strong><small>Recorded Exit actions</small></div>
+                    <div class="analytics-card"><span class="analytics-label">Unique People</span><strong id="gateUnique">0</strong><small>Distinct student or employee IDs</small></div>
+                    <div class="analytics-card"><span class="analytics-label">Unclosed Entries</span><strong id="gateUnclosed">0</strong><small>Within the selected log range</small></div>
+                    <div class="analytics-card"><span class="analytics-label">Peak Entry Hour</span><strong id="gatePeakEntry">—</strong><small id="gatePeakEntryCount">No entries</small></div>
+                    <div class="analytics-card"><span class="analytics-label">Peak Exit Hour</span><strong id="gatePeakExit">—</strong><small id="gatePeakExitCount">No exits</small></div>
+                    <div class="analytics-card"><span class="analytics-label">Average Completed Stay</span><strong id="gateAverageStay">—</strong><small>Matched Entry → Exit visits</small></div>
+                    <div class="analytics-card"><span class="analytics-label">Median Completed Stay</span><strong id="gateMedianStay">—</strong><small>Matched Entry → Exit visits</small></div>
+                </div>
+                <div id="gateAnalyticsNote" class="analytics-note"></div>
+                <div class="gate-chart-grid">
+                    <section class="panel"><div class="panel-title"><i class="fa-solid fa-chart-line"></i> Entry / Exit Trend</div><p class="chart-description">Chronological daily, weekly, or monthly totals based on the selected range.</p><div class="analytics-chart"><canvas id="gateTrendChart"></canvas><p id="gateTrendEmpty" hidden>No traffic to chart.</p></div></section>
+                    <section class="panel"><div class="panel-title"><i class="fa-solid fa-chart-column"></i> Hourly Gate Traffic</div><p class="chart-description">Entry and Exit records grouped by Manila hour.</p><div class="analytics-chart"><canvas id="gateHourlyChart"></canvas><p id="gateHourlyEmpty" hidden>No traffic to chart.</p></div></section>
+                    <section class="panel"><div class="panel-title"><i class="fa-solid fa-people-group"></i> Student vs Employee Activity</div><p class="chart-description" id="gateTypeDescription">Recorded actions by person type.</p><div class="analytics-chart"><canvas id="gateTypeChart"></canvas><p id="gateTypeEmpty" hidden>No traffic to chart.</p></div></section>
+                    <section class="panel"><div class="panel-title"><i class="fa-solid fa-school"></i> Traffic by Grade / Section</div><p class="chart-description">Unique students, Entries, and Exits using each student's current section; logs do not store a historical section snapshot.</p><div class="analytics-chart"><canvas id="gateSectionChart"></canvas><p id="gateSectionEmpty" hidden>No student section data.</p></div></section>
+                    <section class="panel"><div class="panel-title"><i class="fa-solid fa-calendar-week"></i> Total Traffic by Weekday</div><p class="chart-description">Totals over the selected range, not averages.</p><div class="analytics-chart"><canvas id="gateWeekdayChart"></canvas><p id="gateWeekdayEmpty" hidden>No traffic to chart.</p></div></section>
+                    <section class="panel"><div class="panel-title"><i class="fa-solid fa-qrcode"></i> Scan Method</div><p class="chart-description">Recorded Face, QR, Manual, and any unknown methods.</p><div class="analytics-chart"><canvas id="gateMethodChart"></canvas><p id="gateMethodEmpty" hidden>No method data.</p></div></section>
+                    <section class="panel"><div class="panel-title"><i class="fa-solid fa-hourglass-half"></i> Completed Stay Duration</div><p class="chart-description">Only consecutive Entry → Exit pairs in the selected logs.</p><div class="analytics-chart"><canvas id="gateStayChart"></canvas><p id="gateStayEmpty" hidden>No complete visits to chart.</p></div></section>
+                </div>
+                <section class="panel"><div class="panel-title"><i class="fa-solid fa-link-slash"></i> Unclosed Entry Records <span id="gateUnclosedCount" class="analytics-count">0</span></div><p class="chart-description">An unmatched Entry is a logging state; it does not establish physical presence. Range boundaries can leave visits incomplete.</p><div class="table-container"><table class="data-table"><thead><tr><th>Person</th><th>Type</th><th>Grade / Section or Role</th><th>Entry</th><th>Reason</th></tr></thead><tbody id="gateUnclosedBody"></tbody></table></div></section>
+                <section class="panel"><div class="panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Longest Completed Stays</div><div class="table-container"><table class="data-table"><thead><tr><th>Person</th><th>Type</th><th>Entry</th><th>Exit</th><th>Duration</th></tr></thead><tbody id="gateStayBody"></tbody></table></div></section>
+                <section class="panel"><div class="panel-title"><i class="fa-solid fa-calendar-days"></i> Daily Gate Summary</div><div class="table-container"><table class="data-table"><thead><tr><th>Date</th><th>Entries</th><th>Exits</th><th>Unique People</th></tr></thead><tbody id="gateDailyBody"></tbody></table></div></section>
+            </section>
 
             <!-- Daily analytics -->
             <div class="analytics-panel" id="analyticsPanel" style="display:none;">
@@ -142,7 +178,9 @@
     <script src="../../config/config.js"></script>
     <script src="../../shared/ui-feedback.js"></script>
     <script src="../includes/sidebar.js"></script>
-    <script src="../resc/js/reports.js"></script>
+    <script src="../resc/js/gate-analytics.js?v=20260925d"></script>
+    <script src="../resc/js/reports.js?v=20260925d"></script>
+    <script src="../resc/js/gate-report-analytics.js?v=20260925d"></script>
     <script src="../../shared/logout-modal.js"></script>
     <script>
         loadHeader();

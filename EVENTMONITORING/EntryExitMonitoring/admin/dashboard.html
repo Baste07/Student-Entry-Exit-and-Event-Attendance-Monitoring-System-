@@ -4,102 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
-    <title>Dashboard | Entry-Exit Module</title>
-
+    <title>Gate Dashboard | Entry-Exit Module</title>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
-    <link rel="stylesheet" href="../resc/css/dashboard.css">
+    <link rel="stylesheet" href="../resc/css/dashboard.css?v=20260925d">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
     <link rel="stylesheet" href="../../shared/ui-feedback.css">
 </head>
-<body>
-
+<body data-gate-dashboard-version="20260925d">
     <div id="header-container"></div>
     <div id="sidebar-container"></div>
-
-    <main class="main-content">
-        <div class="container">
-
-            <div class="page-header">
-                <div class="header-titles">
-                    <h1><i class="fa-solid fa-chart-pie"></i> Dashboard</h1>
-                    <p>Real-time overview of student gate entry and exit activity</p>
-                </div>
-            </div>
-            <hr>
-
-            <!-- Stat Cards -->
-            <div class="stat-cards">
-                <div class="stat-card anim anim-1">
-                    <div class="stat-label">
-                        Total Students
-                        <i class="fa-solid fa-users"></i>
-                    </div>
-                    <div class="stat-value" id="statTotalStudents">—</div>
-                    <div class="stat-sub">Enrolled in system</div>
-                </div>
-                <div class="stat-card anim anim-2">
-                    <div class="stat-label">
-                        Entered Today
-                        <i class="fa-solid fa-door-open"></i>
-                    </div>
-                    <div class="stat-value" id="statEnteredToday">—</div>
-                    <div class="stat-sub">Gate entries today</div>
-                </div>
-                <div class="stat-card anim anim-3">
-                    <div class="stat-label">
-                        Exited Today
-                        <i class="fa-solid fa-right-from-bracket"></i>
-                    </div>
-                    <div class="stat-value" id="statExitedToday">—</div>
-                    <div class="stat-sub">Gate exits today</div>
-                </div>
-            </div>
-
-            <!-- Recent Activity -->
-            <div class="panel anim anim-5">
-                <div class="panel-title">
-                    <i class="fa-solid fa-clock-rotate-left"></i>
-                    Recent Entry/Exit Activity
-                </div>
-                <table class="data-table" id="recentLogsTable">
-                    <thead>
-                        <tr>
-                            <th>Student</th>
-                            <th>Student ID</th>
-                            <th>Grade & Section</th>
-                            <th>Type</th>
-                            <th>Method</th>
-                            <th>Date</th>
-                            <th>Time</th>
-                        </tr>
-                    </thead>
-                    <tbody id="recentLogsBody">
-                        <tr>
-                            <td colspan="7" class="loading-cell">
-                                <i class="fa-solid fa-spinner fa-spin"></i> Loading...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
+    <main class="main-content"><div class="container">
+        <div class="page-header"><div class="header-titles"><h1><i class="fa-solid fa-chart-pie"></i> Gate Dashboard</h1><p>Today's gate activity and estimated current presence from recorded scans <span class="header-context">Registered students: <strong id="statTotalStudents">—</strong></span></p></div></div>
+        <hr>
+        <div class="dashboard-status" id="dashboardStatus" role="status">Loading gate activity…</div>
+        <div class="stat-cards">
+            <div class="stat-card"><div class="stat-label">Entries Today <i class="fa-solid fa-door-open"></i></div><div class="stat-value" id="statEnteredToday">—</div><div class="stat-sub">Recorded Entry actions</div></div>
+            <div class="stat-card"><div class="stat-label">Exits Today <i class="fa-solid fa-right-from-bracket"></i></div><div class="stat-value" id="statExitedToday">—</div><div class="stat-sub">Recorded Exit actions</div></div>
+            <div class="stat-card"><div class="stat-label">Unique People Today <i class="fa-solid fa-users"></i></div><div class="stat-value" id="statUniqueToday">—</div><div class="stat-sub">Distinct student or employee IDs</div></div>
+            <div class="stat-card"><div class="stat-label">Estimated Currently Inside <i class="fa-solid fa-building"></i></div><div class="stat-value" id="statInside">—</div><div class="stat-sub">Latest recorded action is Entry</div></div>
+            <div class="stat-card compact"><div class="stat-label">Students Inside <i class="fa-solid fa-graduation-cap"></i></div><div class="stat-value" id="statStudentsInside">—</div><div class="stat-sub">Of estimated people inside</div></div>
+            <div class="stat-card compact"><div class="stat-label">Employees Inside <i class="fa-solid fa-id-badge"></i></div><div class="stat-value" id="statEmployeesInside">—</div><div class="stat-sub">Of estimated people inside</div></div>
+            <div class="stat-card compact"><div class="stat-label">Peak Entry Hour <i class="fa-solid fa-arrow-right-to-bracket"></i></div><div class="stat-value text-value" id="statPeakEntry">—</div><div class="stat-sub" id="peakEntryCount">No entries today</div></div>
+            <div class="stat-card compact"><div class="stat-label">Peak Exit Hour <i class="fa-solid fa-arrow-right-from-bracket"></i></div><div class="stat-value text-value" id="statPeakExit">—</div><div class="stat-sub" id="peakExitCount">No exits today</div></div>
         </div>
-    </main>
-
+        <div class="dashboard-grid">
+            <section class="panel"><div class="panel-title"><i class="fa-solid fa-chart-column"></i> Today's Hourly Gate Traffic</div><p class="panel-note">Entry and Exit scans grouped by Manila hour.</p><div class="chart-wrap"><canvas id="hourlyChart" aria-label="Hourly Entry and Exit traffic"></canvas><p id="hourlyEmpty" hidden>No gate activity today.</p></div></section>
+            <section class="panel"><div class="panel-title"><i class="fa-solid fa-users"></i> Student and Employee Activity</div><p class="panel-note" id="dashboardTypeNote">Today's recorded gate actions by person type.</p><div class="chart-wrap"><canvas id="typeChart" aria-label="Student and employee gate activity"></canvas><p id="typeEmpty" hidden>No gate activity today.</p></div></section>
+        </div>
+        <section class="panel"><div class="panel-title"><i class="fa-solid fa-person-circle-check"></i> Estimated Currently Inside <span id="insideCount" class="title-count">0</span></div><p class="panel-note">Latest recorded action for each person across all available history. This is a logging estimate, not a physical headcount.</p><div class="table-scroll"><table class="data-table"><thead><tr><th>Person</th><th>Type</th><th>Grade / Section or Role</th><th>Last Entry</th><th>Elapsed</th></tr></thead><tbody id="insideBody"><tr><td colspan="5" class="loading-cell">Loading…</td></tr></tbody></table></div></section>
+        <section class="panel"><div class="panel-title"><i class="fa-solid fa-link-slash"></i> Unclosed Entry Records <span id="unclosedCount" class="title-count">0</span></div><p class="panel-note">Entries without a corresponding later Exit in the recorded sequence. Repeated Entry scans are shown as a data-quality issue.</p><div class="table-scroll"><table class="data-table"><thead><tr><th>Person</th><th>Type</th><th>Entry</th><th>Elapsed</th><th>Reason</th></tr></thead><tbody id="unclosedBody"><tr><td colspan="5" class="loading-cell">Loading…</td></tr></tbody></table></div><p id="qualityNote" class="panel-note"></p></section>
+        <section class="panel"><div class="panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Entry/Exit Activity</div><div class="table-scroll"><table class="data-table" id="recentLogsTable"><thead><tr><th>Person</th><th>ID / Emp No.</th><th>Grade &amp; Section / Role</th><th>Type</th><th>Method</th><th>Date &amp; Time</th></tr></thead><tbody id="recentLogsBody"><tr><td colspan="6" class="loading-cell">Loading…</td></tr></tbody></table></div></section>
+    </div></main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../config/.env.js"></script>
     <script src="../../config/config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="../../shared/ui-feedback.js"></script>
     <script src="../includes/sidebar.js"></script>
-    <script src="../resc/js/dashboard.js"></script>
+    <script src="../resc/js/gate-analytics.js?v=20260925d"></script>
+    <script src="../resc/js/dashboard.js?v=20260925d"></script>
     <script src="../../shared/logout-modal.js"></script>
-    <script>
-        loadHeader();
-        loadSidebar('dashboard');
-    </script>
+    <script>loadHeader(); loadSidebar('dashboard');</script>
 </body>
 </html>
