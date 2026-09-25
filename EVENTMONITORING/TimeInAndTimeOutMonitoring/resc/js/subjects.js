@@ -380,10 +380,13 @@ document.getElementById('subjectForm').addEventListener('submit', async function
     }
 });
 
+const pendingSubjectDeletes = new Set();
 async function deleteSubject(subjectId, subjectCode) {
-    const confirmed = confirm(`Delete subject "${subjectCode}"?\n\nThis may affect associated schedules and enrollments.`);
-    if (!confirmed) return;
+    if (pendingSubjectDeletes.has(subjectId)) return;
+    const confirmed = await UIFeedback.confirm({ title: 'Delete subject?', message: `Delete "${subjectCode}"? This may affect associated schedules and enrollments.`, confirmText: 'Delete subject', type: 'danger' });
+    if (!confirmed || pendingSubjectDeletes.has(subjectId)) return;
 
+    pendingSubjectDeletes.add(subjectId);
     try {
         const { data: linked, error: chkErr } = await supabaseClient
             .from('lab_schedules')
@@ -395,7 +398,7 @@ async function deleteSubject(subjectId, subjectCode) {
         if (chkErr) throw chkErr;
 
         if (linked && linked.length > 0) {
-            alert(`Cannot delete "${subjectCode}" — it has active schedules. Deactivate those schedules first.`);
+            UIFeedback.warning(`Cannot delete "${subjectCode}" because it has active schedules. Deactivate those schedules first.`);
             return;
         }
 
@@ -411,7 +414,9 @@ async function deleteSubject(subjectId, subjectCode) {
 
     } catch (err) {
         console.error('Delete subject error:', err);
-        alert('Error deleting subject: ' + (err.message || err));
+        UIFeedback.error('Error deleting subject: ' + (err.message || err));
+    } finally {
+        pendingSubjectDeletes.delete(subjectId);
     }
 }
 
@@ -495,7 +500,7 @@ function closeReportModal() {
 }
 
 // ── Smart Duplicate Check Helper ──────────────────────────
-function checkDuplicateWarning(exportType) {
+async function checkDuplicateWarning(exportType) {
     const dateStr    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const reportName = `Subjects Report — ${dateStr} (${exportType})`;
     const currentDataString = JSON.stringify(reportRows);
@@ -505,14 +510,14 @@ function checkDuplicateWarning(exportType) {
     );
 
     if (isExactDuplicate) {
-        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+        return UIFeedback.confirm({ title: 'Duplicate report', message: `A ${exportType} report with this exact data has already been saved today. Generate another?`, confirmText: 'Generate duplicate', type: 'warning' });
     }
     return true;
 }
 
 // ── Save to Reports (Manual Button) ──────────────────────
 async function saveReport() {
-    if (!checkDuplicateWarning('Manual Save')) return;
+    if (!await checkDuplicateWarning('Manual Save')) return;
 
     const btn = document.querySelector('.rm-btn[onclick="saveReport()"]');
     if (btn) {
@@ -563,7 +568,7 @@ async function autoSaveReport(exportType) {
 }
 // ── Print ─────────────────────────────────────────────────
 async function printReport() {
-    if (!checkDuplicateWarning('Print')) return;
+    if (!await checkDuplicateWarning('Print')) return;
 
     const cols = ['#', 'Subject Code', 'Subject Name', 'Units', 'Active Schedules', 'Enrolled Students', 'Sessions Done', 'Description'];
     const nowStr = new Date().toLocaleString();
@@ -638,7 +643,7 @@ async function printReport() {
 }
 // ── Download PDF ──────────────────────────────────────────
 async function downloadPDF() {
-    if (!checkDuplicateWarning('PDF')) return;
+    if (!await checkDuplicateWarning('PDF')) return;
 
     if (!window.jspdf) {
         showToast('PDF library not loaded yet. Please try again.', true);
@@ -773,7 +778,7 @@ async function downloadPDF() {
 }
 // ── Export CSV ────────────────────────────────────────────
 async function exportCSV() {
-    if (!checkDuplicateWarning('CSV')) return;
+    if (!await checkDuplicateWarning('CSV')) return;
 
     const cols = ['#', 'Subject Code', 'Subject Name', 'Units', 'Active Schedules', 'Enrolled Students', 'Sessions Done', 'Description'];
     const lines = [
@@ -801,7 +806,7 @@ async function exportCSV() {
 
 // ── Export Excel ──────────────────────────────────────────
 async function exportExcel() {
-    if (!checkDuplicateWarning('Excel')) return;
+    if (!await checkDuplicateWarning('Excel')) return;
 
     if (!window.XLSX) {
         return exportCSV(); // Fallback if SheetJS not loaded
@@ -854,7 +859,7 @@ async function exportExcel() {
 }
 
 async function exportXML() {
-        if (!checkDuplicateWarning('XML')) return;
+        if (!await checkDuplicateWarning('XML')) return;
 
         const xmlEscape = (value) => String(value ?? '')
                 .replace(/&/g, '&amp;')

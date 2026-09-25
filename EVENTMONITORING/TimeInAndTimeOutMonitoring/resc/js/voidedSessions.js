@@ -37,7 +37,7 @@ function parseSessionLabFromNotes(notes) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!supabaseClient) {
-        alert("Supabase client not found. Please check config/.env.js");
+        UIFeedback.error('Data connection is unavailable. Please check the application configuration.');
         return;
     }
     initAutoFilters();
@@ -95,7 +95,7 @@ async function fetchSessions() {
         `)
         .order('session_date', { ascending: false });
 
-    if (error) { console.error(error); alert("Error fetching data from Supabase"); return; }
+    if (error) { console.error(error); UIFeedback.error('Could not load sessions. Please try again.'); return; }
     allSessions = (data || []).map(s => ({
         ...s,
         laboratory_rooms: parseSessionLabFromNotes(s.notes) || null
@@ -199,20 +199,34 @@ function updateStats() {
     `;
 }
 
+const pendingSessionDeletes = new Set();
 async function deleteSession(id) {
-    if (!confirm(`Are you sure you want to delete Session ID: ${id}?`)) return;
-    const { error } = await supabaseClient.from('lab_sessions').delete().eq('session_id', id);
-    if (!error) { alert("Session deleted successfully."); fetchSessions(); }
-    else { alert("Error deleting session."); }
+    if (pendingSessionDeletes.has(id)) return;
+    if (!await UIFeedback.confirm({ title: 'Delete session?', message: `Delete session ${id}?`, confirmText: 'Delete session', type: 'danger' }) || pendingSessionDeletes.has(id)) return;
+    pendingSessionDeletes.add(id);
+    try {
+        const { error } = await supabaseClient.from('lab_sessions').delete().eq('session_id', id);
+        if (!error) { UIFeedback.success('Session deleted successfully.'); await fetchSessions(); }
+        else { UIFeedback.error('Error deleting session.'); }
+    } finally {
+        pendingSessionDeletes.delete(id);
+    }
 }
 
 function showDeleteAll() { document.getElementById('delAllModal').classList.add('on'); }
 function closeDelAll()   { document.getElementById('delAllModal').classList.remove('on'); }
 
+let deletingAllSessions = false;
 async function deleteAllSessions() {
-    const { error } = await supabaseClient.from('lab_sessions').delete().neq('session_id', 0);
-    if (!error) { alert("All sessions have been wiped."); closeDelAll(); fetchSessions(); }
-    else { alert("Error wiping sessions."); }
+    if (deletingAllSessions) return;
+    deletingAllSessions = true;
+    try {
+        const { error } = await supabaseClient.from('lab_sessions').delete().neq('session_id', 0);
+        if (!error) { UIFeedback.success('All sessions have been deleted.'); closeDelAll(); await fetchSessions(); }
+        else { UIFeedback.error('Error deleting all sessions.'); }
+    } finally {
+        deletingAllSessions = false;
+    }
 }
 
 // ── Report State ──────────────────────────────────────────────
@@ -279,19 +293,19 @@ async function openReportModal() {
 
 function closeReportModal() { document.getElementById('rmModal').classList.remove('on'); }
 
-function checkDuplicateWarning(exportType) {
+async function checkDuplicateWarning(exportType) {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const reportName = `Session History Report — ${dateStr} (${exportType})`;
     const currentDataString = JSON.stringify(window.REPORT_DATA);
     const isExactDuplicate = existingReportsToday.some(r => r.name === reportName && r.dataString === currentDataString);
     if (isExactDuplicate) {
-        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+        return UIFeedback.confirm({ title: 'Duplicate report', message: `A ${exportType} report with this exact data has already been saved today. Generate another?`, confirmText: 'Generate duplicate', type: 'warning' });
     }
     return true;
 }
 
 async function saveReport() {
-    if (!checkDuplicateWarning('Manual Save')) return;
+    if (!await checkDuplicateWarning('Manual Save')) return;
     const btn = document.querySelector('.rm-btn[onclick="saveReport()"]');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
     await autoSaveReport('Manual Save');
@@ -348,7 +362,7 @@ function loadImage(src) {
 
 // ── Print ─────────────────────────────────────────────────────
 async function printReport() {
-    if (!checkDuplicateWarning('Print')) return;
+    if (!await checkDuplicateWarning('Print')) return;
 
     // ✅ Read from sessionStorage BEFORE the HTML string
     const { deptLogo, deptName } = getDeptLogos();
@@ -424,7 +438,7 @@ async function printReport() {
 
 // ── PDF ───────────────────────────────────────────────────────
 async function downloadPDF() {
-    if (!checkDuplicateWarning('PDF')) return;
+    if (!await checkDuplicateWarning('PDF')) return;
 
     const { deptLogo, deptName } = getDeptLogos(); // ✅ before anything else
 
@@ -490,7 +504,7 @@ async function downloadPDF() {
 
 // ── CSV ───────────────────────────────────────────────────────
 async function exportCSV() {
-    if (!checkDuplicateWarning('CSV')) return;
+    if (!await checkDuplicateWarning('CSV')) return;
     const cols = ['#','Date','Day','Subject Code','Professor','Section','Lab','Sched Time','Actual Start','Actual End','Status'];
     const lines = [
         cols.join(','),
@@ -521,7 +535,7 @@ async function exportCSV() {
 
 // ── Excel ─────────────────────────────────────────────────────
 async function exportExcel() {
-    if (!checkDuplicateWarning('Excel')) return;
+    if (!await checkDuplicateWarning('Excel')) return;
     if (!window.XLSX) { return exportCSV(); }
 
     const wb = XLSX.utils.book_new();
@@ -564,7 +578,7 @@ async function exportExcel() {
 
 // ── XML ───────────────────────────────────────────────────────
 async function exportXML() {
-    if (!checkDuplicateWarning('XML')) return;
+    if (!await checkDuplicateWarning('XML')) return;
 
     const { deptLogo, deptName } = getDeptLogos(); // ✅ before anything else
 

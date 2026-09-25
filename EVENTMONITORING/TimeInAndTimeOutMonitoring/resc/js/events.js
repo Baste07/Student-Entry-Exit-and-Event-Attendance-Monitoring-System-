@@ -434,10 +434,13 @@ document.getElementById('eventForm').addEventListener('submit', async function (
     }
 });
 
+const pendingEventDeletes = new Set();
 async function deleteEvent(eventId, eventName) {
-    const confirmed = confirm(`Delete event "${eventName}"?\n\nThis will also remove any associated event attendance records.`);
-    if (!confirmed) return;
+    if (pendingEventDeletes.has(eventId)) return;
+    const confirmed = await UIFeedback.confirm({ title: 'Delete event?', message: `Delete "${eventName}" and its associated attendance records?`, confirmText: 'Delete event', type: 'danger' });
+    if (!confirmed || pendingEventDeletes.has(eventId)) return;
 
+    pendingEventDeletes.add(eventId);
     try {
         await supabaseClient.from('event_attendance').delete().eq('event_id', eventId);
         await supabaseClient.from('event_participants').delete().eq('event_id', eventId);
@@ -448,7 +451,9 @@ async function deleteEvent(eventId, eventName) {
         await loadEvents();
     } catch (err) {
         console.error('Delete event error:', err);
-        alert('Error deleting event: ' + (err.message || err));
+        UIFeedback.error('Error deleting event: ' + (err.message || err));
+    } finally {
+        pendingEventDeletes.delete(eventId);
     }
 }
 

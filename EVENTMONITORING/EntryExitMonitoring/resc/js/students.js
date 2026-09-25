@@ -40,7 +40,7 @@ function resolveHasFace(student) {
 // ── Init ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
     if (!supabaseClient) {
-        showToast('⚠️ Supabase not configured. Check config/.env.js', false);
+        UIFeedback.error('Student records are unavailable. Please check the connection and reload.', 'Connection unavailable');
         return;
     }
     await loadSections();
@@ -289,7 +289,7 @@ async function searchStudent() {
     const searchBtn    = document.getElementById('searchBtn');
     const searchResult = document.getElementById('searchResult');
 
-    if (!studentId) { showToast('Required field should not be left blank', false); return; }
+    if (!studentId) { UIFeedback.fieldError(document.getElementById('studentIdSearch'), 'Student ID is required.'); return; }
 
     searchBtn.disabled = true;
     searchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
@@ -302,7 +302,7 @@ async function searchStudent() {
             .single();
 
         if (error || !s) {
-            showToast('Student not found.', false);
+            UIFeedback.fieldError(document.getElementById('studentIdSearch'), 'Student not found.');
             searchResult.classList.remove('active');
             return;
         }
@@ -330,7 +330,8 @@ async function searchStudent() {
         searchResult.classList.add('active');
 
     } catch (err) {
-        showToast('Error: ' + err.message, false);
+        console.error('Student lookup failed:', err);
+        UIFeedback.toast({ type: 'error', title: 'Search failed', message: 'The student could not be found right now. Please try again.' });
     } finally {
         searchBtn.disabled = false;
         searchBtn.innerHTML = '<i class="fa-solid fa-search"></i> Search Student';
@@ -496,23 +497,48 @@ function closeReportModal() {
     document.getElementById('rmOverlay').classList.remove('on');
 }
 
-function checkDuplicateWarning(exportType) {
+let reportActionPending = false;
+
+async function checkDuplicateWarning(exportType) {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const reportName = `Students Report — ${dateStr} (${exportType})`;
     const currentDataString = JSON.stringify(reportRows);
     const isExactDuplicate = existingReportsToday.some(r => r.name === reportName && r.dataString === currentDataString);
     if (isExactDuplicate) {
-        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+        return UIFeedback.confirm({
+            title: 'Duplicate Report',
+            message: `A ${exportType} report with this exact data has already been saved today. Generate another copy?`,
+            confirmText: 'Generate another',
+            type: 'warning'
+        });
     }
     return true;
 }
 
+async function withReportAction(exportType, action) {
+    if (reportActionPending) return;
+    reportActionPending = true;
+    try {
+        if (!await checkDuplicateWarning(exportType)) return;
+        await action();
+    } catch (error) {
+        console.error('Student report action failed:', error);
+        UIFeedback.error('The report action could not be completed. Please try again.', 'Report failed');
+    } finally {
+        reportActionPending = false;
+    }
+}
+
 async function saveReport() {
-    if (!checkDuplicateWarning('Manual Save')) return;
-    const btn = document.querySelector('.rm-btn[onclick="saveReport()"]');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
-    await autoSaveReport('Manual Save');
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to Reports'; }
+    return withReportAction('Manual Save', async () => {
+        const btn = document.querySelector('.rm-btn[onclick="saveReport()"]');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
+        try {
+            await autoSaveReport('Manual Save');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to Reports'; }
+        }
+    });
 }
 
 async function autoSaveReport(exportType) {
@@ -527,16 +553,17 @@ async function autoSaveReport(exportType) {
     try {
         const { error } = await supabaseClient.from('attendance_reports').insert([payload]);
         if (error) throw error;
-        if (exportType === 'Manual Save') showToast('Report saved successfully!', true);
+        if (exportType === 'Manual Save') UIFeedback.success('Report saved successfully.', 'Report saved');
         else console.log(`[Auto-Save] ${exportType} report archived.`);
         existingReportsToday.push({ name: payload.report_name, dataString: payload.report_data });
     } catch (err) {
         console.error('Auto-save error:', err);
+        if (exportType === 'Manual Save') UIFeedback.error('The report could not be saved. Please try again.', 'Save failed');
     }
 }
 
 async function printReport() {
-    if (!checkDuplicateWarning('Print')) return;
+    return withReportAction('Print', async () => {
 
     const now = new Date();
     const nowStr = `${now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
@@ -592,11 +619,12 @@ async function printReport() {
     <script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);
     w.document.close();
     await autoSaveReport('Print');
+    });
 }
 
 async function downloadPDF() {
-    if (!checkDuplicateWarning('PDF')) return;
-    if (!window.jspdf) { showToast('PDF library not loaded yet. Please try again.', true); return; }
+    return withReportAction('PDF', async () => {
+    if (!window.jspdf) { UIFeedback.error('PDF export is unavailable. Please reload the page and try again.', 'Export unavailable'); return; }
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -657,12 +685,13 @@ async function downloadPDF() {
         await autoSaveReport('PDF');
     } catch (err) {
         console.error('PDF generation error:', err);
-        showToast('There was an error generating the PDF.', true);
+        UIFeedback.error('The PDF could not be generated. Please try again.', 'Export failed');
     }
+    });
 }
 
 async function exportCSV() {
-    if (!checkDuplicateWarning('CSV')) return;
+    return withReportAction('CSV', async () => {
     const cols = ['#','Student ID','Last Name','First Name','Middle Name','Grade Level','Section','Gender','Face Status','Status','Total Attendances','Date Registered'];
     const lines = [cols.join(','), ...reportRows.map((r, i) => [i+1,`"${r.stud_id}"`,`"${r.last_name}"`,`"${r.first_name}"`,`"${r.middle_name}"`,`"${r.grade_level}"`,`"${r.section_name}"`,`"${r.gender}"`,`"${r.face_status}"`,r.status,r.total_attendances,`"${r.date_registered}"`].join(','))];
     const a = document.createElement('a');
@@ -670,11 +699,13 @@ async function exportCSV() {
     a.download = `Students_Report_${new Date().toISOString().split('T')[0]}.csv`;
     a.click(); URL.revokeObjectURL(a.href);
     await autoSaveReport('CSV');
+    UIFeedback.success('CSV exported.', 'Export complete');
+    });
 }
 
 async function exportExcel() {
-    if (!checkDuplicateWarning('Excel')) return;
     if (!window.XLSX) return exportCSV();
+    return withReportAction('Excel', async () => {
     const wb = XLSX.utils.book_new();
     const headers = ['#','Student ID','Last Name','First Name','Middle Name','Grade Level','Section','Gender','Face Status','Status','Total Attendances','Date Registered'];
     const rows = reportRows.map((r, i) => [i+1, r.stud_id, r.last_name, r.first_name, r.middle_name, r.grade_level, r.section_name, r.gender, r.face_status, r.status.toUpperCase(), r.total_attendances, r.date_registered]);
@@ -682,6 +713,8 @@ async function exportExcel() {
     XLSX.utils.book_append_sheet(wb, dataSheet, 'Students');
     XLSX.writeFile(wb, `Students_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
     await autoSaveReport('Excel');
+    UIFeedback.success('Excel report exported.', 'Export complete');
+    });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -710,6 +743,7 @@ window.addEventListener('click', e => {
 });
 
 document.addEventListener('keydown', e => {
+    if (document.getElementById('app-feedback-modal')?.hidden === false) return;
     if (e.key === 'Escape') {
         closeReportModal();
         ['faceRegModal'].forEach(id => {
@@ -722,13 +756,6 @@ document.addEventListener('keydown', e => {
 // ══════════════════════════════════════════════════════════
 // 8. UTILITIES
 // ══════════════════════════════════════════════════════════
-function showToast(msg, showLink) {
-    const t = document.getElementById('toast');
-    document.getElementById('toastMsg').textContent = msg;
-    t.classList.add('on');
-    setTimeout(() => t.classList.remove('on'), 4000);
-}
-
 function escHtml(str) {
     if (!str) return '';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

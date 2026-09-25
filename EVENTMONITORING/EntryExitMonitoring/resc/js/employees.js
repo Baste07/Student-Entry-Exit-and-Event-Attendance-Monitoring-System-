@@ -33,7 +33,7 @@ function resolveHasFace(emp) {
 // ── Init ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
     if (!supabaseClient) {
-        showToast('⚠️ Supabase not configured. Check config/.env.js', false);
+        UIFeedback.error('Employee records are unavailable. Please check the connection and reload.', 'Connection unavailable');
         return;
     }
     await loadEmployees();
@@ -202,7 +202,7 @@ async function searchEmployee() {
     const searchBtn = document.getElementById('searchBtn');
     const searchRes = document.getElementById('searchResult');
 
-    if (!empNo) { showToast('Required field should not be left blank', false); return; }
+    if (!empNo) { UIFeedback.fieldError(document.getElementById('employeeIdSearch'), 'Employee number is required.'); return; }
 
     searchBtn.disabled = true;
     searchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
@@ -215,7 +215,7 @@ async function searchEmployee() {
             .single();
 
         if (error || !e) {
-            showToast('Employee not found.', false);
+            UIFeedback.fieldError(document.getElementById('employeeIdSearch'), 'Employee not found.');
             searchRes.classList.remove('active');
             return;
         }
@@ -238,7 +238,8 @@ async function searchEmployee() {
         searchRes.classList.add('active');
 
     } catch (err) {
-        showToast('Error: ' + err.message, false);
+        console.error('Employee lookup failed:', err);
+        UIFeedback.toast({ type: 'error', title: 'Search failed', message: 'The employee could not be found right now. Please try again.' });
     } finally {
         searchBtn.disabled = false;
         searchBtn.innerHTML = '<i class="fa-solid fa-search"></i> Search Employee';
@@ -360,7 +361,8 @@ async function printReport() {
 }
 
 async function downloadPDF() {
-    if (!window.jspdf) { showToast('PDF library not loaded. Please try again.', false); return; }
+    if (!window.jspdf) { UIFeedback.error('PDF export is unavailable. Please reload the page and try again.', 'Export unavailable'); return; }
+    try {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const now    = new Date();
@@ -392,9 +394,15 @@ async function downloadPDF() {
     });
 
     doc.save(`Employees_Report_${now.toISOString().split('T')[0]}.pdf`);
+    UIFeedback.success('Employee PDF exported.', 'Export complete');
+    } catch (error) {
+        console.error('Employee PDF export failed:', error);
+        UIFeedback.error('The employee PDF could not be exported. Please try again.', 'Export failed');
+    }
 }
 
 function exportCSV() {
+    try {
     const cols  = ['#','Emp No.','Last Name','First Name','Middle Name','Email','Face Status','Status','Date Added'];
     const lines = [cols.join(','), ...reportRows.map((r,i) =>
         [i+1,`"${r.emp_no}"`,`"${r.last_name}"`,`"${r.first_name}"`,`"${r.middle_name}"`,`"${r.email}"`,`"${r.face_status}"`,r.status,`"${r.date_added}"`].join(',')
@@ -403,6 +411,11 @@ function exportCSV() {
     a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
     a.download = `Employees_Report_${new Date().toISOString().split('T')[0]}.csv`;
     a.click(); URL.revokeObjectURL(a.href);
+    UIFeedback.success('Employee CSV exported.', 'Export complete');
+    } catch (error) {
+        console.error('Employee CSV export failed:', error);
+        UIFeedback.error('The employee CSV could not be exported. Please try again.', 'Export failed');
+    }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -431,6 +444,7 @@ window.addEventListener('click', e => {
 });
 
 document.addEventListener('keydown', e => {
+    if (document.getElementById('app-feedback-modal')?.hidden === false) return;
     if (e.key === 'Escape') {
         closeReportModal();
         ['faceRegModal'].forEach(id => {
@@ -443,13 +457,6 @@ document.addEventListener('keydown', e => {
 // ══════════════════════════════════════════════════════════
 // 7. UTILITIES
 // ══════════════════════════════════════════════════════════
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    document.getElementById('toastMsg').textContent = msg;
-    t.classList.add('on');
-    setTimeout(() => t.classList.remove('on'), 4000);
-}
-
 function escHtml(str) {
     if (!str) return '';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

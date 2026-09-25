@@ -465,7 +465,6 @@ bootEngineBtn.addEventListener('click', async () => {
         setOutput('success', 'fa-solid fa-check', 'Engine Online! You can now start the session.');
         if (stopEngineBtn) stopEngineBtn.style.display = 'inline-flex';
     } catch (err) {
-        alert("Failed to start engine: " + err.message);
         setOutput('error', 'fa-solid fa-circle-exclamation', '❌ ' + err.message);
         bootEngineBtn.disabled = false;
         bootEngineBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Start Engine';
@@ -476,7 +475,7 @@ bootEngineBtn.addEventListener('click', async () => {
 });
 
 async function stopEngine() {
-    const confirmed = confirm('Are you sure you want to stop the engine?');
+    const confirmed = await UIFeedback.confirm({ title: 'Stop attendance engine?', message: 'Stop the face attendance engine and current session?', confirmText: 'Stop engine', type: 'warning' });
     if (!confirmed) return;
 
     isBooting = false; 
@@ -636,8 +635,8 @@ startBtn.addEventListener('click', async () => {
     setOutput('success', 'fa-solid fa-circle-check', 'Attendance session is live! Ready for scans.');
 });
 
-stopBtn.addEventListener('click', () => {
-    if (!confirm('Stop the current attendance session? Camera will close.')) return;
+stopBtn.addEventListener('click', async () => {
+    if (!await UIFeedback.confirm({ title: 'Stop attendance session?', message: 'Stop the current session and close the camera?', confirmText: 'Stop session', type: 'warning' })) return;
     stopAttendanceSession();
     setOutput('info', 'fa-solid fa-circle-info', 'Session ended. Click Start to resume.');
 });

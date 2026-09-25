@@ -23,11 +23,15 @@ let AUTO_EXIT     = true;
 let GATE_SETTINGS = {};
 let overlayTimer  = null; // shared dismiss timer
 let isBooting     = false;
+let isStoppingEngine = false;
 let isFaceDbReady = false;
 let previousFaceDbPhase = null;
 let previousRebuildSummaryTimestamp = null;
 let gateSyncModalTimer = null;
 let multiFaceActive = false;
+let scannerToastTimer = null;
+let lastScannerErrorToast = '';
+let lastScannerErrorToastAt = 0;
 
 /* ══════════════════════════════════════════════════
    CLOCK
@@ -220,16 +224,27 @@ async function startAttendanceEngine() {
 }
 
 async function stopEngine() {
-    if (!confirm('Stop the face engine? The camera will be released.')) return;
-
-    stopScanner();
+    if (isStoppingEngine) return;
+    isStoppingEngine = true;
     try {
-        await fetch(`${FLASK_BASE}/shutdown`, { method: 'POST' });
-    } catch (_) {}
+        if (!await UIFeedback.confirm({
+            title: 'Stop Face Engine',
+            message: 'Stop the face engine and release the camera?',
+            confirmText: 'Stop engine',
+            type: 'warning'
+        })) return;
 
-    engineOnline = false;
-    isFaceDbReady = false;
-    setEngineStatus(false);
+        stopScanner();
+        try {
+            await fetch(`${FLASK_BASE}/shutdown`, { method: 'POST' });
+        } catch (_) {}
+
+        engineOnline = false;
+        isFaceDbReady = false;
+        setEngineStatus(false);
+    } finally {
+        isStoppingEngine = false;
+    }
 }
 
 async function switchCameraToEntryExit() {
@@ -1101,10 +1116,20 @@ function setStatus(id, cls, html) {
 function showToast(msg, type = 'green', duration = 3000) {
     const toast = document.getElementById('toast');
     if (!toast) return;
+    const now = Date.now();
+    if (type === 'red' && msg === lastScannerErrorToast && now - lastScannerErrorToastAt < 5000) return;
+    if (type === 'red') {
+        lastScannerErrorToast = msg;
+        lastScannerErrorToastAt = now;
+    }
+    if (scannerToastTimer) clearTimeout(scannerToastTimer);
     toast.className = type;
     toast.textContent = msg;
     toast.style.display = 'block';
-    setTimeout(() => { toast.style.display = 'none'; }, duration);
+    scannerToastTimer = setTimeout(() => {
+        toast.style.display = 'none';
+        scannerToastTimer = null;
+    }, duration);
 }
 
 function debounce(fn, ms) {

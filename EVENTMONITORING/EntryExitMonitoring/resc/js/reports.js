@@ -22,8 +22,9 @@ async function generateReport() {
     const to   = document.getElementById('reportTo').value;
     currentReportType = type;
 
-    if (!from || !to) { showToast('Please select a date range.'); return; }
-    if (from > to)    { showToast('Date From must be before Date To.'); return; }
+    if (!from) { UIFeedback.fieldError(document.getElementById('reportFrom'), 'Start date is required.'); return; }
+    if (!to) { UIFeedback.fieldError(document.getElementById('reportTo'), 'End date is required.'); return; }
+    if (from > to) { UIFeedback.fieldError(document.getElementById('reportTo'), 'End date must be on or after the start date.'); return; }
 
     if (!supabaseClient) {
         showReportError('The database client is unavailable. Please sign in again and reload the page.');
@@ -65,7 +66,7 @@ async function generateReport() {
         });
 
         if (error) {
-            showReportError(`Unable to load report data: ${error.message || 'Unknown database error.'}`);
+            showReportError('Unable to load report data. Please try again.');
             console.error('[reports] entry_exit_logs query error:', error);
             return;
         }
@@ -73,7 +74,7 @@ async function generateReport() {
         if (!logs || logs.length === 0) {
             document.getElementById('emptyState').style.display = 'block';
             document.getElementById('emptyState').querySelector('p').textContent = 'No data found for selected range.';
-            showToast('No records found.'); return;
+            UIFeedback.toast({ type: 'info', title: 'No records', message: 'No records were found for this date range.' }); return;
         }
 
         switch (type) {
@@ -84,7 +85,7 @@ async function generateReport() {
         }
     } catch (e) {
         console.error('[reports] generateReport error:', e);
-        showReportError(`Unable to generate report: ${e.message || 'Unexpected error.'}`);
+        showReportError('Unable to generate the report. Please try again.');
     }
 }
 
@@ -261,7 +262,8 @@ function renderTable(headers, rows, title) {
 }
 
 function exportCSV() {
-    if (!reportData || reportData.length === 0) { showToast('Generate a report first.'); return; }
+    if (!reportData || reportData.length === 0) { UIFeedback.toast({ type: 'info', message: 'Generate a report first.' }); return; }
+    try {
     const type = document.getElementById('reportType').value;
     let headers, rows;
     if (type === 'student') {
@@ -283,11 +285,17 @@ function exportCSV() {
     const a    = document.createElement('a'); a.href = url;
     a.download = `report_${type}_${new Date().toLocaleDateString('en-CA')}.csv`;
     a.click(); URL.revokeObjectURL(url);
-    showToast('CSV exported!');
+    UIFeedback.success('CSV exported.', 'Export complete');
+    } catch (error) {
+        console.error('CSV export failed:', error);
+        UIFeedback.error('The CSV could not be exported. Please try again.', 'Export failed');
+    }
 }
 
 function exportPDF() {
-    if (!reportData || reportData.length === 0) { showToast('Generate a report first.'); return; }
+    if (!reportData || reportData.length === 0) { UIFeedback.toast({ type: 'info', message: 'Generate a report first.' }); return; }
+    if (!window.jspdf) { UIFeedback.error('PDF export is unavailable. Please reload the page and try again.', 'Export unavailable'); return; }
+    try {
     const { jsPDF } = window.jspdf;
     const doc  = new jsPDF();
     const type = document.getElementById('reportType').value;
@@ -317,7 +325,11 @@ function exportPDF() {
 
     doc.autoTable({ head, body, startY: 38, styles: { fontSize: 9 }, headStyles: { fillColor: [11,78,120] } });
     doc.save(`report_${type}_${new Date().toLocaleDateString('en-CA')}.pdf`);
-    showToast('PDF exported!');
+    UIFeedback.success('PDF exported.', 'Export complete');
+    } catch (error) {
+        console.error('PDF export failed:', error);
+        UIFeedback.error('The PDF could not be exported. Please try again.', 'Export failed');
+    }
 }
 
 function getISOWeek(date) {
@@ -325,14 +337,6 @@ function getISOWeek(date) {
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     return { week: Math.ceil((((d - yearStart) / 86400000) + 1) / 7), year: d.getUTCFullYear() };
-}
-
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    const m = document.getElementById('toastMsg');
-    if (!t || !m) return;
-    m.textContent = msg; t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
 }
 
 function toLocalIsoDate(date) {
@@ -346,5 +350,5 @@ function showReportError(message) {
     const emptyState = document.getElementById('emptyState');
     emptyState.style.display = 'block';
     emptyState.querySelector('p').textContent = message;
-    showToast('Error generating report. See the message above and browser console.');
+    UIFeedback.error(message, 'Report failed');
 }

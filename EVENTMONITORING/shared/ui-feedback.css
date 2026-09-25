@@ -2,7 +2,7 @@
 .app-feedback-overlay {
     position: fixed;
     inset: 0;
-    z-index: 1080;
+    z-index: 100100;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -68,7 +68,7 @@
     position: fixed;
     top: 82px;
     right: 20px;
-    z-index: 1090;
+    z-index: 100110;
     display: grid;
     gap: 10px;
     width: min(370px, calc(100vw - 32px));

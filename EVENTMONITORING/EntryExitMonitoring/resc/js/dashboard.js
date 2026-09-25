@@ -105,12 +105,3 @@ function setEl(id, val) {
     const el = document.getElementById(id);
     if (el) el.textContent = val;
 }
-
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    const m = document.getElementById('toastMsg');
-    if (!t || !m) return;
-    m.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
-}

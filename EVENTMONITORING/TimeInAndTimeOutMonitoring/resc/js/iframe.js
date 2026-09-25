@@ -29,8 +29,7 @@ function checkAuthentication() {
         
         // Verify user is an admin
         if (currentUser.userType !== 'admin') {
-            alert('Access denied. Admin account required.');
-            logout();
+            UIFeedback.warning('Access denied. Admin account required.').then(() => logout());
             return false;
         }
         
@@ -187,8 +186,8 @@ document.querySelectorAll('.menu-item').forEach(link => {
  * Logout user
  * Clears session storage and redirects to login
  */
-function logout() {
-    if (confirm('Are you sure you want to log out?')) {
+async function logout() {
+    if (await UIFeedback.confirm({ title: 'Log out?', message: 'End your current session?', confirmText: 'Log out', type: 'warning' })) {
         // Clear session storage
         sessionStorage.removeItem('user');
         

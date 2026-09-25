@@ -432,12 +432,12 @@ async function fetchTodayReports() {
     }
 }
 
-function checkDuplicateWarning(exportType) {
+async function checkDuplicateWarning(exportType) {
     const { reportName, dataString } = getGraphExportState(exportType);
     const isExactDuplicate = existingReportsToday.some((item) => item.name === reportName && item.dataString === dataString);
 
     if (isExactDuplicate) {
-        return confirm(`A ${exportType} report with this EXACT data has already been saved today.\n\nAre you sure you want to generate a duplicate?`);
+        return UIFeedback.confirm({ title: 'Duplicate report', message: `A ${exportType} report with this exact data has already been saved today. Generate another?`, confirmText: 'Generate duplicate', type: 'warning' });
     }
 
     return true;
@@ -468,7 +468,7 @@ async function autoSaveReport(exportType) {
 }
 
 window.downloadGraphsCSV = async function() {
-    if (!checkDuplicateWarning('CSV')) return;
+    if (!await checkDuplicateWarning('CSV')) return;
 
     const configs = buildAttendanceChartConfigs();
     const now = new Date();
@@ -511,10 +511,10 @@ window.downloadGraphsCSV = async function() {
 };
 
 window.downloadGraphsExcel = async function() {
-    if (!checkDuplicateWarning('Excel')) return;
+    if (!await checkDuplicateWarning('Excel')) return;
 
     if (!window.XLSX) {
-        alert('Excel library not loaded yet. Please try again.');
+        UIFeedback.toast({ type: 'error', message: 'Excel library not loaded yet. Please try again.' });
         return;
     }
 
@@ -605,10 +605,10 @@ window.downloadGraphsExcel = async function() {
 };
 
 window.downloadGraphsPDF = async function() {
-    if (!checkDuplicateWarning('PDF')) return;
+    if (!await checkDuplicateWarning('PDF')) return;
 
     if (!window.jspdf) {
-        alert('PDF library not loaded yet. Please try again.');
+        UIFeedback.toast({ type: 'error', message: 'PDF library not loaded yet. Please try again.' });
         return;
     }
 
