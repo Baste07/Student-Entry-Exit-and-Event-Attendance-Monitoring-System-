@@ -206,7 +206,7 @@ function updateBadges() {
 // ══════════════════════════════════════════════════════════
 
 const typeColors = {
-    assembly: '#8b5cf6', meeting: '#06b6d4', sports: '#f59e0b',
+    assembly: '#0369a1', meeting: '#06b6d4', sports: '#f59e0b',
     ceremony: '#ec4899', exam: '#ef4444', holiday: '#22c55e', other: '#6b7280',
 };
 
