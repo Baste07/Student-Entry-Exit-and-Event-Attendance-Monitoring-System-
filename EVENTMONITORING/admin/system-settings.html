@@ -30,6 +30,32 @@
     <div class="settings-container anim anim-2">
         <div class="settings-section">
             <div class="settings-header">
+                <h2>Notifications</h2>
+                <p>System-wide permission for automated guardian messages</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-info">
+                    <label for="attendanceSmsToggle">Master SMS Notifications</label>
+                    <small id="attendanceSmsStatus" aria-live="polite">Loading SMS setting...</small>
+                </div>
+                <input type="checkbox" class="sms-toggle" id="attendanceSmsToggle" role="switch" aria-describedby="attendanceSmsStatus" disabled>
+            </div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-header">
+                <h2>Security</h2>
+                <p>Face-scan protection shared by the Event and Entry &amp; Exit modules</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-info">
+                    <label for="antiSpoofToggle">Anti-Spoof Protection</label>
+                    <small id="antiSpoofStatus" aria-live="polite">Loading security setting...</small>
+                </div>
+                <input type="checkbox" class="sms-toggle" id="antiSpoofToggle" role="switch" aria-describedby="antiSpoofStatus" disabled>
+            </div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-header">
                 <h2>Academic Calendar</h2>
                 <p>Manage school years and set the active year used across all modules</p>
             </div>
@@ -112,19 +138,36 @@
             </div>
         </div>
 
-        <div class="settings-section">
+        <div class="settings-section rollover-section">
             <div class="settings-header">
-                <h2>SMS Notifications</h2>
-                <p>Control guardian SMS messages for event attendance and school entry/exit scans</p>
+                <h2>Student ID Rollover</h2>
+                <p>Advance student ID grade prefixes after the school year ends while keeping each student's section assignment.</p>
             </div>
-            <div class="feature-item">
-                <div class="feature-info">
-                    <label for="attendanceSmsToggle">Send time-in and time-out SMS</label>
-                    <small id="attendanceSmsStatus" aria-live="polite">Loading SMS setting...</small>
+            <div class="settings-form">
+                <div class="form-group">
+                    <label for="rolloverEndMonth" class="form-label">School Year End Date</label>
+                    <div class="rollover-date-inputs">
+                        <select id="rolloverEndMonth" class="form-control" aria-label="End month" disabled></select>
+                        <select id="rolloverEndDay" class="form-control" aria-label="End day" disabled></select>
+                        <button type="button" class="btn btn-primary" id="saveRolloverEndDate" disabled>Save Date</button>
+                    </div>
+                    <small class="form-text text-muted">The daily job first checks at 12:05 AM Manila time on the following day. Student IDs advance from their current prefix; existing sections stay assigned.</small>
                 </div>
-                <input type="checkbox" class="sms-toggle" id="attendanceSmsToggle" role="switch" aria-describedby="attendanceSmsStatus" disabled>
+                <div class="form-group">
+                    <label for="rolloverSchoolYear" class="form-label">School Year to Review</label>
+                    <select id="rolloverSchoolYear" class="form-control" disabled></select>
+                </div>
+                <div id="rolloverPreview" class="rollover-preview" role="status" aria-live="polite">Rollover details will appear after the database migration is available.</div>
+                <div class="rollover-actions">
+                    <button type="button" class="btn btn-secondary" id="previewRolloverBtn" disabled>Preview Rollover</button>
+                    <button type="button" class="btn btn-primary" id="runRolloverBtn" disabled>Run Rollover Now</button>
+                    <button type="button" class="btn btn-secondary" id="reissueRolloverQrBtn" disabled>Email Updated QR Codes</button>
+                </div>
+                <small id="rolloverQrStatus" class="form-text text-muted" aria-live="polite"></small>
+                <small class="form-text text-muted">Grade 10 and inactive students are skipped. Reissue student QR codes after a completed rollover; old ID-only QR codes become invalid.</small>
             </div>
         </div>
+
     </div>
 </main>
 
@@ -133,9 +176,10 @@
 <script src="../config/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../shared/global.js"></script>
+<script src="../shared/settings-service.js"></script>
 <script src="../shared/ui-feedback.js"></script>
 <script src="admin-specific.js"></script>
-<script src="system-settings.js?v=20260925"></script>
+<script src="system-settings.js?v=20260928"></script>
 
 <script>
     requireSuperAdmin();

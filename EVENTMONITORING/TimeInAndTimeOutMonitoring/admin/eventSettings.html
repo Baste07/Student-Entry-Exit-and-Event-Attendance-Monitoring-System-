@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Event Settings | Event Module</title>
+    <link rel="icon" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="../../shared/global.css">
+    <link rel="stylesheet" href="../resc/css/header.css">
+    <link rel="stylesheet" href="../resc/css/nav.css">
+    <link rel="stylesheet" href="../resc/css/eventSettings.css">
+    <link rel="stylesheet" href="../../shared/logout-modal.css">
+    <link rel="stylesheet" href="../../shared/ui-feedback.css">
+</head>
+<body>
+    <div id="header-container"></div>
+    <div id="sidebar-container"></div>
+    <main class="main-content">
+        <div class="container event-settings">
+            <div class="page-heading"><h1><i class="fa-solid fa-gear"></i> Event Settings</h1><p>Attendance rules and event notification preferences</p></div>
+            <section class="setting-card">
+                <h2>Attendance</h2>
+                <div class="setting-row">
+                    <div><label for="lateGraceMinutes"><strong>Late Grace Period</strong></label><p>Students arriving within this many minutes after the scheduled start are on time.</p></div>
+                    <div class="number-control"><input type="number" id="lateGraceMinutes" min="0" max="99" step="1" value="15" disabled><span>minutes</span></div>
+                </div>
+                <p class="setting-note">This value is used by facial attendance, manual attendance, and Event Trends. Existing attendance remarks are not rewritten.</p>
+            </section>
+            <section class="setting-card">
+                <h2>Notifications</h2>
+                <div class="setting-row"><div><strong>System SMS Service</strong><p id="systemSmsStatus">Loading system policy...</p></div><span class="managed-pill">Managed by Super Admin</span></div>
+                <div class="setting-row"><div><label for="eventSmsEnabled"><strong>Facial Event Attendance SMS</strong></label><p id="eventSmsStatus">Loading event preference...</p></div><input type="checkbox" role="switch" id="eventSmsEnabled" disabled></div>
+                <p class="setting-note">Attendance is recorded even when SMS is disabled or delivery fails. Event email delivery follows its existing behavior.</p>
+            </section>
+            <section class="setting-card">
+                <h2>Scanner Security</h2>
+                <div class="setting-row"><div><strong>Anti-Spoof Protection</strong><p id="antiSpoofStatus">Loading system policy...</p></div><span class="managed-pill">Managed by Super Admin</span></div>
+            </section>
+            <div class="actions"><button type="button" id="saveEventSettings" disabled><i class="fa-solid fa-floppy-disk"></i> Save Event Settings</button></div>
+        </div>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="../includes/sidebar.js"></script>
+    <script src="../../shared/global.js"></script>
+    <script src="../../shared/settings-service.js"></script>
+    <script src="../../shared/ui-feedback.js"></script>
+    <script src="../resc/js/eventSettings.js"></script>
+    <script src="../../shared/logout-modal.js"></script>
+    <script>loadHeader(); loadSidebar('event-settings');</script>
+</body>
+</html>

@@ -1,13 +1,13 @@
 'use strict';
 
-// The scanner and manual attendance flows both use a 15-minute grace period.
+// The scanner and manual attendance flows read the same Event grace setting.
 // Event dates/times are school-local (Asia/Manila); attendance timestamps are timestamptz.
-const EVENT_LATE_GRACE_MINUTES = 15;
+let EVENT_LATE_GRACE_MINUTES = 15;
 const PAGE_SIZE = 500;
 const EVENT_CHUNK_SIZE = 80;
 const DETAIL_LIMIT = 200;
 const MANILA_TIME_ZONE = 'Asia/Manila';
-const ANALYTICS_PAGE_VERSION = '20260925c';
+const ANALYTICS_PAGE_VERSION = '20260926';
 const state = {
     events: [], participants: [], attendance: [], charts: {}, loadedRange: null,
     view: null, detailTab: 'late', requestId: 0
@@ -119,7 +119,7 @@ function studentName(student) {
 }
 function sectionInfo(student) {
     const section = student?.sections;
-    return { grade: section?.grade_level || '', name: section?.section_name || '', id: student?.section_id || '' };
+    return { grade: student?.current_grade_level || '', name: section?.section_name || '', id: student?.section_id || '' };
 }
 
 // A record represents one expected student-event assignment. Attendance outside the
@@ -294,6 +294,10 @@ async function loadRange() {
     field('trendError').hidden = true;
     field('btnApplyTrends').disabled = true;
     try {
+        const eventSettings = await AppSettings.load(supabaseClient, 'event', { missingTableDefaults: true });
+        const grace = Number(eventSettings.late_grace_minutes);
+        if (!Number.isInteger(grace) || grace < 0 || grace > 99) throw new Error('Invalid event grace setting');
+        EVENT_LATE_GRACE_MINUTES = grace;
         const events = await fetchPages(() => {
             let query = supabaseClient.from('events').select('event_id,event_name,event_date,end_date,time_start,time_end,event_type,status')
                 .order('event_date', { ascending: true }).order('event_id', { ascending: true });
@@ -304,7 +308,7 @@ async function loadRange() {
         const activeEvents = events.filter(event => event.status !== 'cancelled');
         const ids = activeEvents.map(event => event.event_id);
         const [participants, attendance] = ids.length ? await Promise.all([
-            fetchForEvents('event_participants', 'event_id,student_id,participant_id,students(student_id,stud_id,first_name,middle_name,last_name,section_id,sections(section_id,grade_level,section_name))', ids, 'participant_id'),
+            fetchForEvents('event_participants', 'event_id,student_id,participant_id,students(student_id,stud_id,current_grade_level,first_name,middle_name,last_name,section_id,sections(section_id,section_name))', ids, 'participant_id'),
             fetchForEvents('event_attendance', 'attendance_id,event_id,student_id,time_in,time_out,remarks', ids, 'attendance_id')
         ]) : [[], []];
         if (request !== state.requestId) return;

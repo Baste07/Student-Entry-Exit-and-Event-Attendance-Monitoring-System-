@@ -4,14 +4,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const Gate = require('../resc/js/gate-analytics.js');
+const Gate = require('../../EntryExitMonitoring/resc/js/gate-analytics.js');
 
 function log(id, type, action, time, method = 'face', section = 'Grade 7') {
     return {
         id: `${id}-${action}-${time}`, student_id: type === 'student' ? id : null,
         employee_id: type === 'employee' ? id : null,
         log_type: action, scan_method: method, log_timestamp: time,
-        students: type === 'student' ? { first_name: id, last_name: 'Student', stud_id: id, section_id: section, sections: { grade_level: section, section_name: 'A' } } : null,
+        students: type === 'student' ? { first_name: id, last_name: 'Student', stud_id: id, current_grade_level: section, section_id: section, sections: { grade_level: section, section_name: 'A' } } : null,
         employees: type === 'employee' ? { first_name: id, last_name: 'Employee', emp_no: 1, role: 'teacher', faculty: 'Science' } : null
     };
 }
@@ -50,6 +50,22 @@ test('composite person keys keep overlapping student and employee IDs separate',
     const view = Gate.summary(Gate.normalize(raw, now).rows, now);
     assert.equal(view.uniquePeople, 2);
     assert.equal(view.inside.length, 2);
+});
+
+test('an advanced display ID still resolves historical gate logs by permanent UUID', () => {
+    const row = log('permanent-uuid', 'student', 'entry', at(7), 'qr', 'Grade 1');
+    row.students.stud_id = '2-0001';
+    row.students.current_grade_level = 'Grade 2';
+    row.students.section_id = 'persistent-section-a';
+    const normalized = Gate.normalize([row], now);
+    const view = Gate.summary(normalized.rows, now);
+    assert.equal(view.entries, 1);
+    assert.equal(normalized.rows[0].key, 'student:permanent-uuid');
+    assert.equal(normalized.rows[0].identifier, '2-0001');
+    assert.equal(normalized.rows[0].sectionId, 'persistent-section-a');
+    assert.equal(normalized.rows[0].grade, 'Grade 2');
+    assert.equal(Gate.filterRows(normalized.rows, { grade: 'Grade 2' }).length, 1);
+    assert.equal(Gate.filterRows(normalized.rows, { grade: 'Grade 1' }).length, 0);
 });
 
 test('Entry, Entry, Exit leaves one diagnostic unpaired Entry without false occupancy', () => {
@@ -122,7 +138,7 @@ test('filters and invalid records never produce invented people or negative stay
 
 test('dashboard and report pages reference existing assets and unique element IDs', () => {
     for (const file of ['dashboard.html', 'reports.html']) {
-        const pageFile = path.join(__dirname, '../admin', file);
+        const pageFile = path.join(__dirname, '../../EntryExitMonitoring/admin', file);
         const html = fs.readFileSync(pageFile, 'utf8');
         const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]);
         assert.equal(ids.length, new Set(ids).size, `${file} has duplicate IDs`);
@@ -161,9 +177,9 @@ test('page scripts reference controls present in their matching pages', () => {
         ['dashboard.html', ['dashboard.js']],
         ['reports.html', ['gate-report-analytics.js']]
     ]) {
-        const html = fs.readFileSync(path.join(__dirname, '../admin', page), 'utf8');
+        const html = fs.readFileSync(path.join(__dirname, '../../EntryExitMonitoring/admin', page), 'utf8');
         for (const script of scripts) {
-            const source = fs.readFileSync(path.join(__dirname, '../resc/js', script), 'utf8');
+            const source = fs.readFileSync(path.join(__dirname, '../../EntryExitMonitoring/resc/js', script), 'utf8');
             const ids = [...source.matchAll(/(?:getElementById|dashboardText|gateText)\('([^']+)'/g)].map(match => match[1]);
             assert.deepEqual([...new Set(ids)].filter(id => !html.includes(`id="${id}"`)), [], `${script} references missing controls`);
         }

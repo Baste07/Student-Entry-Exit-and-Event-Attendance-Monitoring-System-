@@ -4,7 +4,7 @@
 const GateAnalytics = (() => {
     const ZONE = 'Asia/Manila';
     const PAGE_SIZE = 500;
-    const LOG_COLUMNS = 'id,student_id,employee_id,log_type,scan_method,log_timestamp,created_at,students(stud_id,first_name,last_name,section_id,sections(grade_level,section_name)),employees(emp_no,first_name,last_name,faculty,role)';
+    const LOG_COLUMNS = 'id,student_id,employee_id,log_type,scan_method,log_timestamp,created_at,students(stud_id,current_grade_level,first_name,last_name,section_id,sections(section_name)),employees(emp_no,first_name,last_name,faculty,role)';
     const dateFormatter = new Intl.DateTimeFormat('en-US', { timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
     const hourFormatter = new Intl.DateTimeFormat('en-US', { timeZone: ZONE, hour: '2-digit', hourCycle: 'h23' });
     const weekdayFormatter = new Intl.DateTimeFormat('en-US', { timeZone: ZONE, weekday: 'long' });
@@ -41,7 +41,7 @@ const GateAnalytics = (() => {
                 hour: manilaHour(new Date(timestamp)), weekday: weekdayFormatter.format(new Date(timestamp)),
                 name: [type === 'student' ? student.first_name : employee.first_name, type === 'student' ? student.last_name : employee.last_name].filter(Boolean).join(' ') || 'Unknown person',
                 identifier: type === 'student' ? student.stud_id || '' : employee.emp_no ?? '',
-                grade: type === 'student' ? section.grade_level || '' : '',
+                grade: type === 'student' ? student.current_grade_level || '' : '',
                 section: type === 'student' ? section.section_name || '' : '',
                 sectionId: type === 'student' ? student.section_id || '' : '',
                 role: type === 'employee' ? employee.role || '' : '',

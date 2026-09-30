@@ -237,19 +237,6 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        // Updated to check the admins table instead of professors
-        const { data: adminRecord } = await supabaseClient
-            .from('admins')
-            .select('email')
-            .eq('email', email)
-            .maybeSingle();
-
-        if (!adminRecord) {
-            modalErrorText.textContent = 'No account found with that email address.';
-            modalError.style.display   = 'flex';
-            return;
-        }
-
         sendResetBtn.disabled    = true;
         sendResetBtn.textContent = 'Sending...';
 
@@ -267,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         sendResetBtn.textContent      = '✓ Link Sent!';
         sendResetBtn.style.background = '#16a34a';
-        modalSuccessText.innerHTML    = `Reset link sent to <strong>${email}</strong>. Check your inbox and spam folder.`;
+        modalSuccessText.textContent  = 'If this email has an account, a reset link has been sent. Check your inbox and spam folder.';
         modalSuccess.style.display    = 'flex';
         cancelForgotBtn.textContent   = 'Close';
 
@@ -386,7 +373,7 @@ async function loginUser(username, password) {
 
     const { data: adminData, error: adminError } = await supabaseClient
         .from('admins')
-        .select('*')
+        .select('admin_id,admin_name,email,admin_level,status,faculty')
         .eq('admin_id', userId)
         .maybeSingle();
 

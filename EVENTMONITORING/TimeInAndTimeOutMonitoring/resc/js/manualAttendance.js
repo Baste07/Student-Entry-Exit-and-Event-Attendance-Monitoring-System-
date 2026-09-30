@@ -4,8 +4,7 @@
    Updated for new schema: students, teachers, events, event_attendance
 ============================================================ */
 
-const STUDENT_GRACE_MINUTES = 15;
-const EVENT_LATE_GRACE_MINUTES = 15;
+let EVENT_LATE_GRACE_MINUTES = 15;
 
 const ERR_ACTIONS = new Set([
     'NOT_REGISTERED', 'NO_ACTIVE_EVENT', 'EVENT_NOT_STARTED', 'ALREADY_TIMED_IN',
@@ -350,6 +349,8 @@ function extractIdFromQr(rawText) {
         .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, '-')
         .trim();
     if (!normalized) return '';
+    const uuid = normalized.match(/student_uuid\s*:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+    if (uuid) return `student_uuid:${uuid[1].toLowerCase()}`;
 
     const collectCandidates = (...values) => {
         for (const value of values) {
@@ -414,7 +415,8 @@ function extractIdFromQr(rawText) {
 
 function isValidDetectedId(id) {
     const val = String(id || '').trim();
-    return /^([Kk]|[1-9]|10)-\d{1,4}$/.test(val) || /^EMP\d+$/i.test(val) || /^\d{9}$/.test(val);
+    return /^student_uuid:[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(val)
+        || /^([Kk]|[1-9]|10)-\d{1,4}$/.test(val) || /^EMP\d+$/i.test(val) || /^\d{9}$/.test(val);
 }
 
 function setQrDebug(text) {
@@ -423,7 +425,7 @@ function setQrDebug(text) {
     if (el) el.textContent = String(text || '');
 }
 
-function processQrResult(rawText) {
+async function processQrResult(rawText) {
     let finalId = extractIdFromQr(rawText)
         .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, '-')
         .trim();
@@ -433,6 +435,20 @@ function processQrResult(rawText) {
     if (!finalId || !isValidDetectedId(finalId)) {
         qrDecodeLocked = false;
         return;
+    }
+
+    if (/^([Kk]|[1-9]|10)-\d{1,4}$/.test(finalId)) {
+        const { data: uuidRequired, error } = await supabaseClient.rpc('student_qr_uuid_required');
+        if (error && error.code !== 'PGRST202') {
+            showToast('Could not verify this QR code. Please try again.', 'e');
+            qrDecodeLocked = false;
+            return;
+        }
+        if (uuidRequired) {
+            showToast('This student QR code expired after ID rollover. Ask for a reissued QR code.', 'e');
+            qrDecodeLocked = false;
+            return;
+        }
     }
 
     const nowMs = Date.now();
@@ -448,7 +464,7 @@ function processQrResult(rawText) {
     const studentRadio = document.querySelector('input[name="role_select"][value="student"]');
     const teacherRadio = document.querySelector('input[name="role_select"][value="teacher"]');
 
-    if (/^([Kk]|[1-9]|10)-\d{1,4}$/.test(finalId)) {
+    if (/^student_uuid:/i.test(finalId) || /^([Kk]|[1-9]|10)-\d{1,4}$/.test(finalId)) {
         if (studentRadio && !studentRadio.checked) {
             studentRadio.checked = true;
             studentRadio.dispatchEvent(new Event('change', { bubbles: true }));
@@ -496,11 +512,12 @@ async function lookupById(id, autoConfirm = false) {
         const role = getSelectedRole();
 
         if (role === 'student') {
-           const { data: student } = await supabaseClient
+           const uuid = id.match(/^student_uuid:([0-9a-f-]{36})$/i);
+           let query = supabaseClient
     .from('students')
-    .select('student_id, stud_id, first_name, middle_name, last_name, status, section_id, email, sections:section_id(grade_level, section_name)')
-    .eq('stud_id', id)
-    .maybeSingle();
+    .select('student_id, stud_id, current_grade_level, first_name, middle_name, last_name, status, section_id, email, sections:section_id(section_name)');
+           query = uuid ? query.eq('student_id', uuid[1]) : query.eq('stud_id', id);
+           const { data: student } = await query.maybeSingle();
 
             if (student) {
                 const result = await getStudentEventStatus(student);
@@ -537,6 +554,10 @@ function getSelectedRole() {
 // STUDENT EVENT STATUS
 // ══════════════════════════════════════════════════════════════
 async function getStudentEventStatus(student) {
+    const eventSettings = await AppSettings.load(supabaseClient, 'event', { missingTableDefaults: true });
+    const grace = Number(eventSettings.late_grace_minutes);
+    if (!Number.isInteger(grace) || grace < 0 || grace > 99) throw new Error('Invalid event grace setting');
+    EVENT_LATE_GRACE_MINUTES = grace;
     const sid = student.student_id;
 
     // 1. Find events this student is registered for
@@ -775,7 +796,7 @@ function sendManualAttendanceEmail(action, eventRow, student, timestampIso, extr
     if (!email) return; // no email on file — skip silently, same as facial recognition engine
 
     const fullName = [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ');
-    const gradeLevel = student?.sections?.grade_level || '';
+    const gradeLevel = student?.current_grade_level || '';
     const sectionName = student?.sections?.section_name || '';
 
     const payload = {
@@ -1105,7 +1126,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') {
             clearQrGunSubmitTimer();
             const id = document.getElementById('id_input').value.trim();
-            if (id) lookupById(id, true);
+            if (id) {
+                if (qrGunModeActive) void processQrResult(id);
+                else lookupById(id, true);
+            }
         }
     });
 
@@ -1134,7 +1158,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     idInput.addEventListener('input', function () {
         let value = this.value;
-        if (getSelectedRole() === 'student') {
+        if (qrGunModeActive) {
+            // QR guns may type the UUID payload; do not strip its letters/colon.
+        } else if (getSelectedRole() === 'student') {
             value = value.replace(/[^Kk0-9\-]/g, '').toUpperCase();
             this.value = value;
         } else {
@@ -1149,15 +1175,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!trimmedValue) return;
 
-        const expectedComplete = getSelectedRole() === 'student'
-            ? /^([Kk]|[1-9]|10)-\d{1,4}$/.test(trimmedValue)
-            : /^\d{9}$/.test(trimmedValue);
+        const expectedComplete = isValidDetectedId(extractIdFromQr(trimmedValue));
 
         if (!expectedComplete) return;
 
         qrGunSubmitTimer = setTimeout(() => {
             const finalId = document.getElementById('id_input').value.trim();
-            if (finalId) doLookup(true);
+            if (finalId) void processQrResult(finalId);
         }, 250);
     });
 

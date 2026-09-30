@@ -1,0 +1,19 @@
+.main-content { margin-left: 60px; margin-top: 68px; min-height: calc(100vh - 68px); background: #f2f8ff; padding: 32px 32px 48px; }
+.event-settings { max-width: 1050px; margin: 0 auto; color: #163c59; font-family: 'Source Sans 3', sans-serif; }
+.page-heading { margin-bottom: 24px; }
+.page-heading h1 { font: 700 28px Merriweather, serif; margin: 0 0 8px; }
+.page-heading h1 i { color: #2384c6; margin-right: 8px; }
+.page-heading p, .setting-row p, .setting-note { color: #566c7e; margin: 4px 0; }
+.setting-card { background: #fff; border: 1px solid #d6e8fa; border-radius: 14px; padding: 22px 26px; margin-bottom: 18px; box-shadow: 0 4px 15px #103c6020; }
+.setting-card h2 { font-size: 20px; margin: 0 0 12px; }
+.setting-row { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 17px 0; border-top: 1px solid #e2edf7; }
+.setting-row strong { font-size: 16px; }
+.setting-row input[type=checkbox] { width: 44px; height: 24px; accent-color: #145985; cursor: pointer; flex: none; }
+.number-control { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.number-control input { width: 80px; padding: 8px; border: 1px solid #bdd9ee; border-radius: 7px; font: inherit; }
+.managed-pill { background: #e9f3fb; color: #145985; padding: 7px 12px; border-radius: 20px; font-weight: 700; white-space: nowrap; }
+.setting-note { font-size: 13px; }
+.actions { display: flex; justify-content: flex-end; }
+.actions button { background: #145985; color: #fff; border: 0; padding: 11px 19px; border-radius: 8px; font: 700 15px 'Source Sans 3', sans-serif; cursor: pointer; }
+.actions button:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 900px) { .main-content { margin-left: 0; margin-top: 0; padding: 22px 16px 32px; } .setting-row { flex-wrap: wrap; } }

@@ -56,7 +56,6 @@ test_mp.py
 
 # Per-machine laboratory lock configuration (generated locally)
 TimeInAndTimeOutMonitoring/students/machine_lab_config.json
-camera_owner.json
 
 # Markdown documentation files
 *.md

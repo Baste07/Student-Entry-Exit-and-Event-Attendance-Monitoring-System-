@@ -70,6 +70,7 @@
                     <select class="form-select" id="departmentSelect" disabled>
                         <option value="" disabled selected>Select grade level first...</option>
                     </select>
+                    <div class="form-text">Section is a persistent grouping; its listed grade may differ from the student's current grade.</div>
                 </div>
 
                 <div>
@@ -396,6 +397,7 @@
                                 <select id="singleDepartment" class="form-select" required disabled>
                                     <option value="" disabled selected>Select grade level first...</option>
                                 </select>
+                                <div class="form-text">Section assignment does not determine current grade.</div>
                             </div>
                             <div class="col-md-4">
                                 <label for="singleStudentId" class="form-label">Student ID <span class="text-danger">*</span></label>
@@ -629,6 +631,24 @@
                             <label for="editDepartment" class="form-label">Section <span class="text-danger">*</span></label>
                             <select id="editDepartment" class="form-select" required></select>
                         </div>
+                        <div class="col-md-6">
+                            <label for="editGradeLevel" class="form-label">Current Grade</label>
+                            <select id="editGradeLevel" class="form-select">
+                                <option value="">Unverified — confirm with registrar</option>
+                                <option value="Kinder">Kinder</option>
+                                <option value="Grade 1">Grade 1</option>
+                                <option value="Grade 2">Grade 2</option>
+                                <option value="Grade 3">Grade 3</option>
+                                <option value="Grade 4">Grade 4</option>
+                                <option value="Grade 5">Grade 5</option>
+                                <option value="Grade 6">Grade 6</option>
+                                <option value="Grade 7">Grade 7</option>
+                                <option value="Grade 8">Grade 8</option>
+                                <option value="Grade 9">Grade 9</option>
+                                <option value="Grade 10">Grade 10</option>
+                            </select>
+                            <div class="form-text">Changing grade also changes the Student ID prefix. Section stays independent.</div>
+                        </div>
                         <div class="col-md-4">
                             <label for="editFirstName" class="form-label">First Name <span class="text-danger">*</span></label>
                             <input type="text" id="editFirstName" class="form-control" required>
@@ -818,7 +838,7 @@
 <script src="../shared/global.js"></script>
 <script src="../shared/ui-feedback.js"></script>
 <script src="admin-specific.js"></script>
-<script src="student-import.js"></script>
+<script src="student-import.js?v=20260928"></script>
 
 <script>
     requireSuperAdmin();

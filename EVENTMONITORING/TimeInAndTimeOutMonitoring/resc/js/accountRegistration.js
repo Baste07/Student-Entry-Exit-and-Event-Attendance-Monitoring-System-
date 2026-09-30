@@ -507,19 +507,18 @@ async function fillStudentFields(data) {
     document.getElementById('s_lastName').value   = data.last_name   || '';
     document.getElementById('s_email').value      = data.email       || '';
 
-    let gradeLevel = 'N/A';
+    let gradeLevel = data.current_grade_level || 'N/A';
     let sectionName = 'N/A';
     
     if (data.section_id) {
         try {
             const { data: sectionData } = await supabaseClient
                 .from('sections')
-                .select('grade_level, section_name')
+                .select('section_name')
                 .eq('section_id', data.section_id)
                 .maybeSingle();
             
             if (sectionData) {
-                gradeLevel = sectionData.grade_level || 'N/A';
                 sectionName = sectionData.section_name || 'N/A';
             }
         } catch (err) {

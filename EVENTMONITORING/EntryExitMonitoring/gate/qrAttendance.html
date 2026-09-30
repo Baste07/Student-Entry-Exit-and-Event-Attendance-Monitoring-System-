@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>QR / ID Check-In | Entry-Exit Module</title>
+    <link rel="icon" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="../resc/css/qrAttendance.css?v=20260927d">
+    <script>
+        (function enforceGateNavigation() {
+            window.gateRouteAuthorized = false;
+            const userStr = sessionStorage.getItem('user');
+            const allowedRoute = sessionStorage.getItem('allowed_admin_route');
+            let user = null;
+            try { user = userStr ? JSON.parse(userStr) : null; }
+            catch (_) { sessionStorage.removeItem('user'); }
+            sessionStorage.removeItem('allowed_admin_route');
+            if (!user || user.userType !== 'admin') {
+                window.location.replace('../../auth/login.html');
+            } else if (allowedRoute !== window.location.pathname) {
+                window.location.replace('../../portal/portal.html');
+            } else {
+                window.gateRouteAuthorized = true;
+            }
+        })();
+    </script>
+</head>
+<body>
+    <aside class="intro-panel">
+        <div class="intro-grid" aria-hidden="true"></div>
+        <div class="brand">
+            <img src="../resc/assets/El Tres Eres Cencia Escuela.jpg" alt="School logo">
+            <div><small>Entry-Exit Module</small><strong>Gate Attendance System</strong></div>
+        </div>
+        <div class="intro-main">
+            <span class="mode-badge"><i class="fa-solid fa-qrcode"></i> QR / ID CHECK-IN</span>
+            <h1>Gate Attendance<br><span>QR &amp; Manual Mode</span></h1>
+            <p>Scan a student QR code or enter a student or employee ID to record entry and exit.</p>
+            <div class="feature"><i class="fa-solid fa-id-card"></i><div><strong>Student &amp; employee IDs</strong><span>Look up the person before recording</span></div></div>
+            <div class="feature"><i class="fa-solid fa-clock-rotate-left"></i><div><strong>Entry and exit</strong><span>Uses the same gate hours and Auto Exit rules</span></div></div>
+            <div class="feature"><i class="fa-solid fa-shield-halved"></i><div><strong>Gate records</strong><span>Saved to Entry &amp; Exit logs</span></div></div>
+        </div>
+        <div class="intro-footer">&copy; <span id="footerYear"></span> Gate Attendance System</div>
+    </aside>
+
+    <main class="checkin-panel">
+        <div class="checkin-shell">
+            <div class="top-actions">
+                <a href="../../auth/login.html" id="backToDashboard">Dashboard</a>
+            </div>
+            <div class="clock-strip"><i class="fa-regular fa-clock"></i> <span id="liveClock">Loading time...</span></div>
+
+            <section class="checkin-card" aria-labelledby="checkinTitle">
+                <div class="card-bar"></div>
+                <div class="eyebrow"><i class="fa-solid fa-fingerprint"></i> GATE ATTENDANCE</div>
+                <h2 id="checkinTitle">Check In / Out</h2>
+                <p class="lead">Enter an ID, use a QR gun, or scan a QR code with the camera.</p>
+
+                <fieldset class="role-picker">
+                    <legend><i class="fa-solid fa-users"></i> Select Role</legend>
+                    <label><input type="radio" name="personRole" value="student" checked> Student</label>
+                    <label><input type="radio" name="personRole" value="employee"> Employee</label>
+                </fieldset>
+
+                <label class="field-label" for="personId" id="idLabel"><i class="fa-solid fa-id-card"></i> Student ID Number</label>
+                <input id="personId" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. K-001 or 10-1234" disabled>
+                <div id="qrReader" class="qr-reader" hidden></div>
+                <div class="button-row">
+                    <button type="button" id="lookupButton" class="primary" disabled><i class="fa-solid fa-magnifying-glass"></i> Look Up</button>
+                    <button type="button" id="qrGunButton" class="soft" aria-pressed="false" disabled><i class="fa-solid fa-barcode"></i> QR Gun</button>
+                    <button type="button" id="cameraButton" class="green" disabled><i class="fa-solid fa-qrcode"></i> Scan QR</button>
+                </div>
+                <p id="pageStatus" class="page-status" role="status" aria-live="polite">Loading gate settings...</p>
+            </section>
+
+            <section id="previewCard" class="preview-card" aria-live="polite" hidden>
+                <div class="preview-head"><span id="previewIcon"><i class="fa-solid fa-user-graduate"></i></span><div><strong id="previewName"></strong><small id="previewMeta"></small></div></div>
+                <p id="previewMessage"></p>
+                <div class="preview-actions">
+                    <button type="button" id="confirmButton" class="primary" disabled><i class="fa-solid fa-check"></i> Confirm</button>
+                    <button type="button" id="againButton" class="soft"><i class="fa-solid fa-rotate-left"></i> Search Again</button>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../config/.env.js"></script>
+    <script src="../../config/config.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="../../shared/settings-service.js"></script>
+    <script src="../resc/js/gate-scan-route.js?v=20260927b"></script>
+    <script src="../resc/js/qrAttendance.js?v=20260928"></script>
+</body>
+</html>

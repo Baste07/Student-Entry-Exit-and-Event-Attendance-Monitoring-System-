@@ -177,7 +177,7 @@ function buildStudentReport(logs) {
         const key = s.stud_id || 'unknown';
         if (!students[key]) students[key] = {
             stud_id: s.stud_id, name: `${s.last_name}, ${s.first_name}`,
-            grade: section.grade_level, section: section.section_name,
+            grade: s.current_grade_level, section: section.section_name,
             entries: 0, exits: 0
         };
         if (l.log_type === 'entry') students[key].entries++;
@@ -200,7 +200,7 @@ function buildGradeReport(logs) {
     const grades = {};
     logs.forEach(l => {
         if (!l.student_id) return;
-        const g = l.students?.sections?.grade_level || 'Unknown';
+        const g = l.students?.current_grade_level || 'Unknown';
         if (!grades[g]) grades[g] = { entries: 0, exits: 0 };
         if (l.log_type === 'entry') grades[g].entries++;
         else                        grades[g].exits++;

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const moduleRoot = path.resolve(__dirname, '..');
+const moduleRoot = path.resolve(__dirname, '../../TimeInAndTimeOutMonitoring');
 
 function loadFunction(relativePath, name, globals) {
     const source = fs.readFileSync(path.join(moduleRoot, relativePath), 'utf8');
