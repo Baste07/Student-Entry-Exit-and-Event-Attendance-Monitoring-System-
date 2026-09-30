@@ -277,7 +277,7 @@ async function loadDepartmentsForRegistration() {
 async function submitRegistration() {
     const userType = 'professor'; // Default to professor
     if (!departmentsLoaded) {
-        alert('Please wait for departments to load before submitting. Try again in a moment.');
+        UIFeedback.warning('Please wait for departments to load before submitting. Try again in a moment.');
         return;
     }
 
@@ -296,7 +296,7 @@ async function submitRegistration() {
 
     // Additional validation for professors
     if (!department) {
-        alert('Please select a department');
+        UIFeedback.warning('Please select a department');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Complete Registration';
         return;
@@ -315,7 +315,7 @@ async function submitRegistration() {
             .maybeSingle();
 
         if (existingProfessor) {
-            alert('An account with this email already exists.');
+            UIFeedback.error('An account with this email already exists.');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Complete Registration';
             return;
@@ -368,7 +368,7 @@ async function submitRegistration() {
     } catch (error) {
         console.error('Registration error:', error);
         console.error('Error details:', error.message, error.details, error.hint); // More detailed error logging
-        alert('Registration failed: ' + (error.message || 'Unknown error occurred'));
+        UIFeedback.error('Registration failed: ' + (error.message || 'Unknown error occurred'));
         submitBtn.disabled = false;
         submitBtn.textContent = 'Complete Registration';
     }
