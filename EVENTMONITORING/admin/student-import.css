@@ -89,6 +89,15 @@
     margin-bottom: 1.5rem;
 }
 
+.form-label.text-success {
+    color: var(--text-main) !important;
+}
+
+.form-label.text-success svg {
+    color: var(--blue-mid);
+    stroke: currentColor;
+}
+
 /* ===== FORM LABELS & CONTROLS ===== */
 .form-label-custom {
     display: flex;
