@@ -88,6 +88,7 @@ async function loadStudents() {
                 birth_date,
                 gender,
                 section_id,
+                current_grade_level,
                 facial_dataset_path,
                 profile_picture,
                 status,
@@ -151,7 +152,7 @@ function renderTable(students) {
     tbody.innerHTML = students.map(s => {
         const hasFace = resolveHasFace(s);
         const section = getSectionById(s.section_id);
-        const gradeLevel = section ? section.grade_level : '-';
+        const gradeLevel = s.current_grade_level || '-';
         const sectionName = section ? section.section_name : '-';
         const dateReg = s.created_at
             ? new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
@@ -258,7 +259,7 @@ function applyFilters() {
     let filtered = allStudents.filter(s => {
         const section = getSectionById(s.section_id);
         const fullName = `${s.first_name || ''} ${s.middle_name || ''} ${s.last_name || ''}`.toLowerCase();
-        const searchable = `${s.stud_id || ''} ${fullName} ${s.gender || ''} ${section ? section.grade_level : ''} ${section ? section.section_name : ''}`.toLowerCase();
+        const searchable = `${s.stud_id || ''} ${fullName} ${s.gender || ''} ${s.current_grade_level || ''} ${section ? section.section_name : ''}`.toLowerCase();
 
         // 1. Text Search
         const matchQ  = !q || searchable.includes(q);
@@ -269,7 +270,7 @@ function applyFilters() {
         const matchFc = !fc || (fc === 'registered' ? hasFace : !hasFace);
 
         // 3. Grade Level & Section Check
-        const matchGr = !gr || (section && section.grade_level === gr);
+        const matchGr = !gr || s.current_grade_level === gr;
         const matchSec = !sec || (s.section_id && s.section_id === sec);
 
         return matchQ && matchSt && matchFc && matchGr && matchSec;
@@ -297,7 +298,7 @@ async function searchStudent() {
     try {
         const { data: s, error } = await supabaseClient
             .from('students')
-            .select('student_id, stud_id, first_name, middle_name, last_name, suffix, gender, section_id, facial_dataset_path, birth_date')
+            .select('student_id, stud_id, current_grade_level, first_name, middle_name, last_name, suffix, gender, section_id, facial_dataset_path, birth_date')
             .eq('stud_id', studentId)
             .single();
 
@@ -318,7 +319,7 @@ async function searchStudent() {
         rb.dataset.studentId = s.stud_id;
 
         const section = getSectionById(s.section_id);
-        const gradeSec = section ? `${section.grade_level} - ${section.section_name}` : '-';
+        const gradeSec = [s.current_grade_level, section?.section_name].filter(Boolean).join(' - ') || '-';
 
         document.getElementById('studentInfo').innerHTML = `
             <div class="info-item"><label>Student ID</label><div class="value">${escHtml(s.stud_id)}</div></div>
@@ -388,7 +389,7 @@ async function buildReportRows() {
                 middle_name:       s.middle_name || '—',
                 last_name:         s.last_name,
                 suffix:            s.suffix || '—',
-                grade_level:       section ? section.grade_level : '—',
+                grade_level:       s.current_grade_level || '—',
                 section_name:      section ? section.section_name : '—',
                 gender:            s.gender || '—',
                 face_status:       resolveHasFace(s) ? 'Registered' : 'Not Registered',
@@ -429,7 +430,7 @@ async function openReportModal() {
         const faceClass = hasFace ? 'registered' : 'not-registered';
         const status    = (s.status || 'active').toLowerCase();
         const section   = getSectionById(s.section_id);
-        const gradeLevel = section ? section.grade_level : '—';
+        const gradeLevel = s.current_grade_level || '—';
         const sectionName = section ? section.section_name : '—';
         const dateReg   = s.created_at
             ? new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })

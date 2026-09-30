@@ -72,6 +72,7 @@ from flask import Flask, Response, request, jsonify
 from flask_cors import CORS
 from supabase import create_client, Client
 from sms_notifications import generate_attendance_sms, resolve_guardian_phone, send_sms
+from runtime_settings import RuntimeSettings
 
 warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -121,6 +122,8 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     sys.exit(1)
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+runtime_settings = RuntimeSettings(supabase)
+runtime_settings.start()
 print("✓ Supabase client ready (Loaded from .env)")
 
 app = Flask(__name__)
@@ -171,8 +174,6 @@ anti_spoof_state = {
     "last_error": None,
 }
 anti_spoof_cache = {}
-
-EVENT_LATE_GRACE_MINUTES = 15
 
 camera_owner_lock = threading.Lock()
 
@@ -306,7 +307,7 @@ def _init_anti_spoof():
 
 
 def _run_anti_spoof(frame_bgr, bbox):
-    if not ANTI_SPOOF_ENABLED:
+    if not runtime_settings.anti_spoof_enabled(ANTI_SPOOF_ENABLED):
         return {"allowed": True, "is_live": True, "score": None, "reason": "disabled"}
 
     if not anti_spoof_state.get("available"):
@@ -444,11 +445,12 @@ def _run_anti_spoof_diagnostic(frame_bgr, bbox):
 
 def _run_anti_spoof_cached(face_key, frame_bgr, bbox):
     now_ts = time.time()
-    cached = anti_spoof_cache.get(face_key)
+    cache_key = (face_key, runtime_settings.anti_spoof_enabled(ANTI_SPOOF_ENABLED))
+    cached = anti_spoof_cache.get(cache_key)
     if cached and (now_ts - cached.get("ts", 0.0)) <= ANTI_SPOOF_CACHE_TTL_SECONDS:
         return cached.get("result")
     result = _run_anti_spoof(frame_bgr, bbox)
-    anti_spoof_cache[face_key] = {"ts": now_ts, "result": result}
+    anti_spoof_cache[cache_key] = {"ts": now_ts, "result": result}
     if len(anti_spoof_cache) > 200:
         oldest = sorted(anti_spoof_cache.items(), key=lambda kv: kv[1].get("ts", 0.0))[:50]
         for k, _v in oldest:
@@ -556,27 +558,21 @@ def _attendance_timestamp_label(timestamp_iso):
     except Exception:
         return str(timestamp_iso)
 
-def _sms_notifications_enabled():
-    """Read the shared switch for both event attendance and school gate SMS."""
-    try:
-        result = supabase.table("system_settings").select("value") \
-            .eq("key", "sms_enabled").limit(1).execute()
-        rows = result.data or []
-        # No saved preference preserves the previous behavior: SMS is on.
-        return (not rows or str(rows[0].get("value", "true")).strip().lower() != "false"), None
-    except Exception as exc:
-        # Do not send SMS when the administrator's saved choice cannot be read.
-        print(f"[SMS] Could not read system setting: {exc}")
+def _sms_notifications_enabled(attendance_type):
+    """Require both the system capability and the matching module preference."""
+    scope = "event" if attendance_type == "event" else "gate"
+    if not runtime_settings.fresh("system") or not runtime_settings.fresh(scope):
         return False, "SMS_SETTINGS_UNAVAILABLE"
+    return runtime_settings.effective_sms(scope), None
 
 def _send_attendance_sms(student_id, notification_type, timestamp_iso, meta, event_name=None, notification_key=None, attendance_record_id=None):
-    attendance_type = "event" if event_name else "school"
+    attendance_type = "event" if str(notification_type).startswith("event_") else "school"
     provider_value = os.getenv("IPROG_SMS_PROVIDER", "0")
-    sms_enabled, setting_error = _sms_notifications_enabled()
+    sms_enabled, setting_error = _sms_notifications_enabled(attendance_type)
     if not sms_enabled:
         _log_sms_status(
             student_id, attendance_type, notification_type, False,
-            "SMS setting unavailable" if setting_error else "SMS disabled in System Settings",
+            "SMS setting unavailable" if setting_error else "SMS disabled in System or module Settings",
             details={"sms_provider": provider_value, "attendance_record_id": attendance_record_id},
             audit={"result": "NOT_ATTEMPTED", "failure_reason": setting_error or "SMS_DISABLED"},
         )
@@ -618,7 +614,7 @@ def _send_attendance_sms(student_id, notification_type, timestamp_iso, meta, eve
         result = send_sms(phone_number, message)
         _log_sms_status(
             student_id,
-            "event" if event_name else "school",
+            attendance_type,
             notification_type,
             result.get("success", False),
             result.get("message", "SMS request failed"),
@@ -676,7 +672,7 @@ def _event_late_minutes(event_row, scan_time):
     if not event_start or not scan_time:
         return 0
 
-    grace_cutoff = event_start + datetime.timedelta(minutes=EVENT_LATE_GRACE_MINUTES)
+    grace_cutoff = event_start + datetime.timedelta(minutes=runtime_settings.event_grace_minutes())
     if scan_time <= grace_cutoff:
         return 0
 
@@ -1044,9 +1040,11 @@ def _fetch_student_details(student_ids):
     """Fetch grade/section info for a list of student IDs from Supabase."""
     if not student_ids:
         return {}
+
+
     try:
         res = supabase.table("students")\
-            .select("student_id, section_id, stud_id, email")\
+            .select("student_id, section_id, stud_id, current_grade_level, email")\
             .in_("student_id", student_ids)\
             .execute()
         students = res.data or []
@@ -1055,7 +1053,7 @@ def _fetch_student_details(student_ids):
         sections = {}
         if section_ids:
             sec_res = supabase.table("sections")\
-                .select("section_id, grade_level, section_name")\
+                .select("section_id, section_name")\
                 .in_("section_id", section_ids)\
                 .execute()
             for sec in sec_res.data or []:
@@ -1068,7 +1066,7 @@ def _fetch_student_details(student_ids):
             sec_info = sections.get(sec_id) if sec_id else {}
             mapping[sid] = {
                 "stud_id": s.get("stud_id"),
-                "grade_level": sec_info.get("grade_level"),
+                "grade_level": s.get("current_grade_level"),
                 "section_name": sec_info.get("section_name"),
                 "email": s.get("email"),  # ← ADD THIS
             }
@@ -1078,6 +1076,29 @@ def _fetch_student_details(student_ids):
         print(f"⚠ Failed to fetch student details: {e}")
         return {}
     
+def _refresh_student_display_metadata(details):
+    """Update display fields without re-encoding faces or changing UUID identity."""
+    global student_details_cache, known_meta
+    if not details:
+        return
+    with face_db_lock:
+        student_details_cache = details
+        refreshed = []
+        for meta in known_meta:
+            if meta.get("role") != "student":
+                refreshed.append(meta)
+                continue
+            current = details.get(str(meta.get("id")))
+            if not current:
+                refreshed.append(meta)
+                continue
+            updated = dict(meta)
+            for key in ("stud_id", "grade_level", "section_name", "email"):
+                updated[key] = current.get(key)
+            refreshed.append(updated)
+        known_meta = refreshed
+
+
 def load_all_faces(force_rebuild=False):
     global known_encodings, known_meta, known_encodings_np, face_db_loading_started, last_rebuild_summary, current_face_fingerprint
 
@@ -1139,6 +1160,14 @@ def load_all_faces(force_rebuild=False):
         student_ids = [str(r["student_id"]) for r in students_rows if r.get("student_id")]
         global student_details_cache
         student_details_cache = _fetch_student_details(student_ids)
+        if student_details_cache and working_meta:
+            for meta in working_meta:
+                if meta.get("role") == "student":
+                    details = student_details_cache.get(str(meta.get("id")))
+                    if details:
+                        for key in ("stud_id", "grade_level", "section_name", "email"):
+                            meta[key] = details.get(key)
+            _activate_face_db(working_encodings, working_meta)
 
         # If we had no usable local cache, seed working arrays from pgvector so we
         # don't have to re-download every photo on a fresh machine.
@@ -1518,22 +1547,28 @@ def _record_gate_log(meta):
 
     id_column = "student_id" if role == "student" else "employee_id"
     try:
+        gate_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+        if not runtime_settings.gate_accepts_scans(gate_now.strftime("%H:%M")):
+            _push({"type": "error", "name": meta.get("name"),
+                   "reason": "The gate scanner is outside its configured hours."})
+            return
         latest = supabase.table("entry_exit_logs") \
             .select("log_type") \
             .eq(id_column, person_id) \
+            .eq("log_date", gate_now.date().isoformat()) \
             .order("log_timestamp", desc=True) \
             .limit(1) \
             .execute()
         previous_type = latest.data[0].get("log_type") if latest.data else None
-        log_type = "exit" if previous_type == "entry" else "entry"
+        log_type = "exit" if runtime_settings.enabled("gate", "autoExit") and previous_type == "entry" else "entry"
         payload = {
             "student_id": person_id if role == "student" else None,
             "employee_id": person_id if role != "student" else None,
             "log_type": log_type,
             "scan_method": "face",
-            "log_date": datetime.datetime.now().date().isoformat(),
+            "log_date": gate_now.date().isoformat(),
             "log_timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "is_late": False,
+            "is_late": role == "student" and log_type == "entry" and runtime_settings.gate_is_late(gate_now.strftime("%H:%M")),
         }
         insert_result = supabase.table("entry_exit_logs").insert(payload).execute()
         notification_key = f"gate:{person_id}:{log_type}:{payload['log_timestamp']}"
@@ -1551,6 +1586,7 @@ def _record_gate_log(meta):
             "name": meta.get("name"),
             "type": "gate_recorded",
             "log_type": log_type,
+            "is_late": payload["is_late"],
             "role": role,
             "stud_id": meta.get("stud_id"),
             "grade": meta.get("grade_level", ""),
@@ -1934,7 +1970,8 @@ def recognition_worker():
                 label = meta["name"]
                 color = (0, 255, 0) if meta["role"] == "student" else (0, 255, 255)
                 print(f"[MATCH]   -> ACCEPTED: recognized as {meta['name']} (role={meta['role']})")
-                if not last or (datetime.datetime.now() - last).total_seconds() >= COOLDOWN_SECS:
+                mode_cooldown = runtime_settings.gate_cooldown_seconds() if _get_scanner_mode() == "entry_exit" else COOLDOWN_SECS
+                if not last or (datetime.datetime.now() - last).total_seconds() >= mode_cooldown:
                     # ── ANALYTICS: MiniFASNet anti-spoof liveness check ──
                     t_spoof0 = time.time()
                     anti_spoof = _run_anti_spoof_cached(key, frame, (top, right, bottom, left))
@@ -1976,7 +2013,7 @@ def recognition_worker():
                     recently_seen[key] = datetime.datetime.now()
                     _handle_recognition(meta)
                 else:
-                    remaining_cd = COOLDOWN_SECS - (datetime.datetime.now() - last).total_seconds()
+                    remaining_cd = mode_cooldown - (datetime.datetime.now() - last).total_seconds()
                     print(f"[MATCH]   -> SKIPPED: cooldown active ({remaining_cd:.1f}s remaining) for {meta['name']}")
             else:
                 label = "Unknown"
@@ -2237,7 +2274,7 @@ def engine_status():
     payload["camera_owner"] = owner_state.get("owner")
     payload["camera_owned_by_this_engine"] = owner_state.get("owner") == ENGINE_CAMERA_OWNER
     payload["anti_spoof"] = {
-        "enabled": anti_spoof_state.get("enabled"),
+        "enabled": runtime_settings.anti_spoof_enabled(ANTI_SPOOF_ENABLED),
         "available": anti_spoof_state.get("available"),
         "message": anti_spoof_state.get("message"),
         "model_dir": anti_spoof_state.get("model_dir"),
@@ -2364,6 +2401,7 @@ def trigger_rebuild():
 def face_auto_sync_worker():
     """Poll facial dataset path fingerprints and auto-trigger incremental rebuild on change."""
     global current_face_fingerprint
+    last_metadata_poll = 0.0
     if AUTO_REBUILD_POLL_SECONDS <= 0:
         print("⚙ Auto rebuild watcher disabled (AUTO_REBUILD_POLL_SECONDS <= 0)")
         return
@@ -2374,6 +2412,10 @@ def face_auto_sync_worker():
             # Only check while engine is already usable and not currently rebuilding.
             if face_db_ready.is_set() and not face_db_loading_started:
                 students_rows, teachers_rows = _fetch_face_rows()
+                if time.monotonic() - last_metadata_poll >= 60.0:
+                    student_ids = [str(row["student_id"]) for row in students_rows if row.get("student_id")]
+                    _refresh_student_display_metadata(_fetch_student_details(student_ids))
+                    last_metadata_poll = time.monotonic()
                 remote_fingerprint, _ = _build_remote_face_fingerprint(students_rows, teachers_rows)
 
                 if current_face_fingerprint is None:

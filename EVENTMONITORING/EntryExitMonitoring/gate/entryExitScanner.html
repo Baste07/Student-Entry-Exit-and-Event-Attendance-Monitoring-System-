@@ -98,11 +98,11 @@
 
         <!-- Mode tabs -->
         <div class="mode-tabs">
-            <button class="mode-tab active" id="tabFace" onclick="switchMode('face')">
+            <button class="mode-tab active" id="tabFace" type="button">
                 <i class="fa-solid fa-face-smile"></i> Face Recognition
             </button>
-            <button class="mode-tab" id="tabManual" type="button" onclick="openManualAccess()">
-                <i class="fa-solid fa-keyboard"></i> Manual Attendance
+            <button class="mode-tab" id="tabManual" type="button" onclick="GateScanRoute.go('qr')">
+                <i class="fa-solid fa-qrcode"></i> QR / ID Check-In
             </button>
         </div>
 
@@ -118,7 +118,7 @@
                 Click <strong>Start Engine</strong>, switch the camera to Entry-Exit, then click <strong>Start Scanner</strong> to begin gate scanning.<br>
                 <span style="font-size:13px;color:#888;">
                     <i class="fa-solid fa-circle-info"></i>
-                    Use <strong>Manual Attendance</strong> when facial recognition is unavailable.
+                    Use <strong>QR / ID Check-In</strong> when facial recognition is unavailable.
                 </span>
             </p>
         </div>
@@ -303,8 +303,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../../config/.env.js"></script>
 <script src="../../config/config.js"></script>
+<script src="../../shared/admin-credential-check.js"></script>
+<script src="../../shared/settings-service.js"></script>
 <script src="../../shared/ui-feedback.js"></script>
-<script src="../resc/js/entryExitScanner.js"></script>
+<script src="../resc/js/gate-scan-route.js?v=20260927b"></script>
+<script src="../resc/js/entryExitScanner.js?v=20260928"></script>
 <script>
     document.addEventListener('keydown', e => {
         if (e.key !== 'Escape') return;

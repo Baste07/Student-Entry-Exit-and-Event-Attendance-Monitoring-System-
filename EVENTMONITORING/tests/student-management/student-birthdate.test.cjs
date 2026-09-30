@@ -5,7 +5,7 @@ const { spawnSync } = require('node:child_process');
 const test = require('node:test');
 const vm = require('node:vm');
 
-const sourcePath = path.join(__dirname, '../admin/student-import.js');
+const sourcePath = path.join(__dirname, '../../admin/student-import.js');
 const source = readFileSync(sourcePath, 'utf8');
 
 class Element {

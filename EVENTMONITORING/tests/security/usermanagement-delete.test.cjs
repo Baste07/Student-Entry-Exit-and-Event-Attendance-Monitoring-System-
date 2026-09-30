@@ -4,7 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-const source = readFileSync(path.join(__dirname, '../admin/usermanagement.js'), 'utf8');
+const source = readFileSync(path.join(__dirname, '../../admin/usermanagement.js'), 'utf8');
 const currentAdmin = { id: 'self', userType: 'admin', adminLevel: 'super_admin' };
 const fixtures = [
     { id: 'self', name: 'Current Admin', email: 'self@example.test', faculty: 'Science', level: 'super_admin', status: 'active' },
@@ -63,6 +63,15 @@ function harness(options = {}) {
         console: { error() {} },
         alert(message) { alerts.push(message); },
         confirm(message) { confirmations.push(message); return options.confirm !== false; },
+        UIFeedback: {
+            warning(message) { alerts.push(message); },
+            success(message) { alerts.push(message); },
+            error(message) { alerts.push(message); },
+            confirm({ message }) {
+                confirmations.push(message);
+                return options.confirm !== false;
+            }
+        },
         supabaseClient: {
             auth: { async getSession() { authCalls.push(true); return authResult; } }
         },
@@ -122,7 +131,7 @@ test('missing, expired, and mismatched Auth sessions prevent deletion and permit
         await app.context.deleteAdmin('target');
         assert.equal(app.requests.length, 0);
         assert.ok(app.ids().includes('target'));
-        assert.match(app.alerts[0], /sign in again|Session expired/);
+        assert.match(app.alerts[0], /could not be deleted/);
         assert.equal(app.pending(), 0);
         assert.equal(app.button('target').disabled, false);
     }
@@ -133,6 +142,7 @@ test('a pending deletion disables its button and rejects duplicate submissions',
     const response = new Promise(resolve => { finish = resolve; });
     const app = harness({ fetch: () => response });
     const deletion = app.context.deleteAdmin('target');
+    await Promise.resolve();
     await Promise.resolve();
     assert.equal(app.pending(), 1);
     assert.equal(app.button('target').disabled, true);
@@ -183,7 +193,7 @@ test('API rejection keeps the account and statistics and enables a successful re
     assert.equal(app.nodes.totalAdminsCount.textContent, 4);
     assert.equal(app.button('target').disabled, false);
     assert.equal(app.pending(), 0);
-    assert.equal(app.alerts[0], 'Account is still referenced.');
+    assert.match(app.alerts[0], /could not be deleted/);
     await app.button('target').listeners.click();
     assert.equal(attempts, 2);
     assert.equal(app.ids().includes('target'), false);

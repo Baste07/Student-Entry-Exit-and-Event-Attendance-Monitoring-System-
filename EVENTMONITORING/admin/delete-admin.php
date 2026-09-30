@@ -24,8 +24,7 @@ function handleDeleteAdminRequest(string $method, string $authorization, string 
         return deleteAdminResponse(400, 'A valid admin ID is required.');
     }
     $adminId = strtolower($adminId);
-    $authDeleted = false;
-    $deleteStarted = false;
+    $profileDeleted = false;
 
     try {
         // Authenticate with Supabase itself; sessionStorage and posted roles are untrusted.
@@ -51,7 +50,7 @@ function handleDeleteAdminRequest(string $method, string $authorization, string 
         }
 
         $profilePath = '/rest/v1/admins?admin_id=eq.' . $adminId;
-        $target = $request('GET', $profilePath . '&select=admin_id&limit=1');
+        $target = $request('GET', $profilePath . '&select=*&limit=1');
         if ($target['status'] !== 200 || !is_array($target['data'])) {
             return deleteAdminResponse(502, 'Could not load the admin account. Please try again.');
         }
@@ -59,40 +58,50 @@ function handleDeleteAdminRequest(string $method, string $authorization, string 
             return deleteAdminResponse(404, 'This admin account no longer exists. Refresh the admin list.');
         }
 
-        // Delete Auth first so a failed Auth deletion never leaves an active orphaned login.
-        // ON DELETE CASCADE removes the profile in the same database transaction when configured.
-        $deleteStarted = true;
-        $deleted = $request('DELETE', '/auth/v1/admin/users/' . $adminId, ['should_soft_delete' => false]);
+        // The deployed admins.admin_id FK has NO ACTION, so Auth cannot be
+        // deleted while this profile exists. Remove the profile first; an
+        // orphaned Auth user cannot pass the application's admin login check.
+        $savedProfile = $target['data'][0];
+        $removed = $request('DELETE', $profilePath);
+        if ($removed['status'] < 200 || $removed['status'] >= 300) {
+            return deleteAdminResponse(409, 'The admin profile has linked records. Reassign them, then retry deleting this admin.');
+        }
+        $profileDeleted = true;
+
+        try {
+            $deleted = $request('DELETE', '/auth/v1/admin/users/' . $adminId, ['should_soft_delete' => false]);
+        } catch (Throwable $error) {
+            $deleted = ['status' => 0, 'data' => null];
+        }
         $missingAuth = $deleted['status'] === 404
             && (($deleted['data']['code'] ?? $deleted['data']['error_code'] ?? '') === 'user_not_found');
         if (($deleted['status'] < 200 || $deleted['status'] >= 300) && !$missingAuth) {
-            return deleteAdminResponse(409, 'The account could not be deleted. Linked records or owned files may need to be reassigned first. Please refresh the admin list before trying again.');
+            // Restore a suspended profile when Auth remains. Never reinstate
+            // an active login after an uncertain Auth deletion response.
+            $savedProfile['status'] = 'suspended';
+            try {
+                $restored = $request('POST', '/rest/v1/admins', $savedProfile);
+            } catch (Throwable $error) {
+                $restored = ['status' => 0];
+            }
+            if ($restored['status'] < 200 || $restored['status'] >= 300) {
+                return deleteAdminResponse(502, 'The profile was removed but Auth deletion or recovery could not be confirmed. Contact the system administrator.');
+            }
+            return deleteAdminResponse(409, 'Auth deletion failed. The admin profile was restored as suspended; retry after resolving linked records.');
         }
-        $authDeleted = true;
 
-        // Also support installations without a cascading Auth/profile relationship.
         $remaining = $request('GET', $profilePath . '&select=admin_id&limit=1');
         if ($remaining['status'] !== 200 || !is_array($remaining['data'])) {
-            return deleteAdminResponse(502, 'The sign-in account was removed, but profile cleanup could not be confirmed. Refresh and retry deleting this admin.');
+            return deleteAdminResponse(502, 'Auth deletion succeeded, but profile cleanup could not be confirmed. Refresh before retrying.');
         }
         if (count($remaining['data']) > 0) {
-            $cleanup = $request('DELETE', $profilePath);
-            if ($cleanup['status'] < 200 || $cleanup['status'] >= 300) {
-                return deleteAdminResponse(409, 'The sign-in account was removed, but the admin profile still has linked records. Reassign those records, then retry deleting this admin.');
-            }
-            $remaining = $request('GET', $profilePath . '&select=admin_id&limit=1');
-            if ($remaining['status'] !== 200 || !is_array($remaining['data']) || count($remaining['data']) !== 0) {
-                return deleteAdminResponse(502, 'The sign-in account was removed, but profile cleanup could not be confirmed. Refresh and retry deleting this admin.');
-            }
+            return deleteAdminResponse(502, 'Auth deletion succeeded, but the admin profile remains. Refresh before retrying.');
         }
 
         return deleteAdminResponse(200, 'Admin account deleted successfully.', true);
     } catch (Throwable $error) {
-        if ($authDeleted) {
-            return deleteAdminResponse(502, 'The sign-in account was removed, but profile cleanup could not be confirmed. Refresh and retry deleting this admin.');
-        }
-        if ($deleteStarted) {
-            return deleteAdminResponse(502, 'Deletion could not be confirmed. Refresh the admin list before trying again.');
+        if ($profileDeleted) {
+            return deleteAdminResponse(502, 'The admin profile was removed, but Auth deletion could not be confirmed. Contact the system administrator.');
         }
         return deleteAdminResponse(503, 'The account service is unavailable. Please try again or check the server configuration.');
     }

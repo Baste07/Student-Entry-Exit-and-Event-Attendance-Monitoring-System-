@@ -45,7 +45,7 @@ async function loadAdmins() {
 
         const { data: admins, error } = await supabaseClient
             .from('admins')
-            .select('*')
+            .select('admin_id,admin_name,email,faculty,admin_level,status,created_at')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -487,35 +487,22 @@ async function submitAdminForm(e) {
             if (password.length < 8) { UIFeedback.fieldError(document.getElementById('adminPassword'), 'Password must be at least 8 characters.'); return; }
             if (password !== passwordConfirm) { UIFeedback.fieldError(document.getElementById('adminPasswordConfirm'), 'Passwords do not match.'); return; }
             
-            const { data: existing } = await supabaseClient
-                .from('admins')
-                .select('email')
-                .eq('email', email)
-                .maybeSingle();
-                
-            if (existing) { UIFeedback.fieldError(document.getElementById('adminEmail'), 'An administrator with this email already exists.'); return; }
-            
-            const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-                email: email,
-                password: password
+            const { data: authSession, error: sessionError } = await supabaseClient.auth.getSession();
+            if (sessionError || !authSession?.session?.access_token) {
+                throw new Error('Please sign in again before creating an administrator.');
+            }
+            const response = await fetch('create-admin.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authSession.session.access_token}`
+                },
+                body: JSON.stringify({ name, email, faculty, level, password })
             });
-            
-            if (authError) throw authError;
-            if (!authData.user) throw new Error('Failed to create auth user');
-            
-            const { error: insertError } = await supabaseClient.from('admins').insert([{
-                admin_id: authData.user.id,
-                admin_name: name,
-                email: email,
-                password: password,
-                admin_level: level,
-                faculty: faculty,
-                status: 'active',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            }]);
-            
-            if (insertError) throw insertError;
+            const result = await response.json();
+            if (!response.ok || result?.success !== true) {
+                throw new Error(result?.message || 'The administrator could not be created.');
+            }
             savedMessage = 'Administrator created successfully.';
         }
         

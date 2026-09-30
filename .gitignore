@@ -1,2 +1,18 @@
 # Keep local test files out of the repository.
 /TEST/
+
+# Supabase generated local metadata
+/supabase/.temp/
+
+# Temporary clean development environment
+/.student-rollover-clean-dev/
+
+# Local test and deployment artifacts
+/.artifacts/
+
+# Camera ownership is local runtime state
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/camera_owner.json
+
+# Generated test and coverage output
+.pytest_cache/
+coverage/

@@ -11,7 +11,7 @@
 
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
-    <link rel="stylesheet" href="../resc/css/settings.css">
+    <link rel="stylesheet" href="../resc/css/settings.css?v=20260926">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
     <link rel="stylesheet" href="../../shared/ui-feedback.css">
 </head>
@@ -26,7 +26,7 @@
             <div class="page-header">
                 <div class="header-titles">
                     <h1><i class="fa-solid fa-gear"></i> Settings</h1>
-                    <p>Configure gate scanner behavior and system preferences</p>
+                    <p>Configure gate hours, scanner behavior, and gate notifications</p>
                 </div>
             </div>
             <hr>
@@ -38,16 +38,20 @@
                 </div>
                 <div class="settings-card">
                     <div class="setting-row">
+                        <div class="setting-info"><strong>Enforce Gate Hours</strong><span>When on, face, QR, and manual scans are accepted only between the times below.</span></div>
+                        <label class="toggle"><input type="checkbox" id="enforceGateHours"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="setting-row">
                         <div class="setting-info">
                             <strong>Gate Open Time</strong>
-                            <span>Time when the gate scanner starts accepting entries</span>
+                            <span>First time a scan is accepted when gate hours are enforced</span>
                         </div>
                         <input type="time" id="gateOpen" class="setting-input">
                     </div>
                     <div class="setting-row">
                         <div class="setting-info">
                             <strong>Gate Close Time</strong>
-                            <span>Time when the gate scanner stops accepting scans</span>
+                            <span>Scans at or after this time are blocked when gate hours are enforced</span>
                         </div>
                         <input type="time" id="gateClose" class="setting-input">
                     </div>
@@ -70,23 +74,16 @@
                     <div class="setting-row">
                         <div class="setting-info">
                             <strong>Preferred Scan Method</strong>
-                            <span>Default recognition method when the gate opens</span>
+                            <span>Page opened from Gate Scanner; operators can still switch between face and QR/ID check-in</span>
                         </div>
                         <select id="scanMethod" class="setting-input">
                             <option value="face">Face Recognition</option>
-                            <option value="qr">QR Code</option>
-                            <option value="both">Both (Face + QR)</option>
+                            <option value="qr">QR / ID Check-In</option>
                         </select>
                     </div>
                     <div class="setting-row">
-                        <div class="setting-info">
-                            <strong>Anti-Spoof Check</strong>
-                            <span>Require liveness detection to prevent photo spoofing</span>
-                        </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="antiSpoof" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
+                        <div class="setting-info"><strong>Anti-Spoof Protection</strong><span id="antiSpoofManaged">Loading system policy...</span></div>
+                        <span class="managed-badge">Managed by Super Admin</span>
                     </div>
                     <div class="setting-row">
                         <div class="setting-info">
@@ -101,7 +98,7 @@
                     <div class="setting-row">
                         <div class="setting-info">
                             <strong>Cooldown Period (seconds)</strong>
-                            <span>Minimum seconds between scans for the same student</span>
+                            <span>Minimum seconds between scans for the same person. Existing defaults are 10 seconds for QR/UI and 5 seconds for face until a value is saved.</span>
                         </div>
                         <input type="number" id="cooldown" class="setting-input" min="1" max="300" value="10" style="width:100px;">
                     </div>
@@ -115,24 +112,12 @@
                 </div>
                 <div class="settings-card">
                     <div class="setting-row">
-                        <div class="setting-info">
-                            <strong>Guardian Email Notification</strong>
-                            <span>Send Email to guardian when student enters or exits</span>
-                        </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="emailEnabled">
-                            <span class="toggle-slider"></span>
-                        </label>
+                        <div class="setting-info"><strong>System SMS Service</strong><span id="systemSmsManaged">Loading system policy...</span></div>
+                        <span class="managed-badge">Managed by Super Admin</span>
                     </div>
                     <div class="setting-row">
-                        <div class="setting-info">
-                            <strong>Notify on Entry Only</strong>
-                            <span>Only send notification on gate entry (not exit)</span>
-                        </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="notifyEntryOnly">
-                            <span class="toggle-slider"></span>
-                        </label>
+                        <div class="setting-info"><strong>Facial Entry &amp; Exit SMS</strong><span id="gateSmsEffective">Loading gate preference...</span></div>
+                        <label class="toggle"><input type="checkbox" id="gateSmsEnabled"><span class="toggle-slider"></span></label>
                     </div>
                 </div>
             </div>
@@ -152,9 +137,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../config/.env.js"></script>
     <script src="../../config/config.js"></script>
+    <script src="../../shared/global.js"></script>
+    <script src="../../shared/settings-service.js"></script>
     <script src="../../shared/ui-feedback.js"></script>
-    <script src="../includes/sidebar.js"></script>
-    <script src="../resc/js/settings.js"></script>
+    <script src="../includes/sidebar.js?v=20260927b"></script>
+    <script src="../resc/js/settings.js?v=20260927b"></script>
     <script src="../../shared/logout-modal.js"></script>
     <script>
         loadHeader();

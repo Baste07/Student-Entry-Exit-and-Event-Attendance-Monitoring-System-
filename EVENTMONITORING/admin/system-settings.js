@@ -1,12 +1,15 @@
 let allSchoolYears = [];
 let savedSmsEnabled = true;
+let savedAntiSpoofEnabled = true;
 let creatingSchoolYear = false;
-const SMS_SETTING_KEY = 'sms_enabled';
+let currentRolloverPreview = null;
+const qrReissueCursorByYear = {};
 
 document.addEventListener('DOMContentLoaded', async () => {
     checkSupabaseConnection();
     setupEventListeners();
     await Promise.all([loadSchoolYears(), loadSmsSetting()]);
+    await loadRolloverControls();
 });
 
 function setupEventListeners() {
@@ -14,7 +17,14 @@ function setupEventListeners() {
     document.getElementById('setActiveSchoolYearBtn')?.addEventListener('click', handleSetActiveClick);
     document.getElementById('inactivateSchoolYearBtn')?.addEventListener('click', handleInactivateClick);
     document.getElementById('existingSchoolYearSelect')?.addEventListener('change', handleSelectChange);
-    document.getElementById('attendanceSmsToggle')?.addEventListener('change', saveSmsSetting);
+    document.getElementById('attendanceSmsToggle')?.addEventListener('change', event => saveCapability(event, 'sms_enabled'));
+    document.getElementById('antiSpoofToggle')?.addEventListener('change', event => saveCapability(event, 'anti_spoof_enabled'));
+    document.getElementById('rolloverEndMonth')?.addEventListener('change', populateRolloverDays);
+    document.getElementById('saveRolloverEndDate')?.addEventListener('click', saveRolloverEndDate);
+    document.getElementById('rolloverSchoolYear')?.addEventListener('change', previewRollover);
+    document.getElementById('previewRolloverBtn')?.addEventListener('click', previewRollover);
+    document.getElementById('runRolloverBtn')?.addEventListener('click', runRollover);
+    document.getElementById('reissueRolloverQrBtn')?.addEventListener('click', reissueRolloverQrCodes);
 
     document.querySelectorAll('.cal-tab').forEach(tab => {
         tab.addEventListener('click', () => switchTab(tab.dataset.tab));
@@ -26,47 +36,83 @@ function renderSmsSetting(enabled) {
     const status = document.getElementById('attendanceSmsStatus');
     if (toggle) toggle.checked = enabled;
     if (status) status.textContent = enabled
-        ? 'On — guardian SMS is sent for event attendance and school entry/exit.'
-        : 'Off — guardian SMS is paused for new scans.';
+        ? 'On — module SMS preferences decide which messages may be sent. The engine refreshes within about 15 seconds.'
+        : 'Off — automated SMS will pause within about 15 seconds; module preferences are retained.';
 }
 
 async function loadSmsSetting() {
-    const toggle = document.getElementById('attendanceSmsToggle');
+    const smsToggle = document.getElementById('attendanceSmsToggle');
+    const securityToggle = document.getElementById('antiSpoofToggle');
     try {
         if (!supabaseClient) throw new Error('Supabase is not available');
-        const { data, error } = await supabaseClient
-            .from('system_settings')
-            .select('value')
-            .eq('key', SMS_SETTING_KEY)
-            .maybeSingle();
-        if (error) throw error;
-        savedSmsEnabled = data ? String(data.value).toLowerCase() !== 'false' : true;
+        const settings = await AppSettings.load(supabaseClient, 'system', { refresh: true });
+        savedSmsEnabled = AppSettings.enabled(settings, 'sms_enabled');
+        savedAntiSpoofEnabled = AppSettings.enabled(settings, 'anti_spoof_enabled');
         renderSmsSetting(savedSmsEnabled);
-        if (toggle) toggle.disabled = false;
+        renderAntiSpoofSetting(savedAntiSpoofEnabled);
+        if (smsToggle) smsToggle.disabled = false;
+        if (securityToggle) securityToggle.disabled = false;
     } catch (error) {
-        console.error('Could not load SMS setting:', error);
-        if (toggle) toggle.disabled = true;
+        console.error('Could not load system settings:', error);
+        if (smsToggle) smsToggle.disabled = true;
+        if (securityToggle) securityToggle.disabled = true;
         const status = document.getElementById('attendanceSmsStatus');
-        if (status) status.textContent = 'SMS setting unavailable. Refresh to try again.';
+        if (status) status.textContent = 'System settings unavailable. Refresh to try again.';
+        const securityStatus = document.getElementById('antiSpoofStatus');
+        if (securityStatus) securityStatus.textContent = 'Security setting unavailable. Refresh to try again.';
     }
 }
 
-async function saveSmsSetting(event) {
+function renderAntiSpoofSetting(enabled) {
+    const toggle = document.getElementById('antiSpoofToggle');
+    const status = document.getElementById('antiSpoofStatus');
+    if (toggle) toggle.checked = enabled;
+    if (status) status.textContent = enabled
+        ? 'On — the face engine applies its existing liveness check after its next settings refresh.'
+        : 'Off — the face engine skips liveness checks after its next settings refresh.';
+}
+
+async function saveCapability(event, key) {
     const toggle = event.target;
     const enabled = toggle.checked;
+    const previous = key === 'sms_enabled' ? savedSmsEnabled : savedAntiSpoofEnabled;
     toggle.disabled = true;
+    if (key === 'sms_enabled' && !enabled && !await UIFeedback.confirm({
+        title: 'Disable Master SMS?',
+        message: 'Automated SMS for Entry & Exit and facial Event attendance will be disabled. Module preferences will be kept.',
+        confirmText: 'Disable SMS', type: 'warning'
+    })) {
+        renderSmsSetting(previous);
+        toggle.disabled = false;
+        return;
+    }
+    if (key === 'anti_spoof_enabled' && !enabled && !await UIFeedback.confirm({
+        title: 'Disable Anti-Spoof Protection?',
+        message: 'Face scans in both modules will skip liveness verification while this is off.',
+        confirmText: 'Disable protection', type: 'warning'
+    })) {
+        renderAntiSpoofSetting(previous);
+        toggle.disabled = false;
+        return;
+    }
     try {
-        const { error } = await supabaseClient
-            .from('system_settings')
-            .upsert({ key: SMS_SETTING_KEY, value: String(enabled) }, { onConflict: 'key' });
-        if (error) throw error;
-        savedSmsEnabled = enabled;
-        renderSmsSetting(enabled);
-        showAlert(`Attendance SMS ${enabled ? 'enabled' : 'disabled'}.`, 'success');
+        await AppSettings.save(supabaseClient, 'system', { [key]: enabled });
+        if (key === 'sms_enabled') {
+            savedSmsEnabled = enabled;
+            renderSmsSetting(enabled);
+        } else {
+            savedAntiSpoofEnabled = enabled;
+            renderAntiSpoofSetting(enabled);
+        }
+        await logSystemAudit({ action: 'UPDATE', moduleName: 'system', pageName: 'system-settings.html',
+            targetTable: 'system_settings', targetId: key,
+            details: { setting: key, old_value: previous, new_value: enabled } });
+        showAlert(`${key === 'sms_enabled' ? 'Master SMS' : 'Anti-Spoof Protection'} ${enabled ? 'enabled' : 'disabled'}.`, 'success');
     } catch (error) {
-        console.error('Could not save SMS setting:', error);
-        renderSmsSetting(savedSmsEnabled);
-        showAlert('Could not save SMS setting. Please try again.', 'danger');
+        console.error('Could not save system setting:', error);
+        if (key === 'sms_enabled') renderSmsSetting(previous);
+        else renderAntiSpoofSetting(previous);
+        showAlert('Could not save system setting. Please try again.', 'danger');
     } finally {
         toggle.disabled = false;
     }
@@ -131,9 +177,269 @@ async function loadSchoolYears() {
         }
 
         populateExistingSchoolYearsDropdown();
+        populateRolloverYears();
     } catch (error) {
         console.error('Error loading school years:', error);
         showAlert('School years could not be loaded. Please try again.', 'danger');
+    }
+}
+
+function populateRolloverYears() {
+    const select = document.getElementById('rolloverSchoolYear');
+    if (!select) return;
+    const previous = select.value;
+    select.replaceChildren();
+    allSchoolYears.forEach(year => {
+        const option = document.createElement('option');
+        option.value = year.id;
+        option.textContent = year.name;
+        select.appendChild(option);
+    });
+    const manilaYear = Number(new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Manila', year: 'numeric'
+    }).format(new Date()));
+    const dueCandidate = allSchoolYears.find(year => Number(String(year.end_date).slice(0, 4)) <= manilaYear);
+    select.value = allSchoolYears.some(year => year.id === previous)
+        ? previous : (dueCandidate?.id || allSchoolYears.find(year => year.is_active)?.id || allSchoolYears[0]?.id || '');
+}
+
+function populateRolloverDays() {
+    const month = Number(document.getElementById('rolloverEndMonth')?.value || 3);
+    const daySelect = document.getElementById('rolloverEndDay');
+    if (!daySelect) return;
+    const previous = Number(daySelect.value || 25);
+    const max = new Date(Date.UTC(2001, month, 0)).getUTCDate();
+    daySelect.replaceChildren();
+    for (let day = 1; day <= max; day++) {
+        const option = document.createElement('option');
+        option.value = String(day).padStart(2, '0');
+        option.textContent = String(day);
+        daySelect.appendChild(option);
+    }
+    daySelect.value = String(Math.min(previous, max)).padStart(2, '0');
+}
+
+async function loadRolloverControls() {
+    const monthSelect = document.getElementById('rolloverEndMonth');
+    const daySelect = document.getElementById('rolloverEndDay');
+    const preview = document.getElementById('rolloverPreview');
+    if (!monthSelect || !daySelect || !preview) return;
+    monthSelect.replaceChildren();
+    for (let month = 1; month <= 12; month++) {
+        const option = document.createElement('option');
+        option.value = String(month).padStart(2, '0');
+        option.textContent = new Intl.DateTimeFormat('en-PH', { month: 'long', timeZone: 'UTC' })
+            .format(new Date(Date.UTC(2001, month - 1, 1)));
+        monthSelect.appendChild(option);
+    }
+    try {
+        const settings = await AppSettings.load(supabaseClient, 'system', { refresh: true });
+        const [month, day] = String(settings.school_year_end_month_day || '03-25').split('-');
+        monthSelect.value = month;
+        populateRolloverDays();
+        daySelect.value = day;
+        const selectedYear = document.getElementById('rolloverSchoolYear')?.value;
+        if (selectedYear) {
+            const { error } = await supabaseClient.rpc('preview_student_id_rollover', {
+                p_school_year_id: selectedYear
+            });
+            if (error) throw error;
+        }
+        for (const id of ['rolloverEndMonth', 'rolloverEndDay', 'saveRolloverEndDate',
+            'rolloverSchoolYear', 'previewRolloverBtn']) {
+            document.getElementById(id).disabled = false;
+        }
+        await previewRollover();
+    } catch (error) {
+        console.error('Rollover configuration unavailable:', error);
+        preview.textContent = 'Student ID rollover is unavailable until its database migration is installed.';
+    }
+}
+
+async function saveRolloverEndDate() {
+    const button = document.getElementById('saveRolloverEndDate');
+    const month = document.getElementById('rolloverEndMonth')?.value;
+    const day = document.getElementById('rolloverEndDay')?.value;
+    if (!month || !day) return;
+    button.disabled = true;
+    try {
+        await AppSettings.save(supabaseClient, 'system', {
+            school_year_end_month_day: `${month}-${day}`
+        });
+        UIFeedback.success('School Year End Date saved.');
+        await previewRollover();
+    } catch (error) {
+        console.error('Could not save rollover date:', error);
+        UIFeedback.error('Could not save the School Year End Date.');
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function previewRollover() {
+    const yearId = document.getElementById('rolloverSchoolYear')?.value;
+    const panel = document.getElementById('rolloverPreview');
+    const runButton = document.getElementById('runRolloverBtn');
+    const reissueButton = document.getElementById('reissueRolloverQrBtn');
+    currentRolloverPreview = null;
+    runButton.disabled = true;
+    reissueButton.disabled = true;
+    if (!yearId || !panel) return;
+    panel.textContent = 'Checking students, sections, and ID conflicts...';
+    try {
+        const { data, error } = await supabaseClient.rpc('preview_student_id_rollover', {
+            p_school_year_id: yearId
+        });
+        if (error) throw error;
+        currentRolloverPreview = data;
+        panel.dataset.ready = String(!!data.can_run);
+        const header = document.createElement('strong');
+        header.textContent = `${data.school_year} · eligible after ${data.eligible_after} (Manila)`;
+        const list = document.createElement('ul');
+        const lines = [
+            `Eligible students: ${data.ready}`,
+            `Invalid IDs: ${data.invalid}; unverified or conflicting student grades: ${data.grade_mismatch || 0}; target conflicts: ${data.collisions}`,
+            `Grade 10 skipped: ${data.highest_grade}; inactive skipped: ${data.inactive}`,
+            'Current student grade and Student ID advance together. Existing section assignments are preserved.',
+            ...Object.entries(data.grade_progression || {}).map(([grade, count]) => `${grade}: ${count}`),
+            data.last_completed_rollover
+                ? `Last completed rollover: ${data.last_completed_rollover.school_year} on ${new Date(data.last_completed_rollover.executed_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}`
+                : 'Last completed rollover: None',
+            data.next_scheduled_rollover
+                ? `Next scheduled rollover: ${data.next_scheduled_rollover.school_year} on ${data.next_scheduled_rollover.due_date} at 12:05 AM Manila time`
+                : 'Next scheduled rollover: Waiting for a following school year to be created',
+            data.already_processed ? 'Already completed for this school year.'
+                : data.next_school_year_id ? (data.can_run ? 'Ready to run.' : 'Pending; the daily job will retry.')
+                    : 'No school year starting in the source year’s end year exists.'
+        ];
+        lines.forEach(line => {
+            const item = document.createElement('li');
+            item.textContent = line;
+            list.appendChild(item);
+        });
+        panel.replaceChildren(header, list);
+        if (data.completed_at) {
+            const completed = document.createElement('small');
+            completed.textContent = `Completed: ${new Date(data.completed_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}`;
+            panel.appendChild(completed);
+        }
+        if (Array.isArray(data.examples) && data.examples.length) {
+            const examples = document.createElement('small');
+            examples.textContent = `Examples: ${data.examples.map(item => `${item.current_grade} → ${item.next_grade} (${item.old} → ${item.new})`).join(', ')}`;
+            panel.appendChild(examples);
+        }
+        if (Array.isArray(data.issues) && data.issues.length) {
+            const issues = document.createElement('small');
+            issues.textContent = `Blockers: ${data.issues.map(item => `${item.id} (${item.reason})`).join(', ')}`;
+            panel.appendChild(issues);
+        }
+        runButton.disabled = !data.can_run;
+        reissueButton.disabled = !data.already_processed;
+    } catch (error) {
+        console.error('Rollover preview failed:', error);
+        panel.textContent = 'Could not load the rollover preview. Refresh and try again.';
+    }
+}
+
+async function reissueRolloverQrCodes() {
+    if (!currentRolloverPreview?.already_processed) return;
+    const yearId = document.getElementById('rolloverSchoolYear')?.value;
+    const button = document.getElementById('reissueRolloverQrBtn');
+    const status = document.getElementById('rolloverQrStatus');
+    button.disabled = true;
+    try {
+        let query = supabaseClient
+            .from('student_id_rollover_qr_queue')
+            .select('student_id')
+            .eq('school_year_id', yearId).is('qr_reissued_at', null)
+            .order('student_id').limit(25);
+        if (qrReissueCursorByYear[yearId]) query = query.gt('student_id', qrReissueCursorByYear[yearId]);
+        let { data: changes, error: changesError } = await query;
+        if (!changes?.length && qrReissueCursorByYear[yearId] && !changesError) {
+            qrReissueCursorByYear[yearId] = null;
+            ({ data: changes, error: changesError } = await supabaseClient
+                .from('student_id_rollover_qr_queue')
+                .select('student_id')
+                .eq('school_year_id', yearId).is('qr_reissued_at', null)
+                .order('student_id').limit(25));
+        }
+        if (changesError) throw changesError;
+        if (!changes?.length) {
+            status.textContent = 'All QR emails for this rollover have been sent.';
+            return;
+        }
+        if (!await UIFeedback.confirm({
+            title: 'Email Updated Student QR Codes',
+            message: `Send new UUID-based QR codes for up to ${changes.length} students now? Students without an email will remain pending.`,
+            confirmText: 'Send QR Emails', type: 'warning'
+        })) return;
+        let sent = 0;
+        let failed = 0;
+        for (const change of changes) {
+            const { data: student, error: studentError } = await supabaseClient
+                .from('students')
+                .select('student_id, stud_id, current_grade_level, first_name, middle_name, last_name, birth_date, gender, email, sections:section_id(section_name)')
+                .eq('student_id', change.student_id).maybeSingle();
+            if (studentError || !student?.email) { failed++; continue; }
+            const section = student.sections || {};
+            const response = await fetch('send-student-qr-email.php', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: student.email, studentId: student.stud_id,
+                    firstName: student.first_name, middleName: student.middle_name,
+                    lastName: student.last_name, birthDate: student.birth_date,
+                    gender: student.gender,
+                    sectionLabel: [student.current_grade_level, section.section_name].filter(Boolean).join(' - '),
+                    qrPayload: `student_uuid:${student.student_id}`
+                })
+            }).catch(() => null);
+            const result = response ? await response.json().catch(() => null) : null;
+            if (!response?.ok || result?.success !== true) {
+                failed++; continue;
+            }
+            const { data: marked, error: markError } = await supabaseClient
+                .rpc('mark_student_rollover_qr_reissued', {
+                    p_school_year_id: yearId, p_student_id: student.student_id
+                });
+            if (markError || !marked) { failed++; continue; }
+            sent++;
+            status.textContent = `QR emails sent: ${sent}; still needing attention in this batch: ${failed}.`;
+        }
+        qrReissueCursorByYear[yearId] = changes[changes.length - 1].student_id;
+        status.textContent = `QR emails sent: ${sent}; pending or failed in this batch: ${failed}. Run again to retry pending students.`;
+        if (failed) UIFeedback.toast({ type: 'warning', message: status.textContent });
+        else UIFeedback.success(status.textContent);
+    } catch (error) {
+        console.error('QR reissue failed:', error);
+        status.textContent = 'Could not finish QR reissue. Retry after checking the connection.';
+        UIFeedback.error(status.textContent);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function runRollover() {
+    if (!currentRolloverPreview?.can_run) return;
+    const yearId = document.getElementById('rolloverSchoolYear')?.value;
+    if (!await UIFeedback.confirm({
+        title: 'Run Student ID Rollover',
+        message: `Advance eligible student IDs for ${currentRolloverPreview.school_year}? This runs only once for this school year and old ID-only QR codes must be replaced.`,
+        confirmText: 'Run Rollover', type: 'danger'
+    })) return;
+    const button = document.getElementById('runRolloverBtn');
+    button.disabled = true;
+    try {
+        const { data, error } = await supabaseClient.rpc('run_student_id_rollover', {
+            p_school_year_id: yearId
+        });
+        if (error) throw error;
+        if (data.result === 'completed') UIFeedback.success(`${data.processed} student IDs advanced. Reissue their QR codes.`);
+        else UIFeedback.toast({ type: 'warning', message: 'Rollover is pending or already complete. Review the preview.' });
+        await previewRollover();
+    } catch (error) {
+        console.error('Rollover failed:', error);
+        UIFeedback.error('No students were changed. Review the preview and try again.');
+        await previewRollover();
     }
 }
 

@@ -21,6 +21,12 @@ const EMAIL_LIKE_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // STUDENT ID format: K-#### or 1-#### through 10-####
 const STUD_ID_PATTERN = /^([Kk]|[1-9]|10)-\d{1,4}$/;
 
+function currentGradeFromStudentId(studId) {
+    if (!STUD_ID_PATTERN.test(String(studId || ''))) return null;
+    const prefix = String(studId).split('-', 1)[0].toUpperCase();
+    return prefix === 'K' ? 'Kinder' : `Grade ${prefix}`;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     setupStudentBirthDateValidation();
     checkSupabaseConnection();
@@ -69,7 +75,6 @@ async function loadDepartments() {
         const { data: depts, error } = await supabaseClient
             .from('sections')
             .select('section_id, grade_level, section_name')
-            .eq('school_year_id', activeSchoolYear.id)
             .order('grade_level', { ascending: true })
             .order('section_name', { ascending: true });
 
@@ -187,8 +192,9 @@ if (deleteStudentModalElement) deleteStudentModal = new bootstrap.Modal(deleteSt
     // ── FIX: Listen for section selection to enable Parse & Preview ──
     deptSelect?.addEventListener('change', () => {
         selectedDepartmentId = deptSelect.value;
-        const selectedOption = deptSelect.options[deptSelect.selectedIndex];
-        selectedDepartmentName = selectedOption ? selectedOption.text : '';
+        const section = departmentsCache.find(s => String(s.section_id) === String(selectedDepartmentId));
+        selectedDepartmentName = section
+            ? `${gradeLevelSelect?.value || ''} - ${section.section_name}`.trim() : '';
         checkReadyToParse();
     });
 
@@ -655,6 +661,11 @@ function validateRow(row, index) {
         errors.push('Student ID is required');
     } else if (!STUD_ID_PATTERN.test(rawId)) {
         errors.push('Student ID format: K-####, 1-####, ..., 10-####');
+    } else {
+        const selectedGrade = document.getElementById('gradeLevelSelect')?.value;
+        if (selectedGrade && currentGradeFromStudentId(rawId) !== selectedGrade) {
+            errors.push('Student ID prefix must match the selected current grade');
+        }
     }
 
     if (!row.firstName) errors.push('First Name is required');
@@ -874,6 +885,7 @@ async function startImport() {
         try {
             const studentData = {
                 stud_id: row.studId,
+                current_grade_level: currentGradeFromStudentId(row.studId),
                 first_name: row.firstName,
                 middle_name: row.middleName || null,
                 last_name: row.lastName,
@@ -951,6 +963,7 @@ async function startImport() {
             }
 
             const emailResult = await sendStudentQrEmail({
+                studentUuid,
                 studId: row.studId,
                 firstName: row.firstName,
                 middleName: row.middleName,
@@ -1019,8 +1032,8 @@ async function loadAllStudentsTable() {
         const { data, error } = await supabaseClient
             .from('students')
             .select(`
-                student_id, stud_id, first_name, middle_name, last_name, suffix, birth_date, gender, section_id, status,
-                sections:section_id(grade_level, section_name),
+                student_id, stud_id, current_grade_level, first_name, middle_name, last_name, suffix, birth_date, gender, section_id, status,
+                sections:section_id(section_name),
                 student_guardians(is_primary_contact, guardians:guardian_id(first_name, last_name, relationship, phone_number, email, address))
             `)
             .order('last_name', { ascending: true })
@@ -1058,7 +1071,7 @@ function renderAllStudentsTable() {
         const matchesSearch = !search
             || fullName.includes(search)
             || String(student.stud_id || '').toLowerCase().includes(search);
-        const gradeLevel = String(student.sections?.grade_level || '').trim();
+        const gradeLevel = String(student.current_grade_level || '').trim();
         const sectionName = String(student.sections?.section_name || '').trim();
         const gender = String(student.gender || '').trim().toLowerCase();
         const matchesDept = !dept || gradeLevel === dept;
@@ -1081,7 +1094,7 @@ function renderAllStudentsTable() {
     tbody.innerHTML = filteredStudents.map((student) => {
         const nameParts = [student.first_name, student.middle_name, student.suffix].filter(Boolean);
         const fullName = student.last_name ? (student.last_name + ', ' + nameParts.join(' ')) : nameParts.join(' ');
-        const gradeLevel = student.sections?.grade_level || 'N/A';
+        const gradeLevel = student.current_grade_level || 'Verify with registrar';
         const sectionName = student.sections?.section_name || 'N/A';
         const rawStatus = student.status || 'inactive';
         const normalizedStatus = String(rawStatus).trim().toLowerCase();
@@ -1146,7 +1159,7 @@ function populateStudentsFilterOptions() {
     const selectedCourse = courseFilter.value;
     const selectedYear = yearFilter.value;
 
-    const uniqueGrades = [...new Set(allStudents.map(s => String(s.sections?.grade_level || '').trim()).filter(Boolean))]
+    const uniqueGrades = [...new Set(allStudents.map(s => String(s.current_grade_level || '').trim()).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     deptFilter.innerHTML = '<option value="">All Grade Levels</option>';
     uniqueGrades.forEach(grade => {
@@ -1426,6 +1439,7 @@ function openEditStudentModal(studId) {
 
     document.getElementById('editStudentUid').value = student.student_id || '';
     document.getElementById('editStudentId').value = student.stud_id || '';
+    document.getElementById('editGradeLevel').value = student.current_grade_level || '';
     document.getElementById('editDepartment').value = String(student.section_id || '');
     document.getElementById('editFirstName').value = student.first_name || '';
     document.getElementById('editMiddleName').value = student.middle_name || '';
@@ -1446,6 +1460,8 @@ async function submitEditStudentForm(event) {
     const saveBtn = document.getElementById('saveStudentEditBtn');
     const studentUid = String(document.getElementById('editStudentUid')?.value || '').trim();
     const studId = String(document.getElementById('editStudentId')?.value || '').trim();
+    const currentGrade = String(document.getElementById('editGradeLevel')?.value || '').trim();
+    const originalStudent = allStudents.find(s => String(s.student_id) === studentUid);
     const sectionId = String(document.getElementById('editDepartment')?.value || '').trim();
     const firstName = String(document.getElementById('editFirstName')?.value || '').trim();
     const middleName = String(document.getElementById('editMiddleName')?.value || '').trim();
@@ -1473,7 +1489,22 @@ async function submitEditStudentForm(event) {
         return;
     }
 
+    const serial = studId.split('-')[1];
+    const newStudId = currentGrade
+        ? `${currentGrade === 'Kinder' ? 'K' : currentGrade.replace('Grade ', '')}-${serial}`
+        : studId;
+    if (!STUD_ID_PATTERN.test(newStudId)) {
+        showImportAlert('Student ID is invalid. Verify the current grade and ID with the registrar.', 'warning');
+        return;
+    }
+    if (!currentGrade && originalStudent?.current_grade_level) {
+        showImportAlert('A verified current grade cannot be cleared.', 'warning');
+        return;
+    }
+
     const updatePayload = {
+        stud_id: newStudId,
+        current_grade_level: currentGrade || null,
         first_name: firstName,
         middle_name: middleName || null,
         last_name: lastName,
@@ -1614,7 +1645,7 @@ function populateGradeLevelSelects() {
 
     if (!gradeSelect || !singleGradeSelect) return;
 
-    const uniqueGrades = [...new Set(departmentsCache.map(d => d.grade_level).filter(Boolean))];
+    const uniqueGrades = ['Kinder', ...Array.from({ length: 10 }, (_, i) => `Grade ${i + 1}`)];
 
     const gradeOrder = ['Kinder', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'];
     const sortedGrades = uniqueGrades.sort((a, b) => gradeOrder.indexOf(a) - gradeOrder.indexOf(b));
@@ -1635,9 +1666,8 @@ function filterSectionsByGradeLevel(gradeLevel, sectionSelectId) {
         return;
     }
 
-    const filteredSections = departmentsCache.filter(d => d.grade_level === gradeLevel);
-    const optionsHtml = filteredSections.map(d =>
-        `<option value="${escapeHtml(d.section_id)}">${escapeHtml(d.grade_level)} - ${escapeHtml(d.section_name)}</option>`
+    const optionsHtml = departmentsCache.map(d =>
+        `<option value="${escapeHtml(d.section_id)}">${escapeHtml(d.section_name)} (section metadata: ${escapeHtml(d.grade_level)})</option>`
     ).join('');
 
     sectionSelect.innerHTML = '<option value="" disabled selected>Select section...</option>' + optionsHtml;
@@ -1670,8 +1700,7 @@ async function openSingleStudentModal() {
             d => String(d.section_id) === String(selectedDepartmentId)
         );
         if (section) {
-            singleGradeLevel.value = section.grade_level;
-            filterSectionsByGradeLevel(section.grade_level, 'singleDepartment');
+            filterSectionsByGradeLevel('select', 'singleDepartment');
             deptSelect.value = selectedDepartmentId;
         }
     }
@@ -1775,6 +1804,10 @@ function proceedToGuardianStep(e) {
     }
     if (!STUD_ID_PATTERN.test(studId)) {
         showImportAlert('Student ID format: K-####, 1-####, ..., 10-####', 'warning');
+        return;
+    }
+    if (currentGradeFromStudentId(studId) !== document.getElementById('singleGradeLevel')?.value) {
+        showImportAlert('Student ID prefix must match the selected current grade.', 'warning');
         return;
     }
     if (!email) {
@@ -1945,6 +1978,10 @@ async function submitSingleStudentForm(event) {
         showImportAlert('Student ID format: K-####, 1-####, ..., 10-####', 'warning');
         return;
     }
+    if (currentGradeFromStudentId(studId) !== document.getElementById('singleGradeLevel')?.value) {
+        showImportAlert('Student ID prefix must match the selected current grade.', 'warning');
+        return;
+    }
     const birthDateError = updateStudentBirthDateInput(document.getElementById('singleYearLevel'));
     if (birthDateError) {
         goBackToStudentStep();
@@ -2023,6 +2060,7 @@ async function submitSingleStudentForm(event) {
         const payload = {
             student_id: studentUuid,
             stud_id: studId,
+            current_grade_level: currentGradeFromStudentId(studId),
             first_name: firstName,
             middle_name: middleName || null,
             last_name: lastName,
@@ -2085,9 +2123,11 @@ async function submitSingleStudentForm(event) {
 
         if (email) {
             const selectedSection = departmentsCache.find(s => String(s.section_id) === String(sectionId));
-            const sectionLabel = selectedSection ? `${selectedSection.grade_level} - ${selectedSection.section_name}` : '';
+            const sectionLabel = selectedSection
+                ? `${currentGradeFromStudentId(studId)} - ${selectedSection.section_name}` : '';
 
             sendStudentQrEmail({
+                studentUuid,
                 studId,
                 firstName,
                 middleName,
@@ -2188,24 +2228,11 @@ function sleep(ms) {
 }
 
 function getStudentQrPayload(student) {
-    const fullName = [student.firstName, student.middleName, student.lastName]
-        .filter(Boolean)
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    const birthDate = String(student.birthDate || '').trim() || 'N/A';
-    const gender = String(student.gender || '').trim() || 'N/A';
-    const sectionLabel = String(student.sectionLabel || '').trim() || 'N/A';
-
-    return [
-        'PLP Laboratory Attendance QR',
-        `Name: ${fullName || 'N/A'}`,
-        `Student ID: ${student.studId || student.studentId || 'N/A'}`,
-        `Birth Date: ${birthDate}`,
-        `Gender: ${gender}`,
-        `Section: ${sectionLabel}`,
-    ].join('\n');
+    const uuid = String(student.studentUuid || '').trim().toLowerCase();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(uuid)) {
+        throw new Error('Student UUID is required for a rollover-safe QR code.');
+    }
+    return `student_uuid:${uuid}`;
 }
 
 async function sendStudentQrEmail(student) {
@@ -2217,6 +2244,13 @@ async function sendStudentQrEmail(student) {
         return { sent: false, message: 'email format not deliverable' };
     }
 
+    let qrPayload;
+    try {
+        qrPayload = getStudentQrPayload(student);
+    } catch (error) {
+        return { sent: false, message: error.message };
+    }
+
     const payload = {
         email,
         studentId: String(student.studId || student.studentId || '').trim(),
@@ -2226,7 +2260,7 @@ async function sendStudentQrEmail(student) {
         birthDate: student.birthDate || null,
         gender: student.gender || null,
         sectionLabel: student.sectionLabel || '',
-        qrPayload: getStudentQrPayload(student),
+        qrPayload,
     };
 
     try {

@@ -52,7 +52,7 @@ let lastScannerErrorToastAt = 0;
    INIT
 ══════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', async () => {
-    await loadGateSettings();
+    if (await loadGateSettings()) return;
     checkEngineStatus();
     setInterval(checkEngineStatus, 10000);
 
@@ -64,11 +64,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadGateSettings() {
     try {
-        const { data } = await supabaseClient.from('gate_settings').select('key,value');
-        (data || []).forEach(r => { GATE_SETTINGS[r.key] = r.value; });
-        COOLDOWN_MS = (parseInt(GATE_SETTINGS.cooldown, 10) || 10) * 1000;
+        GATE_SETTINGS = await AppSettings.load(supabaseClient, 'gate', { refresh: true });
+        if (GateScanRoute.redirectIfPreferred(GATE_SETTINGS, 'face')) return true;
+        COOLDOWN_MS = Math.min(300, Math.max(1, parseInt(GATE_SETTINGS.cooldown, 10) || 10)) * 1000;
         AUTO_EXIT   = GATE_SETTINGS.autoExit !== 'false';
-    } catch (_) { /* use defaults */ }
+    } catch (error) {
+        console.warn('Gate settings could not be loaded; using defaults:', error);
+        GATE_SETTINGS = { ...AppSettings.defaults.gate };
+    }
+    return false;
+}
+
+function manilaGateDateTime() {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(new Date());
+    const get = key => parts.find(part => part.type === key).value;
+    return { date: `${get('year')}-${get('month')}-${get('day')}`, clock: `${get('hour')}:${get('minute')}` };
+}
+
+function gateAcceptsScans() {
+    if (GATE_SETTINGS.enforceGateHours !== 'true') return true;
+    const clock = manilaGateDateTime().clock;
+    return clock >= (GATE_SETTINGS.gateOpen || '06:00') && clock < (GATE_SETTINGS.gateClose || '18:00');
 }
 
 /* ══════════════════════════════════════════════════
@@ -115,30 +134,17 @@ function setEngineStatus(online, status = null) {
    MODE SWITCH
 ══════════════════════════════════════════════════ */
 function switchMode(mode) {
-    stopScanner();
-    currentMode = mode;
-
-    document.getElementById('faceMode').style.display = mode === 'face' ? 'block' : 'none';
-    document.getElementById('qrMode').style.display   = mode === 'qr'   ? 'block' : 'none';
-    document.getElementById('tabFace').classList.toggle('active', mode === 'face');
-    document.getElementById('tabQR').classList.toggle('active',   mode === 'qr');
-    document.getElementById('resultStrip').classList.remove('show');
-
-    const pill = document.getElementById('enginePill');
-    if (pill) pill.style.display = mode === 'face' ? 'inline-flex' : 'none';
-
-    const tileMode = document.getElementById('tileMode');
-    if (tileMode) {
-        tileMode.innerHTML = mode === 'face'
-            ? '<i class="fa-solid fa-face-smile"></i> Face Recognition'
-            : '<i class="fa-solid fa-qrcode"></i> QR Code';
-    }
+    if (mode === 'qr') GateScanRoute.go('qr');
 }
 
 /* ══════════════════════════════════════════════════
    START / STOP
 ══════════════════════════════════════════════════ */
 async function startScanner() {
+    if (!gateAcceptsScans()) {
+        showToast('Gate scanner is outside its configured hours.', 'red', 4000);
+        return;
+    }
     if (currentMode === 'face' && !engineOnline) {
         const started = await startAttendanceEngine();
         if (!started) return;
@@ -386,11 +392,11 @@ async function startFaceMode() {
                             stud_id: data.stud_id,
                             grade_level: data.grade,
                             section_name: data.section
-                        }, data.log_type, false);
+                        }, data.log_type, !!data.is_late);
                     } else {
                         showResultEmployee(data.name, data.emp_no, data.department, data.log_type, false);
                     }
-                    flashStatus('faceStatus', data.log_type, false, data.name, data.role !== 'student');
+                    flashStatus('faceStatus', data.log_type, !!data.is_late, data.name, data.role !== 'student');
                     break;
                 }
 
@@ -447,7 +453,7 @@ async function startFaceMode() {
 ══════════════════════════════════════════════════ */
 async function logEmployeeEntry(data) {
     try {
-        const today   = new Date().toLocaleDateString('en-CA');
+        const today   = manilaGateDateTime().date;
         const isLate  = await checkIfLate();
 
         // Parse name from greeting: "HELLO John Midname Doe" → "John Midname Doe"
@@ -516,7 +522,7 @@ async function logEmployeeEntry(data) {
 ══════════════════════════════════════════════════ */
 async function logStudentGateEntry(data) {
     try {
-        const today  = new Date().toLocaleDateString('en-CA');
+        const today  = manilaGateDateTime().date;
         const isLate = await checkIfLate();
 
         // Resolve student UUID from stud_id (display ID like "2024-00001")
@@ -602,26 +608,7 @@ async function handleSpoofDetected(data) {
    QR MODE
 ══════════════════════════════════════════════════ */
 function startQRMode() {
-    setStatus('qrStatus', 'scanning', '<i class="fa-solid fa-spinner fa-spin"></i> Starting QR scanner...');
-
-    qrScanner = new Html5Qrcode('qrReader');
-    qrScanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 240, height: 240 } },
-        async (decodedText) => {
-            if (isInCooldown(decodedText)) return;
-            setCooldown(decodedText);
-            await logEntryByStudId(decodedText.trim(), 'qr');
-        },
-        () => {}
-    ).then(() => {
-        setStatus('qrStatus', 'scanning',
-            '<i class="fa-solid fa-qrcode"></i> Point camera at student QR code...');
-    }).catch(e => {
-        setStatus('qrStatus', 'error',
-            `<i class="fa-solid fa-triangle-exclamation"></i> Camera error: ${e}`);
-        stopScanner();
-    });
+    GateScanRoute.go('qr');
 }
 
 /* ══════════════════════════════════════════════════
@@ -629,10 +616,11 @@ function startQRMode() {
    Only students have QR codes (generated by Superadmin)
 ══════════════════════════════════════════════════ */
 async function logEntryByStudId(studId, method) {
+    if (!gateAcceptsScans()) return showToast('Gate scanner is outside its configured hours.', 'red', 4000);
     try {
         const { data: rows, error } = await supabaseClient
             .from('students')
-            .select('student_id, stud_id, first_name, last_name, section_id, sections ( grade_level, section_name )')
+            .select('student_id, stud_id, current_grade_level, first_name, last_name, section_id, sections ( section_name )')
             .eq('stud_id', studId)
             .limit(1);
 
@@ -645,7 +633,7 @@ async function logEntryByStudId(studId, method) {
         }
 
         const student = rows[0];
-        const today   = new Date().toLocaleDateString('en-CA');
+        const today   = manilaGateDateTime().date;
         const logType = await determineLogType(student.student_id, today);
         const isLate  = await checkIfLate();
 
@@ -664,7 +652,7 @@ async function logEntryByStudId(studId, method) {
         const displayMeta = {
             name:         `${student.last_name}, ${student.first_name}`,
             stud_id:      student.stud_id,
-            grade_level:  student.sections?.grade_level || '—',
+            grade_level:  student.current_grade_level || '—',
             section_name: student.sections?.section_name || '—'
         };
         showResultStudent(displayMeta, logType, isLate);
@@ -729,20 +717,10 @@ async function submitManualAccess() {
     button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
 
     try {
-        const { data, error: queryError } = await supabaseClient
-            .from('admins')
-            .select('admin_id, admin_level, status')
-            .eq('email', email)
-            .eq('password', password)
-            .eq('status', 'active')
-            .maybeSingle();
-
-        if (queryError) throw queryError;
+        const data = await verifyAdminCredentials(email, password);
         if (!data) throw new Error('Invalid administrator credentials.');
 
-        sessionStorage.setItem('manual_access_granted', 'true');
-        sessionStorage.setItem('manual_access_role', data.admin_level || 'admin');
-        window.location.href = '../../TimeInAndTimeOutMonitoring/students/manualAttendance.html';
+        GateScanRoute.go('qr');
     } catch (err) {
         console.error('[entryExitScanner] manual access verification failed:', err);
         errorText.textContent = err.message || 'Unable to verify credentials.';
@@ -774,7 +752,7 @@ async function previewManualLookup() {
         const section = result.sections || {};
         box.className = 'manual-lookup-result found-student';
         box.innerHTML = `<strong><i class="fa-solid fa-user-graduate"></i> ${result.last_name}, ${result.first_name}</strong>
-                         <span>Student · ${result.stud_id} · ${section.grade_level || '—'} — ${section.section_name || '—'}</span>`;
+                         <span>Student · ${result.stud_id} · ${result.current_grade_level || '—'} — ${section.section_name || '—'}</span>`;
     } else {
         box.className = 'manual-lookup-result found-employee';
         box.innerHTML = `<strong><i class="fa-solid fa-user-tie"></i> ${result.last_name}, ${result.first_name}</strong>
@@ -808,7 +786,7 @@ async function resolveIdInput(val) {
     try {
         const { data: sRows } = await supabaseClient
             .from('students')
-            .select('student_id, stud_id, first_name, middle_name, last_name, section_id, sections ( grade_level, section_name )')
+            .select('student_id, stud_id, current_grade_level, first_name, middle_name, last_name, section_id, sections ( section_name )')
             .eq('stud_id', val)
             .limit(1);
         if (sRows && sRows.length > 0) return { type: 'student', ...sRows[0] };
@@ -834,8 +812,9 @@ async function resolveIdInput(val) {
 }
 
 async function manualLogStudent(student) {
+    if (!gateAcceptsScans()) return showToast('Gate scanner is outside its configured hours.', 'red', 4000);
     try {
-        const today   = new Date().toLocaleDateString('en-CA');
+        const today   = manilaGateDateTime().date;
         const logType = await determineLogType(student.student_id, today);
         const isLate  = await checkIfLate();
 
@@ -853,7 +832,7 @@ async function manualLogStudent(student) {
         const meta = {
             name:         `${student.last_name}, ${student.first_name}`,
             stud_id:      student.stud_id,
-            grade_level:  student.sections?.grade_level || '—',
+            grade_level:  student.current_grade_level || '—',
             section_name: student.sections?.section_name || '—'
         };
         showResultStudent(meta, logType, isLate);
@@ -866,8 +845,9 @@ async function manualLogStudent(student) {
 }
 
 async function manualLogEmployee(emp) {
+    if (!gateAcceptsScans()) return showToast('Gate scanner is outside its configured hours.', 'red', 4000);
     try {
-        const today   = new Date().toLocaleDateString('en-CA');
+        const today   = manilaGateDateTime().date;
         const logType = await determineLogTypeEmployee(emp.employee_id, today);
         const isLate  = await checkIfLate();
 
@@ -999,7 +979,7 @@ function showResultStudent(meta, logType, isLate) {
 
     document.getElementById('resultName').textContent = meta.name || '—';
     document.getElementById('resultMeta').textContent =
-        `${meta.stud_id || '—'} · Grade ${meta.grade_level || '—'} — ${meta.section_name || '—'}`;
+        `${meta.stud_id || '—'} · ${meta.grade_level || 'Grade unavailable'} — ${meta.section_name || '—'}`;
 
     const typeBadge = logType === 'entry'
         ? '<span class="rbadge rbadge-entry"><i class="fa-solid fa-door-open"></i> Entry</span>'
@@ -1012,7 +992,7 @@ function showResultStudent(meta, logType, isLate) {
     document.getElementById('resultStrip').classList.add('show');
     showGateResultOverlay(
         meta.name,
-        `${meta.stud_id || '—'} · Grade ${meta.grade_level || '—'} — ${meta.section_name || '—'}`,
+        `${meta.stud_id || '—'} · ${meta.grade_level || 'Grade unavailable'} — ${meta.section_name || '—'}`,
         typeBadge + lateBadge + roleBadge,
         false
     );

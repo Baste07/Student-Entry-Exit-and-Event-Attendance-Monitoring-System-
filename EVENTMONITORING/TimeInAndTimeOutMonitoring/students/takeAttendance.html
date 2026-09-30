@@ -548,6 +548,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../../config/.env.js"></script>
 <script src="../../config/config.js"></script>
+<script src="../../shared/admin-credential-check.js"></script>
 
 <script src="../../shared/ui-feedback.js"></script>
 <script src="../resc/js/takeAttendance.js"></script>
@@ -590,14 +591,8 @@ async function submitCredentials() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
 
     try {
-        // Check admins table first
-        const { data: adminData } = await supabaseClient
-            .from('admins')
-            .select('admin_id, email, admin_name, admin_level')
-            .eq('email', email)
-            .eq('password', password)
-            .eq('status', 'active')
-            .maybeSingle();
+        // Admin passwords are checked by Supabase Auth, not the profile table.
+        const adminData = await verifyAdminCredentials(email, password);
 
         if (adminData) {
             sessionStorage.setItem('manual_access_granted', 'true');

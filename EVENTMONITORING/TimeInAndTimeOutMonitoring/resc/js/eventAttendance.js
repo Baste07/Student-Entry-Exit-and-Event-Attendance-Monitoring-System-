@@ -134,9 +134,9 @@ async function loadAttendanceForEvent(eventId) {
                     first_name,
                     last_name,
                     stud_id,
+                    current_grade_level,
                     section_id,
                     sections (
-                        grade_level,
                         section_name
                     )
                 )
@@ -189,13 +189,12 @@ function getFilteredRecords() {
         const student = record.students;
         const name = `${student?.first_name || ''} ${student?.last_name || ''}`.toLowerCase();
         const studentId = String(student?.stud_id || '').toLowerCase();
-        const sectionLabel = student?.sections
-            ? `${student.sections.grade_level || ''} - ${student.sections.section_name || ''}`.trim()
-            : '';
+        const sectionLabel = [student?.current_grade_level, student?.sections?.section_name]
+            .filter(Boolean).join(' - ');
 
         return (!query || `${name} ${studentId} ${sectionLabel}`.includes(query))
             && (!status || getAttendanceStatus(record) === status)
-            && (!section || sectionLabel === section);
+            && (!section || String(student?.section_id || '') === section);
     });
 }
 
@@ -226,9 +225,8 @@ function renderTable(rows) {
         const student = r.students;
         const name = student ? `${student.first_name || ''} ${student.last_name || ''}`.trim() : 'Unknown';
         const studId = student ? student.stud_id : '—';
-        const sectionInfo = student?.sections 
-            ? `${student.sections.grade_level || ''} - ${student.sections.section_name || ''}` 
-            : '—';
+        const sectionInfo = [student?.current_grade_level, student?.sections?.section_name]
+            .filter(Boolean).join(' - ') || '—';
         const lateMinutes = getLateMinutes(r);
 
         // Determine status based on time_in
@@ -263,15 +261,14 @@ function populateSectionFilter() {
     const sectionFilter = document.getElementById('sectionFilter');
     if (!sectionFilter) return;
 
-    const sections = [...new Set(currentRecords
-        .map(record => record.students?.sections)
-        .filter(Boolean)
-        .map(section => `${section.grade_level || ''} - ${section.section_name || ''}`.trim())
-        .filter(Boolean))]
-        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const sections = [...new Map(currentRecords
+        .map(record => record.students)
+        .filter(student => student?.section_id && student?.sections?.section_name)
+        .map(student => [String(student.section_id), student.sections.section_name])).entries()]
+        .sort((a, b) => a[1].localeCompare(b[1]));
 
     sectionFilter.innerHTML = '<option value="">All Sections</option>' +
-        sections.map(section => `<option value="${escHtml(section)}">${escHtml(section)}</option>`).join('');
+        sections.map(([id, name]) => `<option value="${escHtml(id)}">${escHtml(name)}</option>`).join('');
 }
 
 function formatTime(t) {
@@ -324,9 +321,8 @@ function getReportRows() {
     return getFilteredRecords().map(record => {
         const student = record.students;
         const name = student ? `${student.first_name || ''} ${student.last_name || ''}`.trim() : 'Unknown';
-        const section = student?.sections
-            ? `${student.sections.grade_level || ''} - ${student.sections.section_name || ''}`.trim()
-            : '—';
+        const section = [student?.current_grade_level, student?.sections?.section_name]
+            .filter(Boolean).join(' - ') || '—';
         const lateMinutes = getLateMinutes(record);
 
         return {

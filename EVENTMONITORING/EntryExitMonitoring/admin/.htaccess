@@ -1,0 +1,3 @@
+<Files "settings.html">
+    Header always set Cache-Control "no-store, max-age=0"
+</Files>

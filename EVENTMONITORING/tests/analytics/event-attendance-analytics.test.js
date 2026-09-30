@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
     normalizeAnalytics, summarizeAnalytics, trendPoints, lateInfo, percentage
-} = require('../resc/js/eventAttendanceTrends.js');
+} = require('../../TimeInAndTimeOutMonitoring/resc/js/eventAttendanceTrends.js');
 
 const events = [
     { event_id: 'first', event_name: 'Science Fair', event_date: '2026-09-04', time_start: '08:00:00', status: 'completed' },
@@ -18,7 +18,7 @@ function participant(eventId, studentId, grade = 'Grade 7', sectionId = 'seven-a
         event_id: eventId, student_id: studentId,
         students: {
             student_id: studentId, stud_id: studentId, first_name: studentId,
-            section_id: sectionId,
+            section_id: sectionId, current_grade_level: grade,
             sections: { section_id: sectionId, grade_level: grade, section_name: sectionId }
         }
     };
@@ -61,6 +61,22 @@ test('duplicate roster and attendance rows count once per student and event', ()
     assert.equal(view.totals.missingTimeOut, 1);
     assert.equal(view.details.missing.length, 1);
     assert.ok(Math.abs(view.totals.attendanceRate - 200 / 3) < 1e-10);
+});
+
+test('advanced display ID keeps event attendance linked by UUID and original section', () => {
+    const row = participant('first', 'permanent-uuid', 'Grade 1', 'persistent-section-a');
+    row.students.stud_id = '2-0001';
+    row.students.current_grade_level = 'Grade 2';
+    const scans = [checkIn('first', 'permanent-uuid', '2026-09-04T00:00:00Z')];
+    const normalized = normalizeAnalytics(events.slice(0, 1), [row], scans);
+    const view = summarizeAnalytics(events.slice(0, 1), normalized);
+    assert.equal(view.totals.expected, 1);
+    assert.equal(view.totals.attended, 1);
+    assert.equal(normalized.records[0].student.stud_id, '2-0001');
+    assert.equal(normalized.records[0].student.section_id, 'persistent-section-a');
+    assert.equal(normalized.records[0].section.grade, 'Grade 2');
+    assert.equal(normalizeAnalytics(events.slice(0, 1), [row], scans, { grade: 'Grade 2' }).records.length, 1);
+    assert.equal(normalizeAnalytics(events.slice(0, 1), [row], scans, { grade: 'Grade 1' }).records.length, 0);
 });
 
 test('the existing 15-minute grace period separates on-time and late scans', () => {
@@ -146,8 +162,8 @@ test('a time-out without a valid time-in does not imply attendance', () => {
 });
 
 test('dashboard script references existing filter, metric, chart, and table elements', () => {
-    const script = fs.readFileSync(path.join(__dirname, '../resc/js/eventAttendanceTrends.js'), 'utf8');
-    const page = fs.readFileSync(path.join(__dirname, '../admin/eventAttendanceTrends.html'), 'utf8');
+    const script = fs.readFileSync(path.join(__dirname, '../../TimeInAndTimeOutMonitoring/resc/js/eventAttendanceTrends.js'), 'utf8');
+    const page = fs.readFileSync(path.join(__dirname, '../../TimeInAndTimeOutMonitoring/admin/eventAttendanceTrends.html'), 'utf8');
     const ids = [...script.matchAll(/(?:field|value|setText)\('([^']+)'/g)].map(match => match[1]);
     const missing = [...new Set(ids)].filter(id => !page.includes(`id="${id}"`));
     assert.deepEqual(missing, []);
@@ -155,9 +171,9 @@ test('dashboard script references existing filter, metric, chart, and table elem
 });
 
 test('dashboard markup and local assets use the current version', () => {
-    const pageFile = path.join(__dirname, '../admin/eventAttendanceTrends.html');
+    const pageFile = path.join(__dirname, '../../TimeInAndTimeOutMonitoring/admin/eventAttendanceTrends.html');
     const page = fs.readFileSync(pageFile, 'utf8');
-    const script = fs.readFileSync(path.join(__dirname, '../resc/js/eventAttendanceTrends.js'), 'utf8');
+    const script = fs.readFileSync(path.join(__dirname, '../../TimeInAndTimeOutMonitoring/resc/js/eventAttendanceTrends.js'), 'utf8');
     const version = page.match(/data-event-analytics-version="([^"]+)"/)?.[1];
     assert.ok(version);
     assert.ok(script.includes(`ANALYTICS_PAGE_VERSION = '${version}'`));

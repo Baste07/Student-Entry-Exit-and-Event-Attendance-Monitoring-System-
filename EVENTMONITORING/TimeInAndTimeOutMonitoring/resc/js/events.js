@@ -146,8 +146,7 @@ async function loadGradeLevels() {
         if (error) throw error;
 
         allSectionsData = data || [];
-        const grades = [...new Set(allSectionsData.map(s => s.grade_level).filter(Boolean))];
-        if (grades.length === 0) grades.push('Grade 11', 'Grade 12');
+        const grades = ['Kinder', ...Array.from({ length: 10 }, (_, i) => `Grade ${i + 1}`)];
 
         renderGradeOptions(grades);
         renderSectionOptions([]);
@@ -382,24 +381,17 @@ document.getElementById('eventForm').addEventListener('submit', async function (
     }
     // ── 3. Grade/Section mode: query all matching active students ──
     else if (participantMode === 'grade') {
-        // Build the list of section_ids that match the selected grades + sections
-   const matchingSectionIds = allSectionsData
-    .filter(s => {
-        const gradeMatch  = selectedGrades.size === 0  || selectedGrades.has(s.grade_level);
-        const sectionMatch = selectedSections.size === 0 || selectedSections.has(s.section_name);
-        return gradeMatch && sectionMatch;
-    })
-    .map(s => s.section_id)
-    .filter(id => id);   // <-- strips any undefined / null
-
-
-        if (matchingSectionIds.length > 0) {
-            const { data: matchedStudents, error: studentErr } = await supabaseClient
-                .from('students')
+        const sectionIds = allSectionsData
+            .filter(s => selectedSections.has(s.section_name))
+            .map(s => s.section_id)
+            .filter(Boolean);
+        if (selectedSections.size === 0 || sectionIds.length > 0) {
+            let query = supabaseClient.from('students')
                 .select('student_id')
-                .in('section_id', matchingSectionIds)
+                .in('current_grade_level', Array.from(selectedGrades))
                 .eq('status', 'active');
-
+            if (selectedSections.size > 0) query = query.in('section_id', sectionIds);
+            const { data: matchedStudents, error: studentErr } = await query;
             if (studentErr) throw studentErr;
             matchedStudents?.forEach(s => studentIdsToInsert.add(s.student_id));
         }
@@ -467,7 +459,7 @@ function openAddModal() {
 
     selectedGrades.clear();
     selectedSections.clear();
-    const grades = [...new Set(allSectionsData.map(s => s.grade_level).filter(Boolean))];
+    const grades = ['Kinder', ...Array.from({ length: 10 }, (_, i) => `Grade ${i + 1}`)];
     renderGradeOptions(grades);
     renderSectionOptions([]);
     
@@ -524,7 +516,7 @@ async function editEvent(id) {
             if (trimmed) selectedGrades.add(trimmed);
         });
     }
-    const grades = [...new Set(allSectionsData.map(s => s.grade_level).filter(Boolean))];
+    const grades = ['Kinder', ...Array.from({ length: 10 }, (_, i) => `Grade ${i + 1}`)];
     renderGradeOptions(grades);
     document.querySelectorAll('#gradeOptionsList .multi-select-option').forEach(opt => {
         if (selectedGrades.has(opt.dataset.value)) {
@@ -741,7 +733,6 @@ function updateSectionTrigger() {
 function updateSectionOptions() {
     const availableSections = [...new Set(
         allSectionsData
-            .filter(s => selectedGrades.size === 0 || selectedGrades.has(s.grade_level))
             .map(s => s.section_name)
             .filter(Boolean)
     )].sort();
@@ -807,13 +798,13 @@ async function loadStudentsForModal() {
     try {
         const { data, error } = await supabaseClient
             .from('students')
-            .select('student_id, first_name, middle_name, last_name, stud_id, section_id, sections(grade_level, section_name)')
+            .select('student_id, first_name, middle_name, last_name, stud_id, current_grade_level, section_id, sections(section_name)')
             .eq('status', 'active');
 
         if (error) {
             const fb = await supabaseClient
                 .from('students')
-                .select('student_id, first_name, middle_name, last_name, stud_id, section_id')
+                .select('student_id, first_name, middle_name, last_name, stud_id, current_grade_level, section_id')
                 .eq('status', 'active');
             if (fb.error) throw fb.error;
             modalAvailableStudents = (fb.data || []).map(s => ({ ...s, sections: null }));
@@ -825,7 +816,7 @@ async function loadStudentsForModal() {
 
         if (gradeFilter) {
             modalAvailableStudents = modalAvailableStudents.filter(s =>
-                s.sections?.grade_level === gradeFilter
+                s.current_grade_level === gradeFilter
             );
         }
         if (sectionFilter) {
@@ -859,7 +850,7 @@ function renderModalStudentList() {
     }
     container.innerHTML = modalAvailableStudents.map(s => {
         const isSelected = modalSelectedStudentIds.has(s.student_id);
-        const info = s.sections ? `(${s.sections.grade_level} ${s.sections.section_name || ''})` : '';
+        const info = `(${s.current_grade_level || 'Grade unavailable'} ${s.sections?.section_name || ''})`;
         return `
         <div class="student-item ${isSelected ? 'selected' : ''}" onclick="toggleModalStudentSelection('${s.student_id}')">
             <div class="student-checkbox">
@@ -938,7 +929,7 @@ async function addAllStudents() {
     try {
         const { data, error } = await supabaseClient
             .from('students')
-            .select('student_id, first_name, middle_name, last_name, stud_id, sections(grade_level, section_name)')
+            .select('student_id, first_name, middle_name, last_name, stud_id, current_grade_level, sections(section_name)')
             .eq('status', 'active');
 
         if (error) throw error;
@@ -964,7 +955,7 @@ async function preloadStudentNames(ids) {
     try {
         const { data, error } = await supabaseClient
             .from('students')
-            .select('student_id, first_name, middle_name, last_name, stud_id, sections(grade_level, section_name)')
+            .select('student_id, first_name, middle_name, last_name, stud_id, current_grade_level, sections(section_name)')
             .in('student_id', ids);
         if (error) throw error;
         (data || []).forEach(s => studentCache.set(s.student_id, s));
