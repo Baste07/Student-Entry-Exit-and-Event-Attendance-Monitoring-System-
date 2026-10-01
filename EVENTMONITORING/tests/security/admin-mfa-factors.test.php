@@ -24,7 +24,7 @@ function mfaTransport(array &$state): callable
     return static function (string $verb, string $path, ?array $body = null,
         ?string $token = null) use (&$state): array {
         if ($verb === 'GET' && $path === '/auth/v1/user') {
-            return in_array($token, [mfaBearer(), mfaBearer('aal1')], true)
+            return in_array($token, [substr(mfaBearer(), 7), substr(mfaBearer('aal1'), 7)], true)
                 ? ['status' => 200, 'data' => ['id' => MFA_ACTOR]]
                 : ['status' => 401, 'data' => []];
         }
@@ -84,8 +84,9 @@ foreach ([
     ['actor_status' => 'suspended'],
 ] as $overrides) {
     $state = mfaFixture($overrides);
-    mfaCheck(mfaRequest($state)['status'] === 403 && $state['deletions'] === 0,
-        'Non-Super or suspended account must not reset factors.');
+    $result = mfaRequest($state);
+    mfaCheck($result['status'] === 403 && $state['deletions'] === 0,
+        'Non-Super or suspended account must not reset factors (status ' . $result['status'] . ').');
 }
 $state = mfaFixture();
 mfaCheck(mfaRequest($state, 'reset', mfaBearer('aal1'))['status'] === 403
