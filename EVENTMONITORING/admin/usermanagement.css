@@ -27,6 +27,30 @@
 /* User Management Page Styles */
 /* Inherits base styles from admin-specific.css */
 
+.btn-success {
+    --bs-btn-bg: var(--blue-btn);
+    --bs-btn-border-color: var(--blue-btn);
+    --bs-btn-hover-bg: var(--blue-hover);
+    --bs-btn-hover-border-color: var(--blue-hover);
+    --bs-btn-active-bg: var(--blue-active);
+    --bs-btn-active-border-color: var(--blue-active);
+}
+
+#totalAdminsCount { color: var(--blue-dark) !important; }
+#superAdminCount { color: var(--blue-btn) !important; }
+#regularAdminCount { color: var(--blue-active) !important; }
+
+.btn-reset-mfa {
+    font-size: 0;
+}
+
+.btn-reset-mfa::before {
+    content: '\f3ed';
+    font-family: 'Font Awesome 6 Free';
+    font-size: 14px;
+    font-weight: 900;
+}
+
 .btn-delete-admin:disabled {
     opacity: 0.45;
     cursor: wait;
