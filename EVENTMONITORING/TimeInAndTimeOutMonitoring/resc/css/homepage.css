@@ -620,6 +620,9 @@ nav a.active {
 @media (max-width: 680px) {
     header {
         padding: 0 20px;
+        min-height: 68px;
+        height: auto;
+        padding-block: 8px;
         flex-wrap: wrap;
         row-gap: 8px;
     }
@@ -643,13 +646,17 @@ nav a.active {
     nav {
         flex: 1 1 100%;
         min-width: 0;
-        overflow-x: auto;
+        overflow-x: visible;
         padding-bottom: 2px;
     }
 
     nav a {
         min-height: 44px;
         flex: 0 0 auto;
+    }
+
+    nav a:last-child {
+        margin-left: 0 !important;
     }
 }
 

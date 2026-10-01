@@ -238,7 +238,20 @@ header {
         gap: 10px;
         position: relative;
     }
+    .top-left-logos img { width: 34px; height: 34px; }
 
+    .header-time {
+        position: static;
+        transform: none;
+        order: 3;
+        width: 100%;
+        flex-direction: row;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .header-time .time-display { font-size: 20px; }
+}
 
 @media (min-width: 901px) and (max-width: 1279px) {
     header {
@@ -298,18 +311,4 @@ header {
     .main-content {
         margin-top: 116px;
     }
-}
-    .top-left-logos img { width: 34px; height: 34px; }
-
-    .header-time {
-        position: static;
-        transform: none;
-        order: 3;
-        width: 100%;
-        flex-direction: row;
-        gap: 10px;
-        align-items: center;
-    }
-
-    .header-time .time-display { font-size: 20px; }
 }
