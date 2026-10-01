@@ -1,45 +1,4 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const AUTH_DISABLED = false;
-    const DEFAULT_ADMIN_PASSWORD = 'Admin123!';
-    const DEFAULT_SUPER_ADMIN_PASSWORD = 'SuperAdmin123!';
-    const HARDCODED_USERS = [
-        {
-            usernames: ['superadmin', 'super admin', 'superadmin@plpasig.edu.ph'],
-            password: DEFAULT_SUPER_ADMIN_PASSWORD,
-            profile: {
-                id: 'hc-super-admin',
-                employeeId: 'SA-001',
-                firstName: 'System',
-                lastName: 'Super Admin',
-                email: 'superadmin@plpasig.edu.ph',
-                role: 'super_admin',
-                userType: 'admin',
-                adminLevel: 'super_admin',
-                department: 'College of Computer Studies',
-                departmentCode: 'CCS',
-                departmentLogo: '../auth/assets/ccslogo.png'
-            },
-            redirect: '../portal/portal.html'
-        },
-        {
-            usernames: ['admin', 'admin@plpasig.edu.ph'],
-            password: DEFAULT_ADMIN_PASSWORD,
-            profile: {
-                id: 'hc-admin',
-                employeeId: 'AD-001',
-                firstName: 'System',
-                lastName: 'Admin',
-                email: 'admin@plpasig.edu.ph',
-                role: 'admin',
-                userType: 'admin',
-                adminLevel: 'admin',
-                department: 'College of Computer Studies',
-                departmentCode: 'CCS',
-                departmentLogo: '../auth/assets/ccslogo.png'
-            },
-            redirect: '../portal/portal.html'
-        }
-    ];
 
     const form          = document.querySelector('form');
     const usernameInput = document.getElementById('username');
@@ -65,13 +24,6 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (AUTH_DISABLED) {
-            submitBtn.disabled    = true;
-            submitBtn.textContent = 'Entering...';
-            await bypassLogin(username, password);
-            return;
-        }
-
         if (username.includes('@')) {
             if (!username.toLowerCase().endsWith('@plpasig.edu.ph')) {
                 showError('Only emails with @plpasig.edu.ph domain are allowed to login.');
@@ -91,53 +43,6 @@ document.addEventListener('DOMContentLoaded', function () {
             submitBtn.textContent = 'Sign In';
         }
     });
-
-    async function bypassLogin(username, password) {
-        const normalizedUsername = String(username || '').trim().toLowerCase();
-        const match = HARDCODED_USERS.find(user => {
-            return user.usernames.includes(normalizedUsername) && user.password === password;
-        });
-
-        if (!match) {
-            showError('Invalid credentials. Use admin or superadmin with the default password.');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Sign In';
-            return;
-        }
-
-        const authReady = await ensureSupabaseAuthSession(match.profile.email, password);
-        if (!authReady) {
-            showError('Could not establish a secure database session. Please try again.');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Sign In';
-            return;
-        }
-
-        const devUser = {
-            id:             match.profile.id,
-            studentId:      null,
-            employeeId:     match.profile.employeeId,
-            firstName:      match.profile.firstName,
-            middleName:     null,
-            lastName:       match.profile.lastName,
-            email:          match.profile.email,
-            course:         null,
-            year_level:     null,
-            section:        null,
-            role:           match.profile.role,
-            userType:       match.profile.userType,
-            adminLevel:     match.profile.adminLevel,
-            departmentId:   null,
-            department:     match.profile.department,
-            departmentCode: match.profile.departmentCode,
-            departmentLogo: match.profile.departmentLogo,
-            authDisabled:   true,
-            loginTime:      new Date().toISOString(),
-        };
-
-        sessionStorage.setItem('user', JSON.stringify(devUser));
-        window.location.href = match.redirect;
-    }
 
     function showError(message) {
         const icon = document.getElementById('alert-icon');
@@ -323,32 +228,6 @@ async function writeLoginAudit(userObj, tableName) {
     }
 }
 
-async function ensureSupabaseAuthSession(email, password) {
-    const { error: signInError } = await supabaseClient.auth.signInWithPassword({ email, password });
-
-    if (!signInError) {
-        console.log('[Auth] ✓ Supabase Auth session established for:', email);
-        return true;
-    }
-
-    console.warn('[Auth] Sign-in failed, attempting sign-up:', signInError.message);
-    const { error: signUpError } = await supabaseClient.auth.signUp({ email, password });
-
-    if (signUpError) {
-        console.warn('[Auth] Sign-up also failed:', signUpError.message);
-        return false;
-    }
-
-    const { error: retryError } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (retryError) {
-        console.warn('[Auth] Sign-in after sign-up failed:', retryError.message);
-        return false;
-    }
-
-    console.log('[Auth] ✓ Supabase Auth session created and established for:', email);
-    return true;
-}
-
 async function loginUser(username, password) {
     console.log('[loginUser] FUNCTION CALLED - username:', username);
 
@@ -380,38 +259,23 @@ async function loginUser(username, password) {
     if (adminError) throw adminError;
 
     if (!adminData) {
+        await supabaseClient.auth.signOut();
         throw new Error('Admin profile not found in database.');
     }
     
     if (adminData.status !== 'active') {
+        await supabaseClient.auth.signOut();
         throw new Error('Your account is not active. Please contact the administrator.');
     }
-
-    // 3. Save session data
-    const userObj = {
-        id:             adminData.admin_id,
-        employeeId:     adminData.employee_id  || null,
-        firstName:      null,
-        lastName:       adminData.admin_name,
-        email:          adminData.email,
-        role:           adminData.admin_level || 'admin',
-        userType:       'admin',
-        adminLevel:     adminData.admin_level || 'admin',
-        departmentId:   adminData.department_id || null,
-        department:     adminData.department    || null,
-        loginTime:      new Date().toISOString(),
-    };
-
-    sessionStorage.setItem('user', JSON.stringify(userObj));
-    console.log('[loginUser] ✓ User saved to sessionStorage:', userObj);
-
-    // 4. Handle audit logging and redirection
-    writeLoginAudit(userObj, 'admins').catch(err => {
-        console.error('[AuditLog] Failed to write login audit:', err);
-    });
-
-    console.log('[loginUser] Redirecting... admin_level=', adminData.admin_level);
-    window.location.href = '../portal/portal.html';
+    const { data: assurance, error: assuranceError } =
+        await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (assuranceError) throw assuranceError;
+    if (assurance.currentLevel === 'aal2') {
+        await AdminMFA.completeLogin(adminData);
+    } else {
+        // Password authentication alone does not create an application session.
+        window.location.replace('mfa.html');
+    }
 }
 
 async function fetchDepartmentInfoAsync(departmentId) {

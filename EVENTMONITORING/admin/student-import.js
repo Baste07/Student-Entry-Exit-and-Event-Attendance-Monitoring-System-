@@ -2264,7 +2264,7 @@ async function sendStudentQrEmail(student) {
     };
 
     try {
-        const response = await fetch(QR_EMAIL_ENDPOINT, {
+        const response = await adminAal2Fetch(QR_EMAIL_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

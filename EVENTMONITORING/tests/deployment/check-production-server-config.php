@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 // Preflight only. Never print the key or make a network request.
 require_once __DIR__ . '/../../config/supabase-server.php';
 $config = loadServerSupabaseConfig();

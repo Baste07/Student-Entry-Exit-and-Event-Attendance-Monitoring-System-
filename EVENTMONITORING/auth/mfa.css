@@ -1,0 +1,12 @@
+.mfa-card { max-width: 470px; width: 100%; }
+.mfa-card[aria-busy="true"] { cursor: wait; }
+.mfa-steps { padding-left: 1.4rem; line-height: 1.55; margin: 1rem 0; }
+.mfa-qr { display: flex; justify-content: center; margin: 1rem 0; }
+.mfa-qr img { background: white; border: 1px solid #d5e4ee; border-radius: 10px; padding: 10px; width: min(220px, 100%); height: auto; }
+.mfa-key-toggle { background: none; border: none; color: #07558a; font-weight: 600; padding: .4rem 0; text-decoration: underline; }
+#setupKeyWrap { background: #f1f7fb; border-radius: 8px; padding: .8rem; overflow-wrap: anywhere; }
+#setupKeyWrap code { color: #153e5a; font-size: 1rem; }
+#setupKeyWrap p { margin: .4rem 0 0; }
+.mfa-code { letter-spacing: .35em; font-size: 1.2rem; text-align: center; }
+.mfa-error { color: #b42318; margin: .6rem 0; }
+.mfa-back { display: inline-block; margin-top: 1rem; }

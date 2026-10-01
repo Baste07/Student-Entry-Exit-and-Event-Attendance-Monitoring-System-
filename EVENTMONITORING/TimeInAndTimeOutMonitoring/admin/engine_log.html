@@ -1043,7 +1043,7 @@
       try {
         const form = new URLSearchParams();
         form.append('timestamp', ts);
-        const res = await fetch('../students/delete_engine_log.php', { method: 'POST', body: form });
+        const res = await adminAal2Fetch('../students/delete_engine_log.php', { method: 'POST', body: form });
         const data = await res.json();
         if (data.ok) {
           loadLogs();
@@ -1079,7 +1079,7 @@
         if (!await UIFeedback.confirm({ title: 'Delete all engine logs?', message: 'This will clear the engine log file.', confirmText: 'Delete all logs', type: 'danger' })) return;
         const form = new URLSearchParams();
         form.append('all', '1');
-        const res = await fetch('../students/delete_engine_log.php', { method: 'POST', body: form });
+        const res = await adminAal2Fetch('../students/delete_engine_log.php', { method: 'POST', body: form });
         const data = await res.json();
         if (data.ok) {
           loadLogs();

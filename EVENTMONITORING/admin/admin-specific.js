@@ -24,6 +24,12 @@ function startAdminIdleTimeout() {
 }
 
 function checkAdminSession() {
+    if (window.adminMfaRouteReady && !window.adminMfaRouteComplete) {
+        window.adminMfaRouteReady.then(allowed => {
+            if (allowed) startAdminIdleTimeout();
+        });
+        return false;
+    }
     const user = sessionStorage.getItem('user');
     if (!user) {
         window.location.href = '../auth/login.html';
@@ -45,6 +51,10 @@ function requireAdminNavigation() {
 }
 
 function requireAdmin() {
+    if (window.adminMfaRouteReady && !window.adminMfaRouteComplete) {
+        window.adminMfaRouteReady.then(allowed => { if (allowed) requireAdmin(); });
+        return false;
+    }
     if (!requireAdminNavigation()) return false;
 
     const userStr = sessionStorage.getItem('user');
@@ -63,6 +73,10 @@ function requireAdmin() {
 }
 
 function requireSuperAdmin() {
+    if (window.adminMfaRouteReady && !window.adminMfaRouteComplete) {
+        window.adminMfaRouteReady.then(allowed => { if (allowed) requireSuperAdmin(); });
+        return false;
+    }
     if (!requireAdminNavigation()) return false;
 
     const userStr = sessionStorage.getItem('user');

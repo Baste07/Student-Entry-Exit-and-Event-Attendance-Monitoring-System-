@@ -3,6 +3,25 @@ declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
 
+require_once __DIR__ . '/../../admin/admin-mfa-auth.php';
+
+// Face attendance calls this route from the local Python service. Its private
+// machine token is never sent to the browser; browser sends require Admin AAL2.
+$localToken = trim((string) getenv('LOCAL_SERVICE_TOKEN'));
+if ($localToken === '' && is_file(__DIR__ . '/.env')) {
+    foreach (file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+        if (preg_match('/^\s*LOCAL_SERVICE_TOKEN\s*=\s*(.*?)\s*$/', $line, $match)) {
+            $localToken = trim($match[1], " \t\n\r\0\x0B\"'");
+            break;
+        }
+    }
+}
+$providedToken = (string) ($_SERVER['HTTP_X_LOCAL_SERVICE_TOKEN'] ?? '');
+$loopback = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
+$internal = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && $loopback && $localToken !== ''
+    && $providedToken !== '' && hash_equals($localToken, $providedToken);
+if (!$internal) enforceAdminAal2Http(['POST']);
+
 // ── ADJUST THIS PATH if mail_config.php lives somewhere else relative to this file ──
 require_once __DIR__ . '/mail_config.php';
 

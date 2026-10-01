@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+if (isset($_SERVER['SCRIPT_FILENAME'])
+    && realpath((string) $_SERVER['SCRIPT_FILENAME']) === __FILE__) {
+    http_response_code(404);
+    exit;
+}
+
 // Server-side only. Never return these settings to the browser.
 function loadServerSupabaseConfig(): array
 {

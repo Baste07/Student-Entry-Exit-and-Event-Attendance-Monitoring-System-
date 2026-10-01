@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
 
+require_once __DIR__ . '/admin-mfa-auth.php';
+enforceAdminAal2Http(['POST']);
+
 // mail_config.php lives at:
 //   CAPSTONEFINAL/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/mail_config.php
 // This file lives at:

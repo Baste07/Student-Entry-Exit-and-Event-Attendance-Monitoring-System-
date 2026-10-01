@@ -382,7 +382,7 @@ async function reissueRolloverQrCodes() {
                 .eq('student_id', change.student_id).maybeSingle();
             if (studentError || !student?.email) { failed++; continue; }
             const section = student.sections || {};
-            const response = await fetch('send-student-qr-email.php', {
+            const response = await adminAal2Fetch('send-student-qr-email.php', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     email: student.email, studentId: student.stud_id,
