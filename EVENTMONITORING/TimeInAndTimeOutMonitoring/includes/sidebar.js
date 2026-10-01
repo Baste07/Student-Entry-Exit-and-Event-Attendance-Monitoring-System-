@@ -67,6 +67,7 @@ async function loadHeader() {
         const res  = await fetch(`${INCLUDES_PATH}header.html`);
         const html = await res.text();
         container.innerHTML = html;
+        window.AppDeployment?.applyNavigation(container);
 
         // Start the Manila clock once the header DOM exists
         _startClock();
@@ -124,6 +125,7 @@ async function loadSidebar(activePage = '') {
         const res  = await fetch(`${INCLUDES_PATH}sidebar.html`);
         const html = await res.text();
         container.innerHTML = html;
+        window.AppDeployment?.applyNavigation(container);
 
         // Mark the active link
         if (activePage) {

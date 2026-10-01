@@ -69,7 +69,12 @@ function adminEndpointAuthorization(string $method, array $allowedMethods, bool 
         $config ??= loadServerSupabaseConfig();
         return serverSupabaseRequest($config, $verb, $path, $body, $token);
     };
-    return verifiedAdminBearer($authorization ?? adminBearerHeader(), $request, $superOnly);
+    try {
+        return verifiedAdminBearer($authorization ?? adminBearerHeader(), $request, $superOnly);
+    } catch (Throwable $error) {
+        error_log('Admin authorization service unavailable.');
+        return ['status' => 503, 'message' => 'Account verification is temporarily unavailable.', 'actor' => null];
+    }
 }
 
 function enforceAdminAal2Http(array $allowedMethods, bool $superOnly = false): array

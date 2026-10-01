@@ -70,8 +70,7 @@
         } finally {
             sessionStorage.clear();
             localStorage.clear();
-            window.location.href =
-                '/CAPSTONEFINAL/EVENTMONITORING/auth/login.html';
+            window.location.href = new URL('auth/login.html', window.AppDeployment.root).href;
         }
     }
 

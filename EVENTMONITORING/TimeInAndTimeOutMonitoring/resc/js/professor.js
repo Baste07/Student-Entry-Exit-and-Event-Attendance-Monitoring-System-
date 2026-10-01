@@ -671,6 +671,7 @@ async function searchProfessor() {
 }
 
 function redirectToProfFaceReg() {
+    if (window.AppDeployment?.isWeb) return;
     const empId = document.getElementById('profIdSearch').value.trim();
     window.top.location.href = '../students/accountRegistration.html?role=professor&employee_id=' + encodeURIComponent(empId);
 }

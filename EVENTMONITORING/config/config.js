@@ -3,6 +3,32 @@ const SUPABASE_CONFIG = {
     anonKey: typeof ENV !== 'undefined' ? ENV.SUPABASE_ANON_KEY : ''
 };
 
+// Set DEPLOYMENT_MODE in the ignored config/.env.js on each installation.
+// This controls navigation only; Supabase RLS and PHP enforce authorization.
+const DEPLOYMENT_MODE = typeof ENV !== 'undefined' && ENV.DEPLOYMENT_MODE === 'WEB'
+    ? 'WEB' : 'LOCAL_GATE';
+const APP_ROOT = typeof document !== 'undefined' && document.currentScript
+    ? new URL('../', document.currentScript.src) : null;
+if (typeof window !== 'undefined') window.AppDeployment = {
+    mode: DEPLOYMENT_MODE,
+    isWeb: DEPLOYMENT_MODE === 'WEB',
+    isLocalGate: DEPLOYMENT_MODE === 'LOCAL_GATE',
+    root: APP_ROOT,
+    applyNavigation(scope = document) {
+        if (DEPLOYMENT_MODE !== 'WEB') return;
+        scope.querySelectorAll('[data-local-operation]').forEach(element => { element.hidden = true; });
+    }
+};
+if (typeof document !== 'undefined') {
+    if (document.documentElement.dataset) document.documentElement.dataset.deploymentMode = DEPLOYMENT_MODE;
+    if (DEPLOYMENT_MODE === 'WEB' && document.head) {
+        const style = document.createElement('style');
+        style.textContent = '[data-local-operation] { display: none !important; }';
+        document.head.appendChild(style);
+    }
+    document.addEventListener?.('DOMContentLoaded', () => window.AppDeployment.applyNavigation());
+}
+
 if (!SUPABASE_CONFIG.projectUrl || !SUPABASE_CONFIG.anonKey) {
     console.error('⚠️ Supabase configuration is missing!');
     console.error('Please create config/.env.js from .env.example.js and add your credentials.');
@@ -35,7 +61,7 @@ async function adminAal2Fetch(url, options = {}) {
 // the same AAL2 rule against direct API calls. The login/MFA pages stay open so
 // existing administrators can enroll after their password-only sign-in.
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const appRoot = new URL('../', document.currentScript.src);
+    const appRoot = APP_ROOT;
     const relativePath = decodeURIComponent(window.location.pathname.slice(appRoot.pathname.length));
     const protectedPage = window.location.pathname.startsWith(appRoot.pathname) &&
         (relativePath.startsWith('admin/') || relativePath.startsWith('portal/') ||

@@ -346,6 +346,7 @@ function openFaceRegModal(studId) {
 }
 
 function redirectToFaceReg() {
+    if (window.AppDeployment?.isWeb) return;
     const sid = document.getElementById('registerFaceBtn').dataset.studentId;
     // Adjust path to match where your face registration page lives
     window.top.location.href =

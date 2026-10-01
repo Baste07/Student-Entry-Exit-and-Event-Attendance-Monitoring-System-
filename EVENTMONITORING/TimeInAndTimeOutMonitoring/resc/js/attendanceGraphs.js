@@ -950,7 +950,7 @@ async function loadAttendanceData() {
     } catch (error) {
         console.error('Error fetching attendance graphs:', error);
         const host = window.location.hostname || '';
-        if (host.includes('localhost') || host === '127.0.0.1') {
+        if (!window.AppDeployment?.isWeb && (host.includes('localhost') || host === '127.0.0.1')) {
             const today = new Date();
             const yyyy = today.getFullYear();
             const mm = String(today.getMonth() + 1).padStart(2, '0');
