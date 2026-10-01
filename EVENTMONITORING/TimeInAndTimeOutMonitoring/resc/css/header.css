@@ -5,6 +5,7 @@
 ============================================================ */
 
 :root {
+    --header-h:    68px;
     --blue-dark:   #0b4e78;
     --blue-mid:    #176aa4;
     --blue-bright: #2f8fce;
@@ -20,7 +21,7 @@ header {
     top: 0;
     left: 0;
     right: 0;
-    height: 68px;
+    height: var(--header-h);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -254,8 +255,12 @@ header {
 }
 
 @media (min-width: 901px) and (max-width: 1279px) {
+    :root {
+        --header-h: 116px;
+    }
+
     header {
-        height: 116px;
+        height: var(--header-h);
         padding: 10px 20px;
         flex-wrap: wrap;
         align-content: center;
@@ -301,6 +306,10 @@ header {
         flex-direction: row;
         justify-content: center;
         gap: 8px;
+        padding: 6px 12px;
+        border: 1px solid rgba(255,255,255,.16);
+        border-radius: 999px;
+        background: rgba(255,255,255,.08);
     }
 
     .header-time .time-display {
@@ -309,6 +318,6 @@ header {
     }
 
     .main-content {
-        margin-top: 116px;
+        margin-top: var(--header-h);
     }
 }

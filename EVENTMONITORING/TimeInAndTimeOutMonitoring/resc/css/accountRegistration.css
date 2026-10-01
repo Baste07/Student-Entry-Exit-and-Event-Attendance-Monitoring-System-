@@ -331,3 +331,54 @@ nav a.active {
     background: var(--yellow);
     font-weight: 700;
 }
+
+@media (max-width: 900px) {
+    header {
+        height: auto;
+        min-height: 68px;
+        padding: 12px 20px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .brand,
+    .brand-text,
+    nav {
+        min-width: 0;
+    }
+
+    .brand {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+
+    .brand-text h1,
+    .brand-text .sys-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    nav {
+        flex: 1 1 100%;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px;
+        overflow: visible;
+    }
+
+    nav > a,
+    nav > button {
+        min-height: 44px;
+        flex: 1 1 auto;
+        justify-content: center;
+        text-align: center;
+    }
+
+    nav > button {
+        padding: 7px 10px !important;
+        border-radius: 7px !important;
+        font-family: 'DM Sans', sans-serif !important;
+        font-size: 13.5px !important;
+    }
+}

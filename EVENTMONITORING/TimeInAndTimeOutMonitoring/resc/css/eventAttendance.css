@@ -40,8 +40,8 @@ body {
 /* ── Layout ─────────────────────────────────────────────── */
 .main-content {
     margin-left: var(--sidebar-collapsed, 64px);
-    margin-top: 68px;
-    min-height: calc(100vh - 68px);
+    margin-top: var(--header-h, 68px);
+    min-height: calc(100vh - var(--header-h, 68px));
     transition: margin-left 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 .main-content.sidebar-open { margin-left: var(--sidebar-expanded, 240px); }
