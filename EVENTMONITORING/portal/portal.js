@@ -41,6 +41,7 @@ function logoutUser() {
 
 document.addEventListener('DOMContentLoaded', async function () {
     console.log('=== DOMContentLoaded fired ===');
+    if (window.adminMfaRouteReady && !await window.adminMfaRouteReady) return;
     checkUserSession();
     await loadSystemFeatures();
     loadDepartmentLogoAndInfo();

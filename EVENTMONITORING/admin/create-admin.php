@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/supabase-server.php';
+require_once __DIR__ . '/admin-mfa-auth.php';
 
 function createAdminResponse(int $status, string $message, bool $success = false): array
 {
@@ -35,21 +36,9 @@ function handleCreateAdminRequest(string $method, string $authorization, string 
     }
 
     try {
-        $identity = $request('GET', '/auth/v1/user', null, $token);
-        $callerId = $identity['data']['id'] ?? null;
-        if ($identity['status'] !== 200 || !is_string($callerId)
-            || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $callerId)) {
-            return createAdminResponse(401, 'Your session has expired. Please sign in again.');
-        }
-        $actor = $request('GET', '/rest/v1/admins?admin_id=eq.' . strtolower($callerId)
-            . '&select=admin_id,admin_level,status&limit=1');
-        if ($actor['status'] !== 200 || !is_array($actor['data'])) {
-            return createAdminResponse(502, 'Could not verify your admin permissions.');
-        }
-        $profile = $actor['data'][0] ?? null;
-        if (!$profile || ($profile['admin_level'] ?? '') !== 'super_admin'
-            || ($profile['status'] ?? '') !== 'active') {
-            return createAdminResponse(403, 'Only active Super Admins can create admin accounts.');
+        $authorizationResult = verifiedAdminBearer($authorization, $request);
+        if ($authorizationResult['status'] !== 200) {
+            return createAdminResponse($authorizationResult['status'], $authorizationResult['message']);
         }
 
         $existing = $request('GET', '/rest/v1/admins?email=eq.' . rawurlencode($email)
@@ -94,7 +83,7 @@ function handleCreateAdminRequest(string $method, string $authorization, string 
             }
             return createAdminResponse(502, 'The admin profile could not be created. Please try again.');
         }
-        return createAdminResponse(201, 'Administrator created successfully.', true);
+        return createAdminResponse(201, 'Administrator created. Google Authenticator setup will be required at first login.', true);
     } catch (Throwable $error) {
         return createAdminResponse(503, 'The account service is unavailable. Please try again.');
     }

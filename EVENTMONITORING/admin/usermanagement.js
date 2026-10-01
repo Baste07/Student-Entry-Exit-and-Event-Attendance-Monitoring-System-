@@ -2,9 +2,12 @@ let allAdmins = [];
 let currentUser = null;
 let isUserSuperAdmin = false;
 let adminModal = null;
+let adminEmailModal = null;
 const pendingAdminDeletions = new Set();
 const pendingAdminStatusChanges = new Set();
 let savingAdmin = false;
+let savingAdminEmail = false;
+let mfaLoadVersion = 0;
 
 function initializeUserSession() {
     const userStr = sessionStorage.getItem('user');
@@ -30,8 +33,54 @@ function renderAdminsSkeleton() {
             <td><span class="skeleton-block skeleton-line"></span></td>
             <td><span class="skeleton-block skeleton-line"></span></td>
             <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
         </tr>
     `).join('');
+}
+
+async function mfaAdminRequest(action, adminId) {
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error || !data?.session?.access_token) throw new Error('Please sign in again.');
+    const response = await fetch('admin-mfa-factors.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+            'Authorization': `Bearer ${data.session.access_token}` },
+        body: JSON.stringify({ action, adminId })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result?.message || 'Authenticator service unavailable.');
+    return result;
+}
+
+async function loadAdminMfaStatuses() {
+    if (!isUserSuperAdmin) return;
+    const version = ++mfaLoadVersion;
+    await Promise.all(allAdmins.map(async admin => {
+        try {
+            const status = await mfaAdminRequest('status', admin.id);
+            if (version === mfaLoadVersion) admin.mfaEnabled = status.enabled === true;
+        } catch (_) {
+            if (version === mfaLoadVersion) admin.mfaEnabled = 'unavailable';
+        }
+    }));
+    if (version === mfaLoadVersion) applyFilters();
+}
+
+async function resetAdminMfa(adminId) {
+    const admin = allAdmins.find(item => item.id === adminId);
+    if (!admin || !isUserSuperAdmin || adminId === currentUser?.id || admin.mfaEnabled !== true) return;
+    if (!await UIFeedback.confirm({
+        title: 'Reset Administrator Authenticator',
+        message: `Remove ${admin.name}'s authenticator? Their current sessions will be downgraded and they must enroll a new authenticator at next login.`,
+        confirmText: 'Reset MFA', type: 'danger'
+    })) return;
+    try {
+        const result = await mfaAdminRequest('reset', adminId);
+        UIFeedback.success(result.message, 'Authenticator reset');
+        await loadAdminMfaStatuses();
+    } catch (error) {
+        UIFeedback.error(error.message, 'Reset failed');
+    }
 }
 
 async function loadAdmins() {
@@ -57,6 +106,7 @@ async function loadAdmins() {
             faculty: admin.faculty || 'N/A',
             level: admin.admin_level || 'admin',
             status: normalizeStatus(admin.status, 'active'),
+            mfaEnabled: null,
             created_at: admin.created_at,
             rawData: admin
         }));
@@ -64,6 +114,7 @@ async function loadAdmins() {
         applyFilters();
         updateStatistics();
         applyRoleBasedRestrictions();
+        await loadAdminMfaStatuses();
 
     } catch (error) {
         console.error('Error loading admins:', error);
@@ -98,7 +149,7 @@ function displayAdmins(admins) {
     if (admins.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                <td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted);">
                     No admins found
                 </td>
             </tr>
@@ -133,6 +184,14 @@ function displayAdmins(admins) {
                     <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </button>
             `);
+
+            if (isUserSuperAdmin) {
+                buttons.push(`
+                    <button type="button" class="btn-icon btn-change-admin-email" title="Change Email" aria-label="Change email for ${escapeHtml(admin.name)}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 6 10 7 10-7"/></svg>
+                    </button>
+                `);
+            }
             
             if (admin.status === 'suspended') {
                 buttons.push(`
@@ -149,6 +208,9 @@ function displayAdmins(admins) {
             }
             
             if (isUserSuperAdmin && currentUser?.id && admin.id !== currentUser.id) {
+                if (admin.mfaEnabled === true) {
+                    buttons.push(`<button type="button" class="btn-icon btn-reset-mfa" title="Reset MFA" aria-label="Reset MFA for ${escapeHtml(admin.name)}">🔐</button>`);
+                }
                 buttons.push(`
                     <button type="button" class="btn-icon danger btn-delete-admin" title="Delete Admin" aria-label="Delete Admin"
                         ${pendingAdminDeletions.has(admin.id) ? 'disabled' : ''}>
@@ -166,12 +228,82 @@ function displayAdmins(admins) {
             <td>${escapeHtml(admin.faculty)}</td>
             <td><span class="badge ${levelBadgeClass}">${levelText}</span></td>
             <td><span class="badge ${statusBadgeClass}">${statusText}</span></td>
+            <td>${admin.mfaEnabled === true ? 'Enabled' : admin.mfaEnabled === false ? 'Setup Required' : admin.mfaEnabled === 'unavailable' ? 'Unavailable' : 'Checking…'}</td>
             <td>${actionButtonsHtml}</td>
         `;
 
         row.querySelector('.btn-delete-admin')?.addEventListener('click', () => deleteAdmin(admin.id));
+        row.querySelector('.btn-reset-mfa')?.addEventListener('click', () => resetAdminMfa(admin.id));
+        row.querySelector('.btn-change-admin-email')?.addEventListener('click', () => openAdminEmailModal(admin.id));
         tbody.appendChild(row);
     });
+}
+
+function openAdminEmailModal(adminId) {
+    if (!isUserSuperAdmin || !adminEmailModal) return;
+    const admin = allAdmins.find(item => item.id === adminId);
+    if (!admin) return;
+    const form = document.getElementById('adminEmailForm');
+    form.reset();
+    UIFeedback.clearFormErrors(form);
+    document.getElementById('emailAdminId').value = admin.id;
+    document.getElementById('oldAdminEmail').value = admin.email;
+    adminEmailModal.show();
+}
+
+async function submitAdminEmailForm(event) {
+    event.preventDefault();
+    if (savingAdminEmail || !isUserSuperAdmin) return;
+    const form = event.currentTarget;
+    UIFeedback.clearFormErrors(form);
+    const adminId = document.getElementById('emailAdminId').value;
+    const emailField = document.getElementById('newAdminEmail');
+    const email = emailField.value.trim().toLowerCase();
+    const admin = allAdmins.find(item => item.id === adminId);
+    if (!admin || !emailField.checkValidity()) {
+        UIFeedback.fieldError(emailField, 'Enter a valid email address.');
+        return;
+    }
+    if (email === admin.email.toLowerCase()) {
+        UIFeedback.fieldError(emailField, 'Enter a different email address.');
+        return;
+    }
+    if (!document.getElementById('confirmAdminEmail').checked) {
+        UIFeedback.fieldError(document.getElementById('confirmAdminEmail'), 'Verify the address before confirming it.');
+        return;
+    }
+    if (!await UIFeedback.confirm({
+        title: 'Confirm Email Change',
+        message: `Change ${admin.name}'s sign-in email from ${admin.email} to ${email}? The new address will be confirmed immediately. Their password, authenticator, and account ID will stay the same.`,
+        confirmText: 'Change Email', type: 'warning'
+    })) return;
+
+    savingAdminEmail = true;
+    const button = document.getElementById('changeAdminEmailBtn');
+    button.disabled = true;
+    try {
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error || !data?.session?.access_token) throw new Error('Please sign in again.');
+        const response = await fetch('update-admin-email.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${data.session.access_token}` },
+            body: JSON.stringify({ adminId, email, confirmEmail: true })
+        });
+        const result = await response.json();
+        if (!response.ok || result?.success !== true) {
+            if (result?.changed) await loadAdmins();
+            throw new Error(result?.message || 'The email could not be changed.');
+        }
+        adminEmailModal.hide();
+        await loadAdmins();
+        UIFeedback.success(result.message, 'Email changed');
+    } catch (error) {
+        UIFeedback.error(error.message, 'Email change failed');
+    } finally {
+        savingAdminEmail = false;
+        button.disabled = false;
+    }
 }
 
 function normalizeStatus(status, fallback = 'active') {
@@ -503,7 +635,7 @@ async function submitAdminForm(e) {
             if (!response.ok || result?.success !== true) {
                 throw new Error(result?.message || 'The administrator could not be created.');
             }
-            savedMessage = 'Administrator created successfully.';
+            savedMessage = 'Administrator created. Google Authenticator setup will be required at first login.';
         }
         
         if (adminModal) adminModal.hide();
@@ -531,13 +663,16 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, m => map[m]);
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', async function () {
+    if (window.adminMfaRouteReady && !await window.adminMfaRouteReady) return;
     checkSupabaseConnection();
     initializeUserSession();
     
     if (window.bootstrap) {
         const modalEl = document.getElementById('adminModal');
         if (modalEl) adminModal = new bootstrap.Modal(modalEl);
+        const emailModalEl = document.getElementById('adminEmailModal');
+        if (emailModalEl) adminEmailModal = new bootstrap.Modal(emailModalEl);
     }
     
     loadAdmins();
@@ -546,4 +681,5 @@ document.addEventListener('DOMContentLoaded', function () {
     setupAddUserButton();
     
     document.getElementById('adminForm')?.addEventListener('submit', submitAdminForm);
+    document.getElementById('adminEmailForm')?.addEventListener('submit', submitAdminEmailForm);
 });

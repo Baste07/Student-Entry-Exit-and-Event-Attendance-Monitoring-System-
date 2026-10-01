@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/supabase-server.php';
+require_once __DIR__ . '/admin-mfa-auth.php';
 
 function deleteAdminResponse(int $status, string $message, bool $success = false): array
 {
@@ -27,24 +28,11 @@ function handleDeleteAdminRequest(string $method, string $authorization, string 
     $profileDeleted = false;
 
     try {
-        // Authenticate with Supabase itself; sessionStorage and posted roles are untrusted.
-        $identity = $request('GET', '/auth/v1/user', null, $token);
-        if ($identity['status'] !== 200 || !is_string($identity['data']['id'] ?? null)) {
-            return deleteAdminResponse(401, 'Your session has expired. Please sign in again.');
+        $authorizationResult = verifiedAdminBearer($authorization, $request);
+        if ($authorizationResult['status'] !== 200) {
+            return deleteAdminResponse($authorizationResult['status'], $authorizationResult['message']);
         }
-        $callerId = strtolower($identity['data']['id']);
-        if (!preg_match('/^[0-9a-f-]{36}$/', $callerId)) {
-            return deleteAdminResponse(401, 'Your session is invalid. Please sign in again.');
-        }
-
-        $caller = $request('GET', '/rest/v1/admins?admin_id=eq.' . $callerId . '&select=admin_id,admin_level,status&limit=1');
-        if ($caller['status'] !== 200 || !is_array($caller['data'])) {
-            return deleteAdminResponse(502, 'Could not verify your admin permissions. Please try again.');
-        }
-        $actor = $caller['data'][0] ?? null;
-        if (!$actor || ($actor['admin_level'] ?? '') !== 'super_admin' || ($actor['status'] ?? '') !== 'active') {
-            return deleteAdminResponse(403, 'Only active Super Admins can delete admin accounts.');
-        }
+        $callerId = strtolower($authorizationResult['actor']['admin_id']);
         if ($callerId === $adminId) {
             return deleteAdminResponse(403, 'You cannot delete your own account.');
         }
@@ -62,6 +50,14 @@ function handleDeleteAdminRequest(string $method, string $authorization, string 
         // deleted while this profile exists. Remove the profile first; an
         // orphaned Auth user cannot pass the application's admin login check.
         $savedProfile = $target['data'][0];
+        if (($savedProfile['admin_level'] ?? '') === 'super_admin'
+            && ($savedProfile['status'] ?? '') === 'active') {
+            $actorHasFactor = hasVerifiedTotpFactor($callerId, $request);
+            if ($actorHasFactor !== true) {
+                return deleteAdminResponse($actorHasFactor === null ? 502 : 409,
+                    'Another active Super Admin with a verified authenticator is required.');
+            }
+        }
         $removed = $request('DELETE', $profilePath);
         if ($removed['status'] < 200 || $removed['status'] >= 300) {
             return deleteAdminResponse(409, 'The admin profile has linked records. Reassign them, then retry deleting this admin.');

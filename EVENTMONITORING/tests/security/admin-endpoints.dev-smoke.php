@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 // Isolated development-project smoke test. Never run against production.
 require_once __DIR__ . '/../../admin/create-admin.php';
 require_once __DIR__ . '/../../admin/delete-admin.php';

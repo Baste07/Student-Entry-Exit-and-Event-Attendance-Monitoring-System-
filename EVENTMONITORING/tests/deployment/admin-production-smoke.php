@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 // Explicitly guarded production smoke test. Creates only synthetic admin accounts
 // and removes them in finally. Never print passwords, service keys, or JWTs.
 require_once __DIR__ . '/../../admin/create-admin.php';

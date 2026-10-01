@@ -1,10 +1,21 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 require_once __DIR__ . '/../../admin/delete-admin.php';
 
 const CALLER_ID = '11111111-1111-4111-8111-111111111111';
 const TARGET_ID = '22222222-2222-4222-8222-222222222222';
+
+function deleteJwt(string $aal = 'aal2'): string
+{
+    $claims = ['sub' => CALLER_ID, 'role' => 'authenticated', 'aal' => $aal];
+    return 'header.' . rtrim(strtr(base64_encode(json_encode($claims)), '+/', '-_'), '=') . '.signature';
+}
 
 function check(bool $condition, string $message): void
 {
@@ -29,7 +40,7 @@ function transportFor(array &$state): callable
         $state['calls']++;
         if ($method === 'GET' && $path === '/auth/v1/user') {
             check($token !== null, 'Auth verification must receive the caller bearer token.');
-            return $token === 'valid-token'
+            return in_array($token, [deleteJwt(), deleteJwt('aal1')], true)
                 ? ['status' => 200, 'data' => ['id' => CALLER_ID]]
                 : ['status' => 401, 'data' => []];
         }
@@ -77,9 +88,9 @@ function transportFor(array &$state): callable
     };
 }
 
-function deleteWith(array &$state, string $authorization = 'Bearer valid-token', string $targetId = TARGET_ID): array
+function deleteWith(array &$state, ?string $authorization = null, string $targetId = TARGET_ID): array
 {
-    return handleDeleteAdminRequest('POST', $authorization, json_encode(['adminId' => $targetId]), transportFor($state));
+    return handleDeleteAdminRequest('POST', $authorization ?? ('Bearer ' . deleteJwt()), json_encode(['adminId' => $targetId]), transportFor($state));
 }
 
 $tests = [
@@ -87,7 +98,7 @@ $tests = [
         $state = fixture();
         check(handleDeleteAdminRequest('GET', '', '', transportFor($state))['status'] === 405, 'GET must fail.');
         check(deleteWith($state, '')['status'] === 401, 'Missing bearer must fail.');
-        check(deleteWith($state, 'Bearer valid-token', 'bad-id')['status'] === 400, 'Invalid ID must fail.');
+        check(deleteWith($state, 'Bearer ' . deleteJwt(), 'bad-id')['status'] === 400, 'Invalid ID must fail.');
         check($state['calls'] === 0, 'Validation must happen before upstream requests.');
     },
     'invalid sessions, regular admins, and suspended super admins cannot delete' => static function (): void {
@@ -100,9 +111,15 @@ $tests = [
         check(deleteWith($state, 'Bearer expired-token')['status'] === 401, 'Expired bearer must fail.');
         check($state['writes'] === [], 'Expired sessions must not mutate records.');
     },
+    'password-only Super Admin cannot delete' => static function (): void {
+        $state = fixture();
+        check(deleteWith($state, 'Bearer ' . deleteJwt('aal1'))['status'] === 403,
+            'AAL1 must fail before deletion.');
+        check($state['writes'] === [], 'AAL1 must not mutate records.');
+    },
     'self-deletion is blocked on the server' => static function (): void {
         $state = fixture();
-        check(deleteWith($state, 'Bearer valid-token', CALLER_ID)['status'] === 403, 'Self-delete must fail.');
+        check(deleteWith($state, 'Bearer ' . deleteJwt(), CALLER_ID)['status'] === 403, 'Self-delete must fail.');
         check($state['writes'] === [], 'Self-delete must not mutate records.');
     },
     'missing admin profile cannot delete an unrelated Auth user' => static function (): void {

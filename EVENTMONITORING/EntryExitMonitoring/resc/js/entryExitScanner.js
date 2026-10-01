@@ -7,7 +7,7 @@ const FLASK_BASE          = 'http://127.0.0.1:5000';
 const ENGINE_STATUS_URL   = `${FLASK_BASE}/engine_status`;
 const VIDEO_FEED_URL      = `${FLASK_BASE}/video_feed`;
 const ATTENDEE_STREAM_URL = `${FLASK_BASE}/attendee_stream`;
-const ATTENDANCE_TRIGGER_URL = 'http://localhost/CAPSTONEFINAL/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/trigger_attendance.php';
+const ATTENDANCE_TRIGGER_URL = '../../TimeInAndTimeOutMonitoring/students/trigger_attendance.php';
 const OVERLAY_DISMISS_MS  = 5000; // auto-dismiss overlays after 5s
 
 /* ══════════════════════════════════════════════════
@@ -188,7 +188,7 @@ async function startAttendanceEngine() {
     setStatus('faceStatus', 'scanning', '<i class="fa-solid fa-circle-notch fa-spin"></i> Starting face engine...');
 
     try {
-        const triggerResponse = await fetch(ATTENDANCE_TRIGGER_URL, { method: 'POST' });
+        const triggerResponse = await adminAal2Fetch(ATTENDANCE_TRIGGER_URL, { method: 'POST' });
         if (!triggerResponse.ok) throw new Error('Engine start request failed.');
 
         for (let attempt = 0; attempt < 60; attempt++) {
@@ -242,7 +242,7 @@ async function stopEngine() {
 
         stopScanner();
         try {
-            await fetch(`${FLASK_BASE}/shutdown`, { method: 'POST' });
+            await adminAal2Fetch(`${FLASK_BASE}/shutdown`, { method: 'POST' });
         } catch (_) {}
 
         engineOnline = false;
@@ -264,7 +264,7 @@ async function switchCameraToEntryExit() {
         let switched = false;
         for (const base of [FLASK_BASE, 'http://127.0.0.1:5001']) {
             try {
-                const response = await fetch(`${base}/camera_control`, {
+                const response = await adminAal2Fetch(`${base}/camera_control`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ owner: 'attendance', force: true })
@@ -320,7 +320,7 @@ function stopScanner() {
      upcoming → info overlay (reminder)
 ══════════════════════════════════════════════════ */
 async function setScannerMode(mode) {
-    const response = await fetch(`${FLASK_BASE}/scanner_mode`, {
+    const response = await adminAal2Fetch(`${FLASK_BASE}/scanner_mode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode })

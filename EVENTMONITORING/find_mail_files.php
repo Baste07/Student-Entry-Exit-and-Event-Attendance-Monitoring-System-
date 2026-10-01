@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+// Diagnostics reveal server paths and are never part of the browser workflow.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 /**
  * ONE-TIME DIAGNOSTIC SCRIPT.
  * Drop this anywhere inside your XAMPP htdocs folder and open it in a browser,

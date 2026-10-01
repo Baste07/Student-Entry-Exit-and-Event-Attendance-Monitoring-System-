@@ -59,6 +59,7 @@ mp_selfie_segmentation = mp.solutions.selfie_segmentation
 
 from flask import Flask, Response, request, jsonify
 from flask_cors import CORS
+from local_admin_auth import require_admin_aal2
 from supabase import create_client, Client
 
 # 5. Disable Flask logging
@@ -76,6 +77,7 @@ ATTENDANCE_TRIGGER = os.getenv("ATTENDANCE_TRIGGER", "http://127.0.0.1:5000/trig
 ATTENDANCE_TRIGGER_TOKEN = (
     os.getenv("ATTENDANCE_TRIGGER_TOKEN")
     or os.getenv("REBUILD_SECRET")
+    or os.getenv("LOCAL_SERVICE_TOKEN")
     or ""
 ).strip()
 CAMERA_OWNER_FILE = os.path.join(script_dir, "camera_owner.json")
@@ -1119,6 +1121,7 @@ def generate_frames():
         yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
 @app.route('/start_registration', methods=['POST'])
+@require_admin_aal2
 def start_reg():
     global session
     try:
@@ -1180,6 +1183,7 @@ def status():
 
 
 @app.route('/camera_control', methods=['GET', 'POST'])
+@require_admin_aal2
 def camera_control():
     if request.method == 'GET':
         state = _read_camera_owner_state()
@@ -1220,6 +1224,7 @@ def video_feed():
 
 # ── ADDED: trigger + retrieve the pipeline diagnostic snapshot ──
 @app.route('/pipeline_snapshot', methods=['POST'])
+@require_admin_aal2
 def pipeline_snapshot():
     """Runs the full pipeline once on the current frame and saves a single
     labeled PNG collage to pipeline_snapshots/. Call this while registration
@@ -1248,6 +1253,7 @@ def pipeline_snapshot_image(filename):
 
 
 @app.route('/shutdown', methods=['POST'])
+@require_admin_aal2
 def shutdown():
     global cap, capture_running, latest_frame
     try:

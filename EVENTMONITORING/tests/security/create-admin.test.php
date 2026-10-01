@@ -1,10 +1,21 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 require_once __DIR__ . '/../../admin/create-admin.php';
 
 const CREATE_CALLER_ID = '11111111-1111-4111-8111-111111111111';
 const CREATE_NEW_ID = '22222222-2222-4222-8222-222222222222';
+
+function createJwt(string $aal = 'aal2'): string
+{
+    $claims = ['sub' => CREATE_CALLER_ID, 'role' => 'authenticated', 'aal' => $aal];
+    return 'header.' . rtrim(strtr(base64_encode(json_encode($claims)), '+/', '-_'), '=') . '.signature';
+}
 
 function requireCreate(bool $condition, string $message): void
 {
@@ -25,7 +36,7 @@ function createTransport(array &$state): callable
     return static function (string $verb, string $path, ?array $body = null, ?string $token = null) use (&$state): array {
         $state['calls'][] = [$verb, $path, $body, $token];
         if ($verb === 'GET' && $path === '/auth/v1/user') {
-            return $token === 'valid-token'
+            return in_array($token, [createJwt(), createJwt('aal1')], true)
                 ? ['status' => 200, 'data' => ['id' => CREATE_CALLER_ID]]
                 : ['status' => 401, 'data' => []];
         }
@@ -60,9 +71,9 @@ function createTransport(array &$state): callable
     };
 }
 
-function createWith(array &$state, string $level = 'admin', string $token = 'valid-token'): array
+function createWith(array &$state, string $level = 'admin', ?string $token = null): array
 {
-    return handleCreateAdminRequest('POST', 'Bearer ' . $token, json_encode([
+    return handleCreateAdminRequest('POST', 'Bearer ' . ($token ?? createJwt()), json_encode([
         'name' => 'Test Admin', 'email' => 'test@example.edu', 'faculty' => 'Science',
         'level' => $level, 'password' => 'test-password-123',
     ]), createTransport($state));
@@ -73,7 +84,7 @@ $tests = [
         $state = createFixture();
         requireCreate(handleCreateAdminRequest('GET', '', '', createTransport($state))['status'] === 405, 'GET must fail.');
         requireCreate(handleCreateAdminRequest('POST', '', '{}', createTransport($state))['status'] === 401, 'Bearer required.');
-        requireCreate(handleCreateAdminRequest('POST', 'Bearer valid-token', '{}', createTransport($state))['status'] === 400, 'Fields required.');
+        requireCreate(handleCreateAdminRequest('POST', 'Bearer ' . createJwt(), '{}', createTransport($state))['status'] === 400, 'Fields required.');
         requireCreate($state['calls'] === [], 'Validation should precede network calls.');
     },
     'normal and suspended admins cannot create accounts' => static function (): void {
@@ -82,6 +93,12 @@ $tests = [
             requireCreate(createWith($state)['status'] === 403, 'Unauthorized caller must fail.');
             requireCreate(!$state['auth_created'], 'Unauthorized caller must not create Auth users.');
         }
+    },
+    'password-only Super Admin cannot create an account' => static function (): void {
+        $state = createFixture();
+        requireCreate(createWith($state, 'admin', createJwt('aal1'))['status'] === 403,
+            'AAL1 must fail before account creation.');
+        requireCreate(!$state['auth_created'], 'AAL1 must not create Auth users.');
     },
     'super admin can create regular and super admin accounts' => static function (): void {
         foreach (['admin', 'super_admin'] as $level) {
