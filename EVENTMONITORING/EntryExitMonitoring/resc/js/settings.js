@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function openSavedGateScanner(event) {
+    if (window.AppDeployment?.isWeb) return;
     const link = event.target.closest('a.header-attendance-btn');
     if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
     event.preventDefault();

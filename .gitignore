@@ -9,6 +9,9 @@
 
 # Local test and deployment artifacts
 /.artifacts/
+/dist/
+__pycache__/
+*.pyc
 
 # Camera ownership is local runtime state
 /EVENTMONITORING/TimeInAndTimeOutMonitoring/students/camera_owner.json

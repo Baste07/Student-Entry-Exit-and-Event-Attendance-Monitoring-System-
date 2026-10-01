@@ -253,6 +253,7 @@ function openFaceRegModal(empNo) {
 }
 
 function redirectToFaceReg() {
+    if (window.AppDeployment?.isWeb) return;
     const empNo = document.getElementById('registerFaceBtn').dataset.empNo;
     // accountRegistration.html already supports role=professor&employee_id=EMP_NO
     window.top.location.href =

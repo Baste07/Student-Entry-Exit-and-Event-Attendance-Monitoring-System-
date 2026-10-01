@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', function () {
         sendResetBtn.textContent = 'Sending...';
 
         const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin + '/auth/reset-password.html'
+            redirectTo: new URL('reset-password.html', window.location.href).href
         });
 
         if (error) {
