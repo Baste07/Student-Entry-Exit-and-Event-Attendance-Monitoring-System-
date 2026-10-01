@@ -1,6 +1,7 @@
 <?php
+require_once __DIR__ . '/../../admin/admin-mfa-auth.php';
+enforceAdminAal2Http(['POST']);
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
 
 // If registration engine is already online, return immediately.
 $sock = @fsockopen('127.0.0.1', 5001, $errno, $errstr, 0.2);

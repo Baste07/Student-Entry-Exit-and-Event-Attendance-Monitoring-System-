@@ -457,7 +457,8 @@ bootEngineBtn.addEventListener('click', async () => {
     setOutput('info', 'fa-solid fa-microchip fa-spin', '<span class="spin"></span> Starting Facial Recognition Engine...');
 
     try {
-        await fetch('http://localhost/CAPSTONEFINAL/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/trigger_attendance.php', { method: 'POST' });
+        const response = await adminAal2Fetch('trigger_attendance.php', { method: 'POST' });
+        if (!response.ok) throw new Error('Engine start request was not authorized.');
 
         await waitForFlask(60, 1000); 
 
@@ -481,7 +482,7 @@ async function stopEngine() {
     isBooting = false; 
 
     try {
-        await fetch('http://127.0.0.1:5000/shutdown', { method: 'POST' });
+        await adminAal2Fetch('http://127.0.0.1:5000/shutdown', { method: 'POST' });
     } catch (_) {}
 
     if (stopEngineBtn) stopEngineBtn.style.display = 'none';
@@ -548,7 +549,7 @@ async function switchCameraOwner(targetOwner) {
 
     for (const url of endpoints) {
         try {
-            const res = await fetch(url, {
+            const res = await adminAal2Fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ owner: targetOwner, force: true })
@@ -598,7 +599,7 @@ if (switchCameraBtn) {
 // SESSION START / STOP
 // ══════════════════════════════════════════════════
 async function setScannerMode(mode) {
-    const response = await fetch('http://127.0.0.1:5000/scanner_mode', {
+    const response = await adminAal2Fetch('http://127.0.0.1:5000/scanner_mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode })

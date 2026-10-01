@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../../shared/admin-credential-check.js'), 'utf8');
 
-async function check({ authError = null, userId = 'admin-1', profile = { admin_id: 'admin-1', admin_level: 'admin', status: 'active' } } = {}) {
+async function check({ authError = null, userId = 'admin-1', aal = 'aal2', profile = { admin_id: 'admin-1', admin_level: 'admin', status: 'active' } } = {}) {
     const calls = [];
     const client = {
         auth: {
@@ -31,6 +31,15 @@ async function check({ authError = null, userId = 'admin-1', profile = { admin_i
     };
     const context = {
         SUPABASE_CONFIG: { projectUrl: 'https://example.supabase.co', anonKey: 'public-test-key' },
+        supabaseClient: {
+            auth: {
+                getUser: async () => ({ data: { user: { id: 'operator-1' } }, error: null }),
+                mfa: { getAuthenticatorAssuranceLevel: async () =>
+                    ({ data: { currentLevel: aal }, error: null }) }
+            },
+            from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () =>
+                ({ data: { admin_id: 'operator-1', status: 'active' }, error: null }) }) }) })
+        },
         supabase: { createClient(url, key, options) {
             calls.push(['createClient', url, key, options]);
             return client;
@@ -56,6 +65,10 @@ async function check({ authError = null, userId = 'admin-1', profile = { admin_i
 
     const suspended = await check({ profile: { admin_id: 'admin-1', admin_level: 'admin', status: 'suspended' } });
     assert.equal(suspended.result, null);
+
+    const passwordOnly = await check({ aal: 'aal1' });
+    assert.equal(passwordOnly.result, null);
+    assert.equal(passwordOnly.calls.length, 0);
 
     console.log('PASS: manual admin credential checks use isolated Auth and reject invalid or suspended accounts');
 })().catch(error => { console.error(error); process.exitCode = 1; });

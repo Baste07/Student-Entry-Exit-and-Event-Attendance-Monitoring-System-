@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../../admin/admin-mfa-auth.php';
+enforceAdminAal2Http(['GET', 'POST'], ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST');
 header('Content-Type: application/json; charset=utf-8');
 
 $configFile = __DIR__ . DIRECTORY_SEPARATOR . 'machine_lab_config.json';
@@ -49,7 +51,7 @@ function writeConfig(string $configFile, array $payload): array {
         'machine_name' => gethostname() ?: php_uname('n'),
     ];
 
-    if ($data['lab_id'] === '' && $data['lab_code'] === '') {
+    if (($data['lab_id'] ?? '') === '' && ($data['lab_code'] ?? '') === '') {
         respond(['success' => false, 'message' => 'Missing laboratory assignment.'], 400);
     }
 

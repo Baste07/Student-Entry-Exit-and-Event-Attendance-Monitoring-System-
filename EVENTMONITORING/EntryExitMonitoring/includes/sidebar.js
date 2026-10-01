@@ -12,8 +12,9 @@
 
 /* Every page using this loader is an admin page. Reject direct URL access
    before the page-specific scripts can initialize or query Supabase. */
-(function enforceAdminSession() {
+(async function enforceAdminSession() {
     document.documentElement.style.visibility = 'hidden';
+    if (window.adminMfaRouteReady && !await window.adminMfaRouteReady) return;
 
     const userStr = sessionStorage.getItem('user');
     const allowedRoute = sessionStorage.getItem('allowed_admin_route');

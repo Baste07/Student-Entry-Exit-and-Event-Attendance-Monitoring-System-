@@ -70,6 +70,7 @@ else:
 
 from flask import Flask, Response, request, jsonify
 from flask_cors import CORS
+from local_admin_auth import require_admin_aal2, local_service_or_admin
 from supabase import create_client, Client
 from sms_notifications import generate_attendance_sms, resolve_guardian_phone, send_sms
 from runtime_settings import RuntimeSettings
@@ -719,10 +720,14 @@ def _send_attendance_email(student_id, event_id, timestamp_iso, meta, event_row,
         return
 
     try:
+        mail_headers = {"Content-Type": "application/json"}
+        local_service_token = os.getenv("LOCAL_SERVICE_TOKEN", "")
+        if local_service_token:
+            mail_headers["X-Local-Service-Token"] = local_service_token
         req = urllib.request.Request(
             "http://localhost/CAPSTONEFINAL/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/send_event_attendance_email.php",
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers=mail_headers,
             method="POST",
         )
         response = urllib.request.urlopen(req, timeout=8)
@@ -2291,6 +2296,7 @@ def engine_status():
 
 
 @app.route('/camera_control', methods=['GET', 'POST'])
+@require_admin_aal2
 def camera_control():
     if request.method == 'GET':
         state = _read_camera_owner_state()
@@ -2328,6 +2334,7 @@ def camera_control():
 
 
 @app.route('/scanner_mode', methods=['GET', 'POST'])
+@require_admin_aal2
 def scanner_mode_control():
     global scanner_mode
 
@@ -2354,25 +2361,10 @@ def trigger_rebuild():
     POST JSON: { "force": true }  -> forces a full rebuild
     """
     global face_db_loading_started
-    # Simple auth: require a secret header
+    if not local_service_or_admin():
+        return jsonify({"success": False, "message": "Active Admin MFA session or local service token required."}), 403
     data = request.get_json(silent=True) or {}
     force = bool(data.get("force", False))
-    token = (
-        request.headers.get('X-REBUILD-TOKEN')
-        or request.headers.get('X-REBUILD-SECRET')
-        or request.args.get('token')
-        or data.get('token')
-        or ""
-    )
-    token = str(token).strip()
-    expected_secret = str(REBUILD_SECRET or "").strip()
-    if expected_secret:
-        if not token or token != expected_secret:
-            print(
-                f"Unauthorized rebuild trigger from {request.remote_addr}; "
-                f"token_len={len(token)} expected_len={len(expected_secret)}"
-            )
-            return jsonify({"success": False, "message": "Unauthorized"}), 401
 
     # Simple rate-limit: avoid too-frequent rebuilds
     now_ts = time.time()
@@ -2429,6 +2421,7 @@ def face_auto_sync_worker():
             time.sleep(max(3.0, AUTO_REBUILD_POLL_SECONDS))
 
 @app.route('/shutdown', methods=['POST'])
+@require_admin_aal2
 def shutdown():
     print("--- Shutdown request received: Cleaning up ---")
     try:

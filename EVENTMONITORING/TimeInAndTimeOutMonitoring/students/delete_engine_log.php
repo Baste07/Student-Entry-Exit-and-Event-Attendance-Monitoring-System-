@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../../admin/admin-mfa-auth.php';
+enforceAdminAal2Http(['POST']);
 header('Content-Type: application/json');
 
 $xmlPath = __DIR__ . '/engine_log.xml';

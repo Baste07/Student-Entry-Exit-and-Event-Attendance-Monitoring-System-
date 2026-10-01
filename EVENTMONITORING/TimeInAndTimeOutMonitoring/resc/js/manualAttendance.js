@@ -818,7 +818,7 @@ function sendManualAttendanceEmail(action, eventRow, student, timestampIso, extr
         ...extra,
     };
 
-    fetch('send_event_attendance_email.php', {
+    adminAal2Fetch('send_event_attendance_email.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

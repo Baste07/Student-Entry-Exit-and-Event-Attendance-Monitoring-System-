@@ -74,7 +74,7 @@ async function switchCameraOwner(targetOwner) {
 
     for (const url of endpoints) {
         try {
-            const res = await fetch(url, {
+            const res = await adminAal2Fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ owner: targetOwner, force: true })
@@ -95,7 +95,7 @@ async function fetchCameraOwnerStatus() {
     const endpoints = [`${REG_ENGINE_BASE}/camera_control`, `${ATT_ENGINE_BASE}/camera_control`];
     for (const url of endpoints) {
         try {
-            const res = await fetch(url, { method: 'GET' });
+            const res = await adminAal2Fetch(url, { method: 'GET' });
             if (!res.ok) continue;
             const data = await res.json();
             return data.owner || 'none';
@@ -341,7 +341,7 @@ studentScanBtn.addEventListener('click', async () => {
     try {
         captureStatus.innerHTML = '<i class="fa-solid fa-broom fa-spin"></i> Purging old data & preparing camera...';
         
-        const startResponse = await fetch(`${REG_ENGINE_BASE}/start_registration`, {
+        const startResponse = await adminAal2Fetch(`${REG_ENGINE_BASE}/start_registration`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -634,7 +634,7 @@ professorScanBtn.addEventListener('click', async () => {
     try {
         captureStatus.innerHTML = '<i class="fa-solid fa-broom fa-spin"></i> Purging old data & preparing camera...';
 
-        const startResponse = await fetch(`${REG_ENGINE_BASE}/start_registration`, {
+        const startResponse = await adminAal2Fetch(`${REG_ENGINE_BASE}/start_registration`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -676,7 +676,7 @@ document.getElementById('professorClearBtn').addEventListener('click', () => {
 let _rebuildTimer = null;
 async function triggerRebuild(force = false) {
     try {
-        await fetch('http://127.0.0.1:5000/trigger_rebuild', {
+        await adminAal2Fetch('http://127.0.0.1:5000/trigger_rebuild', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ force: !!force })
@@ -741,7 +741,7 @@ async function bootRegistrationEngine() {
     startBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Booting...';
 
     try {
-        const triggerRes = await fetch('trigger_registration.php', { method: 'POST' });
+        const triggerRes = await adminAal2Fetch('trigger_registration.php', { method: 'POST' });
         const triggerJson = await triggerRes.json().catch(() => ({}));
 
         if ((triggerJson.status || '') === 'running') {
@@ -769,7 +769,7 @@ async function stopEngine() {
     isBooting = false; 
 
     try {
-        await fetch(`${REG_ENGINE_BASE}/shutdown`, { method: 'POST' });
+        await adminAal2Fetch(`${REG_ENGINE_BASE}/shutdown`, { method: 'POST' });
     } catch (_) {}
 
     const startBtn = document.getElementById('startEngineNavBtn');
