@@ -53,6 +53,8 @@ body {
     padding: 32px 36px 48px;
     min-height: 100%;
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
 }
 
 hr {
@@ -135,10 +137,19 @@ hr {
 .btn.btn-clear:hover { background: var(--hover-bg); }
 
 /* ── Table ── */
-.table-container { box-shadow: none; padding: 0; background: transparent; border: none; }
+.table-container {
+    box-shadow: none;
+    padding: 0;
+    background: transparent;
+    border: none;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+}
 
 .data-table {
-    width: 100%; border-collapse: collapse; background: var(--white);
+    width: 100%; min-width: max-content; border-collapse: collapse; background: var(--white);
     border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm);
 }
 .data-table thead th {

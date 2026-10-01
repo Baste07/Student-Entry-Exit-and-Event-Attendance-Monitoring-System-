@@ -653,6 +653,23 @@ nav a.active {
     }
 }
 
+@media (max-width: 480px) {
+    nav {
+        overflow-x: visible;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 2px;
+    }
+
+    nav a {
+        flex: 1 1 auto;
+        justify-content: center;
+        padding-inline: 6px;
+        font-size: .85rem;
+        text-align: center;
+    }
+}
+
 img {
     max-width: 100%;
 }
