@@ -28,6 +28,7 @@ body {
     background: var(--body-bg);
     color: var(--text-main);
     min-height: 100vh;
+    min-height: 100dvh;
 }
 
 .topbar {
@@ -283,6 +284,7 @@ body {
     margin-top: var(--topbar-h);
     padding: 2.2rem 2rem;
     min-height: calc(100vh - var(--topbar-h));
+    min-height: calc(100dvh - var(--topbar-h));
 }
 
 .page-header {
@@ -611,6 +613,33 @@ body {
 .anim-5 { animation-delay: .33s; }
 
 @media (max-width: 900px) {
+    .topbar {
+        padding-inline: .75rem;
+        gap: .75rem;
+    }
+
+    .topbar-left,
+    .topbar-info {
+        min-width: 0;
+    }
+
+    .topbar-left {
+        flex: 1 1 auto;
+    }
+
+    .topbar-title,
+    .topbar-subtitle {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .btn-back-module,
+    .btn-logout {
+        padding-inline: .55rem;
+        gap: .35rem;
+    }
+
     .stat-cards { grid-template-columns: repeat(2, 1fr); }
     .charts-row { grid-template-columns: 1fr; }
     
@@ -643,5 +672,11 @@ body {
     
     .page-header {
         padding: 0 0.5rem;
+    }
+
+    input,
+    select,
+    textarea {
+        font-size: 16px;
     }
 }
