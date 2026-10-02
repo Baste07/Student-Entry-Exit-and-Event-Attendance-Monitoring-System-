@@ -2,11 +2,13 @@
 import { readFile, writeFile, mkdir, cp, rm, stat, readdir } from 'node:fs/promises';
 import { resolve, dirname, extname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateSupabaseBuildConfig } from './supabase-build-guard.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const source = join(root, 'EVENTMONITORING');
 const out = join(root, 'dist', 'web');
 const testConfig = process.argv.includes('--test-config');
+validateSupabaseBuildConfig(process.env, { testConfig });
 const url = testConfig ? 'https://example.invalid' : process.env.WEB_SUPABASE_URL || '';
 const key = testConfig ? 'TEST_PUBLIC_ANON_KEY' : process.env.WEB_SUPABASE_ANON_KEY || '';
 if (!/^https:\/\//.test(url) || !key) throw new Error('WEB_SUPABASE_URL and WEB_SUPABASE_ANON_KEY are required');
