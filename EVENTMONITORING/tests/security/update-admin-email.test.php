@@ -108,6 +108,20 @@ function emailChange(array &$state, ?string $jwt = null, string $email = 'new@ex
 }
 
 $tests = [
+    'valid email domains accepted and malformed addresses rejected' => static function (): void {
+        foreach (['admin@gmail.com', 'user@outlook.com', 'person@yahoo.com',
+            'codex-super-20260926@example.com', 'admin@plpasig.edu.ph'] as $email) {
+            $state = emailState();
+            emailAssert(emailChange($state, null, $email)['status'] === 200,
+                'Valid administrator email should be accepted.');
+        }
+        foreach (['abc', 'user@', '@example.com'] as $email) {
+            $state = emailState();
+            emailAssert(emailChange($state, null, $email)['status'] === 400,
+                'Malformed administrator email should be rejected.');
+            emailAssert($state['calls'] === [], 'Malformed email must not contact Supabase.');
+        }
+    },
     'requires POST, valid input and explicit confirmation' => static function (): void {
         $state = emailState();
         $transport = emailTransport($state);

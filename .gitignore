@@ -10,6 +10,11 @@
 # Local test and deployment artifacts
 /.artifacts/
 /dist/
+/.env
+/.env.*
+!/.env.example
+node_modules/
+.vercel/
 __pycache__/
 *.pyc
 

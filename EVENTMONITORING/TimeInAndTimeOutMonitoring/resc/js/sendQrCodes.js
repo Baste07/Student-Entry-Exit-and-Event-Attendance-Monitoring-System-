@@ -62,18 +62,35 @@ async function loadStudents() {
     tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading students...</td></tr>';
 
     try {
+        const web = window.AppDeployment?.isWeb;
         const { data, error } = await supabaseClient
             .from('students')
-            .select('student_id, id_number, first_name, middle_name, last_name, course, year_level, section, email, status, facial_dataset_path, created_at')
+            .select(web
+                ? 'student_id, stud_id, first_name, middle_name, last_name, current_grade_level, sections:section_id(section_name), email, status, facial_dataset_path, created_at'
+                : 'student_id, id_number, first_name, middle_name, last_name, course, year_level, section, email, status, facial_dataset_path, created_at')
             .order('last_name', { ascending: true });
 
         if (error) throw error;
 
         students = (data || []).map(student => ({
             ...student,
+            ...(web ? {
+                id_number: student.stud_id,
+                course: student.current_grade_level || '',
+                year_level: '',
+                section: (Array.isArray(student.sections) ? student.sections[0] : student.sections)?.section_name || ''
+            } : {}),
             full_name: [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim(),
             face_registered: !!student.facial_dataset_path,
         }));
+
+        if (web) {
+            document.querySelector('label[for="courseFilter"]').textContent = 'Grade';
+            document.querySelector('label[for="yearFilter"]').textContent = 'Section';
+            const headings = document.querySelectorAll('.students-table thead th');
+            if (headings[3]) headings[3].textContent = 'Grade';
+            if (headings[4]) headings[4].textContent = 'Section';
+        }
 
         populateFilters();
         applyFilters();
@@ -357,7 +374,10 @@ async function sendQrEmail(student, signal = null) {
         course: String(student.course || '').trim(),
         yearLevel: String(student.year_level ?? '').trim(),
         section: String(student.section || '').trim(),
-        qrPayload: buildQrPayload(student),
+        qrPayload: window.AppDeployment?.isWeb
+            ? `student_uuid:${String(student.student_id || '').toLowerCase()}`
+            : buildQrPayload(student),
+        studentUuid: student.student_id,
     };
 
     if (!payload.email) {
