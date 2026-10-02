@@ -71,10 +71,10 @@ function createTransport(array &$state): callable
     };
 }
 
-function createWith(array &$state, string $level = 'admin', ?string $token = null): array
+function createWith(array &$state, string $level = 'admin', ?string $token = null, string $email = 'test@example.edu'): array
 {
     return handleCreateAdminRequest('POST', 'Bearer ' . ($token ?? createJwt()), json_encode([
-        'name' => 'Test Admin', 'email' => 'test@example.edu', 'faculty' => 'Science',
+        'name' => 'Test Admin', 'email' => $email, 'faculty' => 'Science',
         'level' => $level, 'password' => 'test-password-123',
     ]), createTransport($state));
 }
@@ -108,6 +108,20 @@ $tests = [
             requireCreate($state['auth_created'] && $state['profile_created'], 'Both account records must exist.');
             $profileCall = array_values(array_filter($state['calls'], static fn ($call) => $call[1] === '/rest/v1/admins'))[0];
             requireCreate(($profileCall[2]['admin_level'] ?? null) === $level, 'Requested level must be saved.');
+        }
+    },
+    'valid external and institutional email domains are accepted' => static function (): void {
+        foreach (['admin@gmail.com', 'user@outlook.com', 'person@yahoo.com',
+            'codex-super-20260926@example.com', 'admin@plpasig.edu.ph'] as $email) {
+            $state = createFixture();
+            requireCreate(createWith($state, 'admin', null, $email)['status'] === 201,
+                'Valid email should be accepted.');
+        }
+        foreach (['abc', 'user@', '@example.com'] as $email) {
+            $state = createFixture();
+            requireCreate(createWith($state, 'admin', null, $email)['status'] === 400,
+                'Malformed email should be rejected.');
+            requireCreate($state['calls'] === [], 'Malformed email must not contact Supabase.');
         }
     },
     'expired bearer and duplicate email do not create accounts' => static function (): void {

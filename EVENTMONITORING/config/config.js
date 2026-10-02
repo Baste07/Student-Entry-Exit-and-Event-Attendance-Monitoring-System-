@@ -4,16 +4,27 @@ const SUPABASE_CONFIG = {
 };
 
 // Set DEPLOYMENT_MODE in the ignored config/.env.js on each installation.
-// This controls navigation only; Supabase RLS and PHP enforce authorization.
+// This controls navigation/API routing only; RLS and the server enforce authorization.
 const DEPLOYMENT_MODE = typeof ENV !== 'undefined' && ENV.DEPLOYMENT_MODE === 'WEB'
     ? 'WEB' : 'LOCAL_GATE';
 const APP_ROOT = typeof document !== 'undefined' && document.currentScript
     ? new URL('../', document.currentScript.src) : null;
+const WEB_API_ROUTES = new Set([
+    'create-admin.php', 'delete-admin.php', 'admin-mfa-factors.php',
+    'update-admin-email.php', 'send-student-qr-email.php'
+]);
+function adminApiRoute(localPath) {
+    if (DEPLOYMENT_MODE !== 'WEB') return localPath;
+    const basename = String(localPath).split('/').pop();
+    if (!WEB_API_ROUTES.has(basename)) throw new Error('Unsupported WEB API route.');
+    return new URL(`api/${basename.slice(0, -4)}`, APP_ROOT).href;
+}
 if (typeof window !== 'undefined') window.AppDeployment = {
     mode: DEPLOYMENT_MODE,
     isWeb: DEPLOYMENT_MODE === 'WEB',
     isLocalGate: DEPLOYMENT_MODE === 'LOCAL_GATE',
     root: APP_ROOT,
+    apiRoute: adminApiRoute,
     applyNavigation(scope = document) {
         if (DEPLOYMENT_MODE !== 'WEB') return;
         scope.querySelectorAll('[data-local-operation]').forEach(element => { element.hidden = true; });
@@ -40,13 +51,32 @@ if (typeof supabase !== 'undefined' && SUPABASE_CONFIG.projectUrl && SUPABASE_CO
         auth: {
             persistSession: true,      
             autoRefreshToken: true,  
-            detectSessionInUrl: false   
+            // Only the recovery page may exchange a password-reset link for a session.
+            detectSessionInUrl: typeof window !== 'undefined' &&
+                /\/auth\/reset-password\.html$/.test(window.location.pathname)
         }
     });
+    // Register on the same script turn as createClient: Supabase can emit the
+    // recovery event before a later page script has downloaded and executed.
+    if (typeof window !== 'undefined' &&
+        /\/auth\/reset-password\.html$/.test(window.location.pathname)) {
+        window.passwordRecoverySessionReady = false;
+        window.passwordRecoveryUserId = null;
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (event === 'PASSWORD_RECOVERY' && session?.user?.id) {
+                window.passwordRecoverySessionReady = true;
+                window.passwordRecoveryUserId = session.user.id;
+                window.dispatchEvent(new Event('password-recovery-ready'));
+            } else if (event === 'SIGNED_OUT') {
+                window.passwordRecoverySessionReady = false;
+                window.passwordRecoveryUserId = null;
+            }
+        });
+    }
 }
 
-// Attach the current Supabase access token to protected same-origin PHP calls.
-// PHP verifies identity, role, and AAL2 independently; this helper is not an
+// Attach the current Supabase access token to protected same-origin API calls.
+// The backend verifies identity, role, and AAL2 independently; this helper is not an
 // authorization decision and never sends the service-role credential.
 async function adminAal2Fetch(url, options = {}) {
     if (!supabaseClient) throw new Error('Sign in is required.');
@@ -54,10 +84,10 @@ async function adminAal2Fetch(url, options = {}) {
     if (error || !data?.session?.access_token) throw new Error('Sign in is required.');
     const headers = new Headers(options.headers || {});
     headers.set('Authorization', `Bearer ${data.session.access_token}`);
-    return fetch(url, { ...options, headers });
+    return fetch(adminApiRoute(url), { ...options, headers });
 }
 
-// A browser route check improves navigation, while database RLS and PHP enforce
+// A browser route check improves navigation, while database RLS and the backend enforce
 // the same AAL2 rule against direct API calls. The login/MFA pages stay open so
 // existing administrators can enroll after their password-only sign-in.
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {

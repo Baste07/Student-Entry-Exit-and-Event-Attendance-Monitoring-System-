@@ -41,15 +41,15 @@
 
             <form action="#" method="POST" novalidate>
                 <div class="mb-field">
-                    <label class="form-label" for="username">Email or ID</label>
+                    <label class="form-label" for="username">Email Address</label>
                     <div class="input-wrapper">
                         <input
-                        type="text"
+                        type="email"
                         id="username"
                         name="username"
                         class="form-control"
-                        placeholder="Enter your email or ID"
-                        autocomplete="username"
+                        placeholder="Enter your email address"
+                        autocomplete="email"
                         required
                     />
                     <svg class="input-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -104,7 +104,7 @@
                 </svg>
             </div>
             <h2 class="forgot-modal-title">Forgot Password?</h2>
-            <p class="forgot-modal-copy">Enter your institutional email and we'll send you a reset link.</p>
+            <p class="forgot-modal-copy">Enter your email address and we'll send you a reset link.</p>
         </div>
 
         <div id="modal-error" style="display:none; background:#fef2f2; border:1px solid #fecaca; color:#dc2626; font-size:13px; padding:10px 14px; border-radius:8px; margin-bottom:14px; align-items:center; gap:8px;">
@@ -127,7 +127,7 @@
                 <input
                     type="email"
                     id="forgotEmailInput"
-                    placeholder="yourname@plpasig.edu.ph"
+                    placeholder="name@example.com"
                     style="width:100%; padding:11px 14px 11px 40px; border:1.5px solid #d1d5db; border-radius:9px; font-size:14px; outline:none; font-family:'Source Sans 3',sans-serif; transition:border-color 0.2s; box-sizing:border-box;"
                     onfocus="this.style.borderColor='#1a3a5c'"
                     onblur="this.style.borderColor='#d1d5db'"
@@ -162,6 +162,6 @@
 <script src="../config/config.js"></script>
 <script src="../shared/admin-mfa.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="login.js?v=9"></script>
+<script src="login.js?v=10"></script>
 </body>
 </html>

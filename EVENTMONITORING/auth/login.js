@@ -1,3 +1,7 @@
+function isValidLoginEmail(email) {
+    return email.length <= 254 && /^[^\s@.][^\s@]*@[^\s@.]+(?:\.[^\s@.]+)+$/.test(email);
+}
+
 document.addEventListener('DOMContentLoaded', function () {
 
     const form          = document.querySelector('form');
@@ -20,15 +24,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const password = passwordInput.value;
 
         if (!username || !password) {
-            showError('Please enter both email/ID and password');
+            showError('Please enter both email and password.');
             return;
         }
 
-        if (username.includes('@')) {
-            if (!username.toLowerCase().endsWith('@plpasig.edu.ph')) {
-                showError('Only emails with @plpasig.edu.ph domain are allowed to login.');
-                return;
-            }
+        if (!isValidLoginEmail(username)) {
+            showError('Enter a valid email address.');
+            return;
         }
 
         submitBtn.disabled    = true;
@@ -136,8 +138,8 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (!email.endsWith('@plpasig.edu.ph')) {
-            modalErrorText.textContent = 'Only @plpasig.edu.ph emails are allowed.';
+        if (!isValidLoginEmail(email)) {
+            modalErrorText.textContent = 'Enter a valid email address.';
             modalError.style.display   = 'flex';
             return;
         }

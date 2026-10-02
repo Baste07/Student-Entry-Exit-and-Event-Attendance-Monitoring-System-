@@ -41,7 +41,7 @@ function renderAdminsSkeleton() {
 async function mfaAdminRequest(action, adminId) {
     const { data, error } = await supabaseClient.auth.getSession();
     if (error || !data?.session?.access_token) throw new Error('Please sign in again.');
-    const response = await fetch('admin-mfa-factors.php', {
+    const response = await fetch(window.AppDeployment.apiRoute('admin-mfa-factors.php'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json',
             'Authorization': `Bearer ${data.session.access_token}` },
@@ -284,7 +284,7 @@ async function submitAdminEmailForm(event) {
     try {
         const { data, error } = await supabaseClient.auth.getSession();
         if (error || !data?.session?.access_token) throw new Error('Please sign in again.');
-        const response = await fetch('update-admin-email.php', {
+        const response = await fetch(window.AppDeployment.apiRoute('update-admin-email.php'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${data.session.access_token}` },
@@ -353,7 +353,7 @@ async function deleteAdmin(adminId) {
             throw new Error('Please sign in again before deleting an admin.');
         }
 
-        const response = await fetch('delete-admin.php', {
+        const response = await fetch(window.AppDeployment.apiRoute('delete-admin.php'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -623,7 +623,7 @@ async function submitAdminForm(e) {
             if (sessionError || !authSession?.session?.access_token) {
                 throw new Error('Please sign in again before creating an administrator.');
             }
-            const response = await fetch('create-admin.php', {
+            const response = await fetch(window.AppDeployment.apiRoute('create-admin.php'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
