@@ -82,6 +82,9 @@ do $$ begin
   if to_regclass('public.system_audit_logs') is not null then
     revoke all on table public.system_audit_logs from public, anon, authenticated;
     grant select, insert on table public.system_audit_logs to authenticated;
+    -- Legacy permissive policies would OR with the own-user policy below.
+    drop policy if exists "Allow inserts for authenticated users" on public.system_audit_logs;
+    drop policy if exists "Allow reads for authenticated users" on public.system_audit_logs;
     drop policy if exists "Authenticated access after MFA" on public.system_audit_logs;
     drop policy if exists "AAL2 admins read audit" on public.system_audit_logs;
     drop policy if exists "AAL2 admins append own audit" on public.system_audit_logs;
