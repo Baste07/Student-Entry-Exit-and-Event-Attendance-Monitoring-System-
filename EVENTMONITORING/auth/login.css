@@ -4,6 +4,7 @@
     --blue-mid:   #1976b8;
     --blue-btn:   #2382c8;
     --blue-hover: #17679a;
+    --yellow: #f6b23e;
     --card-shadow: 0 24px 70px rgba(4, 23, 37, 0.24);
     --surface: #ffffff;
     --surface-soft: #f5faff;
@@ -63,25 +64,97 @@ body {
     align-items: center;
     padding: .38rem .7rem;
     border-radius: 999px;
-    background: rgba(255,255,255,0.18);
+    gap: .45rem;
+    background: rgba(246,178,62,0.16);
+    border: 1px solid rgba(246,178,62,0.42);
+    color: #fff4cf;
     text-transform: uppercase;
     letter-spacing: .12em;
     font-size: .74rem;
     font-weight: 700;
-    margin-bottom: 5rem;
+    margin-bottom: 2.15rem;
+}
+
+.eyebrow svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
 }
 
 .auth-hero-card h2 {
     font-family: 'Merriweather', serif;
     font-size: clamp(1.5rem, 4.2vw, 5.15rem);
-    line-height: 1.2;
+    line-height: 1.12;
+    letter-spacing: -.025em;
+    text-wrap: balance;
 }
 
-.auth-hero-card p {
+.auth-hero-card h2 span {
+    color: var(--yellow);
+}
+
+.hero-copy {
+    margin-top: 1.15rem;
     font-size: 1rem;
-    line-height: 1.7;
-    color: rgba(255,255,255,0.9);
-    max-width: 480px;
+    line-height: 1.65;
+    color: rgba(255,255,255,0.78);
+    max-width: 430px;
+}
+
+.hero-features {
+    display: grid;
+    gap: .8rem;
+    margin-top: 2rem;
+}
+
+.hero-feature {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    color: #fff;
+}
+
+.hero-feature-icon {
+    display: grid;
+    flex: 0 0 2.35rem;
+    width: 2.35rem;
+    height: 2.35rem;
+    place-items: center;
+    border: 1px solid rgba(246,178,62,0.32);
+    border-radius: .75rem;
+    background: rgba(246,178,62,0.12);
+    color: var(--yellow);
+}
+
+.hero-feature-icon svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.hero-feature strong,
+.hero-feature small {
+    display: block;
+}
+
+.hero-feature strong {
+    font-size: .9rem;
+    font-weight: 700;
+}
+
+.hero-feature small {
+    margin-top: .12rem;
+    color: rgba(255,255,255,0.62);
+    font-size: .78rem;
+    line-height: 1.35;
 }
 
 .auth-panel {
@@ -373,6 +446,10 @@ body {
 
     .auth-hero-card {
         padding: 1.35rem;
+    }
+
+    .hero-features {
+        margin-top: 1.35rem;
     }
 }
 
