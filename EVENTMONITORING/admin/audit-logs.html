@@ -372,13 +372,57 @@
             return formatFriendlyAuditText(log);
         }
 
+        function auditIdentityValue(value, placeholder) {
+            const text = String(value || '').trim();
+            return text && text !== placeholder ? text : null;
+        }
+
+        function resolveAuditLogActors(logs, profiles) {
+            const profilesById = new Map((profiles || []).map(profile =>
+                [String(profile.admin_id).toLowerCase(), profile]));
+            const snapshotsById = new Map();
+            // Labeled events from the same UUID can identify older LOGIN rows
+            // even when the Admin profile was subsequently removed.
+            for (const log of logs) {
+                if (!log.user_id) continue;
+                const id = String(log.user_id).toLowerCase();
+                const snapshot = snapshotsById.get(id) || {};
+                snapshot.name ||= auditIdentityValue(log.full_name, 'Unknown User');
+                snapshot.email ||= auditIdentityValue(log.email, 'No email');
+                snapshot.role ||= auditIdentityValue(log.role, 'Unknown');
+                snapshotsById.set(id, snapshot);
+            }
+            return logs.map(log => {
+                const id = log.user_id ? String(log.user_id).toLowerCase() : '';
+                const snapshot = snapshotsById.get(id) || {};
+                const profile = profilesById.get(id) || {};
+                let name = auditIdentityValue(log.full_name, 'Unknown User') || snapshot.name || profile.admin_name || null;
+                let email = auditIdentityValue(log.email, 'No email') || snapshot.email || profile.email || null;
+                let role = auditIdentityValue(log.role, 'Unknown') || snapshot.role || profile.admin_level || null;
+                if (!id && log.action === 'STUDENT_ID_ROLLOVER' && log.details?.mode === 'automatic') {
+                    name = 'System';
+                    role = 'System';
+                } else if (!id && log.details?.actor_type === 'local_gate') {
+                    name = 'Local Gate';
+                    role = 'Local Service';
+                }
+                return { ...log, full_name: name, email, role };
+            });
+        }
+
+        function escapeAuditHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[char]);
+        }
+
         function buildSessionGroups(logs) {
             const ordered = [...logs].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
             const groups = [];
             let currentGroup = null;
 
             ordered.forEach((log) => {
-                const userKey = String(log.user_id || log.email || log.full_name || 'unknown-user');
+                const userKey = String(log.user_id || log.email || log.full_name || `unidentified-${log.id || log.created_at}`);
                 const action = String(log.action || '').toUpperCase();
 
                 if (action === 'LOGIN') {
@@ -465,7 +509,7 @@
 
             return filtered.map((log) => ({
                 id: `log-${log.id || `${log.user_id || 'user'}-${log.created_at}`}`,
-                userKey: String(log.user_id || log.email || log.full_name || 'unknown-user'),
+                userKey: String(log.user_id || log.email || log.full_name || `unidentified-${log.id || log.created_at}`),
                 userLabel: log.full_name || log.email || 'Unknown User',
                 email: log.email || 'No email',
                 role: log.role || 'Unknown',
@@ -516,11 +560,11 @@
                 const detailsHtml = entry.actions.map((log) => `
                     <div class="audit-session-item">
                         <div class="audit-session-header">
-                            <span class="badge-audit ${getActionBadgeClass(log.action)}">${(log.action || 'ACTION').toUpperCase()}</span>
+                            <span class="badge-audit ${getActionBadgeClass(log.action)}">${escapeAuditHtml((log.action || 'ACTION').toUpperCase())}</span>
                             <small>${formatDateTime(log.created_at)}</small>
                         </div>
-                        <div class="audit-session-meta">${humanizeModuleName(log.module_name)} • ${humanizePageName(log.page_name)}</div>
-                        <pre class="log-details">${summarizeDetails(log)}</pre>
+                        <div class="audit-session-meta">${escapeAuditHtml(humanizeModuleName(log.module_name))} • ${escapeAuditHtml(humanizePageName(log.page_name))}</div>
+                        <pre class="log-details">${escapeAuditHtml(summarizeDetails(log))}</pre>
                     </div>
                 `).join('');
 
@@ -528,13 +572,13 @@
                     <tr class="audit-group-row" data-group-id="${entry.id}" style="cursor:pointer;">
                         <td>${formatDateTime(entry.firstTime)}</td>
                         <td>
-                            <strong>${entry.userLabel}</strong><br>
-                            <small>${entry.email}</small>
+                            <strong>${escapeAuditHtml(entry.userLabel)}</strong><br>
+                            <small>${escapeAuditHtml(entry.email)}</small>
                         </td>
-                        <td>${entry.role || 'Unknown'}</td>
-                        <td><span class="badge-audit ${getActionBadgeClass(entry.firstAction.action)}">${actionSummary.toUpperCase()}</span></td>
-                        <td>${summaryText}</td>
-                        <td>${humanizePageName(entry.firstAction.page_name || 'unknown')}</td>
+                        <td>${escapeAuditHtml(entry.role || 'Unknown')}</td>
+                        <td><span class="badge-audit ${getActionBadgeClass(entry.firstAction.action)}">${escapeAuditHtml(actionSummary.toUpperCase())}</span></td>
+                        <td>${escapeAuditHtml(summaryText)}</td>
+                        <td>${escapeAuditHtml(humanizePageName(entry.firstAction.page_name || 'unknown'))}</td>
                         <td>
                             <div class="audit-session-summary">${entry.totalActions} action${entry.totalActions > 1 ? 's' : ''} in this session</div>
                         </td>
@@ -567,7 +611,19 @@
 
                 if (error) throw error;
 
-                auditState.logs = data || [];
+                const actorIds = [...new Set((data || []).map(log => log.user_id).filter(Boolean))];
+                const profiles = [];
+                for (let i = 0; i < actorIds.length; i += 50) {
+                    const { data: batch, error: profileError } = await supabaseClient.from('admins')
+                        .select('admin_id, admin_name, email, admin_level')
+                        .in('admin_id', actorIds.slice(i, i + 50));
+                    if (profileError) {
+                        console.warn('Admin profile lookup for audit display failed:', profileError.message);
+                        break;
+                    }
+                    profiles.push(...(batch || []));
+                }
+                auditState.logs = resolveAuditLogActors(data || [], profiles);
 
                 const moduleSelect = document.getElementById('auditModuleFilter');
                 if (moduleSelect) {
@@ -577,7 +633,7 @@
 
                     const current = moduleSelect.value;
                     moduleSelect.innerHTML = '<option value="all">All Modules</option>' + uniqueModules.map(module => 
-                        `<option value="${module}">${module}</option>`
+                        `<option value="${escapeAuditHtml(module)}">${escapeAuditHtml(module)}</option>`
                     ).join('');
 
                     if (uniqueModules.includes(current)) {
