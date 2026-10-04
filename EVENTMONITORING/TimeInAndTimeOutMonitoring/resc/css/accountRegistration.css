@@ -19,6 +19,8 @@
     --border:       #dcebf5;
     --border-focus: #2f8fce;
     --card-shadow:  0 18px 50px rgba(11,78,120,0.14);
+    --radius:       10px;
+    --red:          #dc2626;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -97,6 +99,7 @@ body {
     display: flex; background: var(--white); border: 1.5px solid var(--border);
     border-radius: 12px; padding: 5px; margin-bottom: 28px; gap: 5px;
     box-shadow: var(--card-shadow);
+    width: 100%;
 }
 
 .role-btn {
@@ -104,6 +107,8 @@ body {
     font-family: 'Syne', sans-serif; font-size: 13.5px; font-weight: 700;
     cursor: pointer; background: transparent; color: var(--text-muted);
     transition: all 0.22s; display: flex; align-items: center; justify-content: center; gap: 8px;
+    min-width: 0;
+    line-height: 1.25;
 }
 
 .role-btn:hover { background: var(--surface); color: var(--blue-dark); }
@@ -180,14 +185,83 @@ body {
 .field-msg.success { color: var(--blue-mid); }
 
 /* ─── BUTTONS ─── */
-.button-row { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; padding-top: 24px; border-top: 1px solid var(--border); }
-.btn-primary, .btn-outline { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; padding: 11px 22px; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; letter-spacing: 0.2px; }
-.btn-primary { background: var(--blue-dark); color: var(--white); }
-.btn-primary:hover:not(:disabled) { background: var(--blue-mid); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(26,71,49,0.25); }
-.btn-primary:disabled { background: #b8cfc0; cursor: not-allowed; }
+.button-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+}
+.registration-actions {
+    display: contents;
+}
+.button-row button,
+.registration-actions button,
+.btn-primary,
+.btn-outline {
+    min-height: 41px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14.5px;
+    font-weight: 700;
+    padding: 11px 24px;
+    border: 0;
+    border-radius: var(--radius);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: background .18s, transform .18s, box-shadow .18s;
+}
+.button-row button:focus-visible {
+    outline: 3px solid rgba(128,199,245,.75);
+    outline-offset: 2px;
+}
+.btn-boot {
+    background: var(--blue-bright);
+    color: var(--white);
+    box-shadow: 0 3px 12px rgba(47,143,206,.22);
+}
+.btn-boot:hover:not(:disabled) {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(47,143,206,.3);
+}
+.btn-start {
+    background: var(--blue-mid);
+    color: var(--white);
+    box-shadow: 0 3px 12px rgba(23,106,164,.25);
+}
+.btn-start:hover:not(:disabled) {
+    background: var(--blue-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(26,71,49,.3);
+}
+.btn-stop {
+    background: var(--red);
+    color: var(--white);
+    box-shadow: 0 3px 12px rgba(220,38,38,.22);
+}
+.btn-stop:hover:not(:disabled) {
+    background: #b91c1c;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(220,38,38,.3);
+}
+.button-row button:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+    transform: none;
+}
+.registration-actions button {
+    flex: 0 1 auto;
+}
+.btn-primary { background: var(--blue-dark); color: var(--white); box-shadow: 0 3px 12px rgba(11,78,120,.25); }
+.btn-primary:hover:not(:disabled) { background: var(--blue-mid); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(11,78,120,.3); }
+.btn-primary:disabled { background: #8fb8d2; cursor: not-allowed; opacity: .8; }
 .btn-primary .btn-accent { color: var(--yellow); }
-.btn-outline { background: transparent; color: var(--text-muted); border: 1.5px solid var(--border); }
-.btn-outline:hover { background: var(--surface); color: var(--blue-dark); border-color: var(--blue-light); }
+.btn-outline { background: #e8f3fb; color: var(--blue-dark); border: 1.5px solid var(--blue-light); box-shadow: none; }
+.btn-outline:hover { background: #d5eafa; color: var(--blue-dark); border-color: var(--blue-mid); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(11,78,120,.12); }
 
 /* ─── LOADING SPINNER ─── */
 .loading { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(64,145,108,0.22); border-top-color: var(--blue-bright); border-radius: 50%; animation: spin 0.75s linear infinite; }
@@ -253,11 +327,41 @@ footer { background: var(--blue-dark); }
     .main-wrapper    { padding: 32px 16px 60px; }
     .form-card-body  { padding: 20px 18px 24px; }
     .page-hero       { padding: 36px 20px 32px; }
+    .role-toggle {
+        gap: 6px;
+    }
+    .role-btn {
+        padding: 11px 10px;
+        font-size: 12.5px;
+        gap: 6px;
+    }
+    .button-row .registration-actions button {
+        flex: 1 1 calc(50% - 6px);
+    }
+}
+
+@media (max-width: 480px) {
+    .role-toggle {
+        flex-direction: column;
+        gap: 5px;
+    }
+    .role-btn {
+        flex: 1 1 auto;
+        width: 100%;
+        min-height: 44px;
+    }
+    .button-row {
+        flex-direction: column;
+    }
+    .button-row .registration-actions button {
+        width: 100%;
+        flex: 1 1 auto;
+    }
 }
 
 /* ─── HEADER ─── */
 header {
-    background: var(--blue-dark);
+    background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue-mid) 100%);
     position: sticky;
     top: 0;
     z-index: 200;
@@ -332,24 +436,24 @@ nav a.active {
     font-weight: 700;
 }
 
-@media (max-width: 900px) {
+/* Keep the header responsive behavior identical to homepage.html. */
+@media (max-width: 680px) {
     header {
-        height: auto;
+        padding: 0 20px;
         min-height: 68px;
-        padding: 12px 20px;
+        height: auto;
+        padding-block: 8px;
         flex-wrap: wrap;
-        gap: 10px;
+        row-gap: 8px;
     }
 
     .brand,
-    .brand-text,
-    nav {
+    .brand-text {
         min-width: 0;
     }
 
     .brand {
-        flex: 1 1 100%;
-        justify-content: center;
+        flex: 1 1 auto;
     }
 
     .brand-text h1,
@@ -361,24 +465,34 @@ nav a.active {
 
     nav {
         flex: 1 1 100%;
+        min-width: 0;
+        overflow-x: visible;
+        padding-bottom: 2px;
+    }
+
+    nav a {
+        min-height: 44px;
+        flex: 0 0 auto;
+    }
+
+    nav a:last-child {
+        margin-left: 0 !important;
+    }
+}
+
+@media (max-width: 480px) {
+    nav {
+        overflow-x: visible;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 6px;
-        overflow: visible;
+        gap: 2px;
     }
 
-    nav > a,
-    nav > button {
-        min-height: 44px;
+    nav a {
         flex: 1 1 auto;
         justify-content: center;
+        padding-inline: 6px;
+        font-size: .85rem;
         text-align: center;
-    }
-
-    nav > button {
-        padding: 7px 10px !important;
-        border-radius: 7px !important;
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 13.5px !important;
     }
 }

@@ -248,6 +248,14 @@ function switchRole(role) {
     document.getElementById('btnStudent').classList.toggle('active',   role === 'student');
     document.getElementById('btnProfessor').classList.toggle('active', role === 'professor');
 
+    const registrationActions = document.querySelector('.registration-actions');
+    const activeButtonRow = document.querySelector(
+        role === 'student' ? '#studentForm .button-row' : '#professorForm .button-row'
+    );
+    if (registrationActions && activeButtonRow) {
+        activeButtonRow.appendChild(registrationActions);
+    }
+
     const isEmp = role === 'professor';
     document.getElementById('heroSub').textContent = isEmp
         ? 'Look up your Employee Number, then launch the Lab Camera to register.'

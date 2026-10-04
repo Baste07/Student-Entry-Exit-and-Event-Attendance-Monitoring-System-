@@ -2,7 +2,9 @@
     --blue-dark: #0b4e78;
     --blue-mid: #176aa4;
     --blue-bright: #2f8fce;
+    --blue-light: #80c7f5;
     --yellow: #f6b23e;
+    --red: #dc2626;
     --ink: #14364c;
     --muted: #668098;
     --border: #dcebf5;
@@ -56,11 +58,47 @@ button:disabled { opacity: .55; cursor: wait; }
 #personId:focus { border-color: var(--blue-bright); box-shadow: 0 0 0 3px #2f8fce28; }
 .button-row, .preview-actions { display: flex; gap: 9px; margin-top: 14px; }
 .button-row button, .preview-actions button { border: 0; border-radius: 9px; padding: 11px 13px; font-size: 13px; font-weight: 800; flex: 1; }
-.primary { background: var(--blue-dark); color: #fff; }
-.green { background: #25845b; color: #fff; }
-.soft { background: #eaf5fb; color: var(--blue-dark); border: 1px solid var(--border) !important; }
-.soft[aria-pressed="true"] { background: #dcfce7; color: #166534; border-color: #86efac !important; }
-.qr-reader { margin-top: 14px; width: 100%; border: 2px solid #25845b; border-radius: 10px; overflow: hidden; background: #000; }
+.lookup-button,
+.soft {
+    color: var(--blue-dark);
+    border: 1px solid var(--blue-light) !important;
+    background: #eaf5fb;
+}
+.lookup-button:hover:not(:disabled),
+.soft:hover:not(:disabled) {
+    background: #d5eafa;
+}
+.soft[aria-pressed="true"] {
+    background: #dbeeff;
+    color: var(--blue-dark);
+    border-color: var(--blue-mid) !important;
+
+}
+.scan-button {
+    background: #f6b23e26;
+    color: var(--yellow);
+    border: 1px solid #f6b23e80 !important;
+    box-shadow: 0 3px 10px #f6b23e26;
+}
+.scan-button:hover:not(:disabled) {
+    background: #f6b23e40;
+}
+.scan-button:focus-visible,
+.lookup-button:focus-visible,
+.soft:focus-visible {
+    outline: 3px solid #80c7f5b3;
+    outline-offset: 2px;
+}
+.scan-button.camera-stop {
+    background: #fee2e2;
+    color: var(--red);
+    border-color: #fca5a5 !important;
+    box-shadow: 0 3px 10px #dc262633;
+}
+.scan-button.camera-stop:hover:not(:disabled) {
+    background: #fecaca;
+}
+.qr-reader { margin-top: 14px; width: 100%; border: 2px solid var(--blue-bright); border-radius: 10px; overflow: hidden; background: #000; }
 .page-status { min-height: 20px; margin: 14px 0 0; color: var(--muted); font-size: 13px; }
 .page-status.error { color: #b42318; }
 .page-status.success { color: #16734d; }

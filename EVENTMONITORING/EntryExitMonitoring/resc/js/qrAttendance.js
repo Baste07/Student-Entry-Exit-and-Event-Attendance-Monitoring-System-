@@ -249,7 +249,9 @@ async function stopQrCamera() {
         try { await instance.clear(); } catch (_) { /* Clear only when supported. */ }
     }
     document.getElementById('qrReader').hidden = true;
-    document.getElementById('cameraButton').innerHTML = '<i class="fa-solid fa-qrcode"></i> Scan QR';
+    const button = document.getElementById('cameraButton');
+    button.classList.remove('camera-stop');
+    button.innerHTML = '<i class="fa-solid fa-qrcode"></i> Scan QR';
 }
 
 async function startQrCamera() {
@@ -289,6 +291,7 @@ async function startQrCamera() {
     cameraStarting = false;
     button.disabled = false;
     if (started) {
+        button.classList.add('camera-stop');
         button.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Camera';
         showStatus('Point the camera at a student QR code.');
     } else {

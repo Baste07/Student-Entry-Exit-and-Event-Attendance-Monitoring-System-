@@ -48,7 +48,7 @@
     <main class="checkin-panel">
         <div class="checkin-shell">
             <div class="top-actions">
-                <a href="../../auth/login.html" id="backToDashboard">Dashboard</a>
+                <a href="../../portal/portal.html" id="backToDashboard">Management</a>
             </div>
             <div class="clock-strip"><i class="fa-regular fa-clock"></i> <span id="liveClock">Loading time...</span></div>
 
@@ -68,9 +68,9 @@
                 <input id="personId" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. K-001 or 10-1234" disabled>
                 <div id="qrReader" class="qr-reader" hidden></div>
                 <div class="button-row">
-                    <button type="button" id="lookupButton" class="primary" disabled><i class="fa-solid fa-magnifying-glass"></i> Look Up</button>
+                    <button type="button" id="lookupButton" class="lookup-button" disabled><i class="fa-solid fa-magnifying-glass"></i> Look Up</button>
                     <button type="button" id="qrGunButton" class="soft" aria-pressed="false" disabled><i class="fa-solid fa-barcode"></i> QR Gun</button>
-                    <button type="button" id="cameraButton" class="green" disabled><i class="fa-solid fa-qrcode"></i> Scan QR</button>
+                    <button type="button" id="cameraButton" class="scan-button" disabled><i class="fa-solid fa-qrcode"></i> Scan QR</button>
                 </div>
                 <p id="pageStatus" class="page-status" role="status" aria-live="polite">Loading gate settings...</p>
             </section>
