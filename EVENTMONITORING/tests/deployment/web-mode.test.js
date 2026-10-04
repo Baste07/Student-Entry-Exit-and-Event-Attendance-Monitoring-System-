@@ -63,3 +63,20 @@ test('only the reset page parses recovery links and subscribes before its page s
     reset.authEvent()('PASSWORD_RECOVERY', { user: { id: 'test-uid' } });
     assert.equal(reset.window.passwordRecoverySessionReady, true);
 });
+
+test('Entry & Exit management links resolve in WEB and LOCAL_GATE layouts', () => {
+    const header = fs.readFileSync(path.join(__dirname, '../../EntryExitMonitoring/includes/header.html'), 'utf8');
+    const qrPage = fs.readFileSync(path.join(__dirname, '../../EntryExitMonitoring/gate/qrAttendance.html'), 'utf8');
+    const headerHref = header.match(/href="([^"]+)"[^>]*class="header-back-btn"/)?.[1];
+    const qrHref = qrPage.match(/href="([^"]+)" id="backToDashboard"/)?.[1];
+    assert.equal(headerHref, '../../portal/portal.html');
+    assert.equal(qrHref, '../../portal/portal.html');
+
+    for (const prefix of ['/', '/CAPSTONEFINAL/EVENTMONITORING/']) {
+        const base = `https://school.example${prefix}`;
+        assert.equal(new URL(headerHref, `${base}EntryExitMonitoring/admin/dashboard.html`).pathname,
+            `${prefix}portal/portal.html`);
+        assert.equal(new URL(qrHref, `${base}EntryExitMonitoring/gate/qrAttendance.html`).pathname,
+            `${prefix}portal/portal.html`);
+    }
+});
