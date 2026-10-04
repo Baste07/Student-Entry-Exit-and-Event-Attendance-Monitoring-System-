@@ -624,7 +624,7 @@ async function printReport() {
                 <div class="univ-title">PAMANTASAN NG LUNGSOD NG PASIG</div>
                 <div class="college-title">College of Computer Studies</div>
             </div>
-            <img src="../../auth/assets/ccslogo.png" class="logo-img" alt="CCS Logo">
+            <img src="../resc/assets/ccs_logo.png" class="logo-img" alt="CCS Logo">
         </div>
         <div class="report-title">Subjects Report</div>
         <div class="report-meta">Generated: ${nowStr} &nbsp;&middot;&nbsp; Total Subjects: ${metaStats.total} &nbsp;&middot;&nbsp; Active Schedules: ${metaStats.schedules} &nbsp;&middot;&nbsp; Total Units: ${metaStats.units}</div>

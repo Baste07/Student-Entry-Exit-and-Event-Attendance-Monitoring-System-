@@ -141,6 +141,7 @@ function filterCardsByRole() {
         const isEvent      = card.classList.contains('event-attendance-card');
         const isEntry      = card.classList.contains('entry-exit-card');
         const isSuperPanel = card.classList.contains('superadmin-panel-card');
+        const isLocalOps = card.classList.contains('local-operations-card');
         const isThesis     = href.includes('ThesisAndCapstoneArchiving');
         const isFaculty    = href.includes('FacultyRequirementSubmissionSystem');
         const isViolation  = href.includes('StudentViolationManagementSystem');
@@ -150,10 +151,10 @@ function filterCardsByRole() {
 
         if (isSuperAdmin) {
             // Superadmin: Event + Entry Exit + Superadmin panel
-            show = isEvent || isEntry || isSuperPanel;
+            show = isEvent || isEntry || isSuperPanel || (isLocalOps && window.AppDeployment?.isLocalGate);
         } else if (isAdmin) {
             // Admin: Event + Entry Exit only
-            show = isEvent || isEntry;
+            show = isEvent || isEntry || (isLocalOps && window.AppDeployment?.isLocalGate);
         } else if (isStudent) {
             show = (isThesis     && moduleEnabledForHref(href)) ||
                    (isViolation  && moduleEnabledForHref(href)) ||

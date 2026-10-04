@@ -1,6 +1,10 @@
 let currentStep = 1;
 const totalSteps = 2;
 
+function isValidRegistrationEmail(email) {
+    return email.length <= 254 && /^[^\s@.][^\s@]*@[^\s@.]+(?:\.[^\s@.]+)+$/.test(email);
+}
+
 const form = document.getElementById('registrationForm');
 const backBtn = document.getElementById('backBtn');
 const nextBtn = document.getElementById('nextBtn');
@@ -119,9 +123,8 @@ function validateStep(step) {
         }
 
         const email = document.getElementById('email');
-        const emailPattern = /^[^\s@]+@plpasig\.edu\.ph$/;
-        if (!emailPattern.test(email.value)) {
-            showError(email, 'Please use your institutional email (@plpasig.edu.ph)');
+        if (!isValidRegistrationEmail(email.value.trim())) {
+            showError(email, 'Enter a valid email address.');
             isValid = false;
         }
     }
@@ -139,9 +142,8 @@ function validateField(field) {
     }
 
     if (field.type === 'email') {
-        const emailPattern = /^[^\s@]+@plpasig\.edu\.ph$/;
-        if (!emailPattern.test(value)) {
-            showError(field, 'Please use your institutional email (@plpasig.edu.ph)');
+        if (!isValidRegistrationEmail(value)) {
+            showError(field, 'Enter a valid email address.');
             return false;
         }
     }

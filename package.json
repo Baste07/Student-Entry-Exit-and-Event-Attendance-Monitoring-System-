@@ -1,0 +1,26 @@
+{
+  "name": "eventmonitoring-vercel-web",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build:web": "node tools/build_vercel.mjs",
+    "test:secrets": "node tools/check_web_secrets.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:api": "tsc --noEmit false --outDir .artifacts/vercel-test && node --test .artifacts/vercel-test/tests/vercel/parity.test.js",
+    "test:build-guard": "node --test tests/vercel/supabase-build-guard.test.mjs",
+    "test:dev-integration": "npm run test:api && node tests/vercel/development-integration.mjs",
+    "test:web-local": "npm run test:api && node tools/test_vercel_local.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.2",
+    "nodemailer": "10.0.13",
+    "qrcode": "1.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "@types/nodemailer": "8.0.2",
+    "@types/qrcode": "1.5.6",
+    "typescript": "5.9.3"
+  }
+}

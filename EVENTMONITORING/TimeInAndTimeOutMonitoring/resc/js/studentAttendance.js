@@ -357,7 +357,7 @@ async function loadAttendanceData() {
         // If running locally, populate with lightweight mock data so the UI can be tested.
         try {
             const host = window.location.hostname || '';
-            if (host.includes('localhost') || host === '127.0.0.1') {
+            if (!window.AppDeployment?.isWeb && (host.includes('localhost') || host === '127.0.0.1')) {
                 const today = new Date();
                 const yyyy = today.getFullYear();
                 const mm = String(today.getMonth() + 1).padStart(2, '0');

@@ -1,0 +1,5 @@
+.artifacts/
+/TEST/
+/dist/
+/.student-rollover-clean-dev/
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/camera_owner.json

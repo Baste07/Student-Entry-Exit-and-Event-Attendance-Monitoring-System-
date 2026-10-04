@@ -75,6 +75,7 @@ function harness(options = {}) {
         supabaseClient: {
             auth: { async getSession() { authCalls.push(true); return authResult; } }
         },
+        window: { AppDeployment: { apiRoute: path => path } },
         async fetch(url, init) {
             requests.push({ url, init });
             return options.fetch ? options.fetch(url, init) : { ok: true, async json() { return { success: true }; } };

@@ -52,7 +52,7 @@
                 <button class="btn-report" onclick="openReportModal()">
                     <i class="fa-solid fa-file-chart-column"></i> Generate Report
                 </button>
-                <button class="btn-add-prof btn-add--amber" onclick="openModal('faceRegModal')">
+                <button class="btn-add-prof btn-add--amber" data-local-operation onclick="openModal('faceRegModal')">
                     <i class="fa-solid fa-camera"></i> Register Face
                 </button>
             </div>
@@ -176,7 +176,7 @@
                 <div id="profSearchResult" class="prof-search-result">
                     <div id="profFaceStatus" class="face-status"></div>
                     <div id="profStudentInfo" class="student-info"></div>
-                    <button type="button" id="profRegisterFaceBtn" onclick="redirectToProfFaceReg()"
+                    <button type="button" id="profRegisterFaceBtn" data-local-operation onclick="redirectToProfFaceReg()"
                         style="display:none;width:100%;padding:12px;background:#166534;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;align-items:center;justify-content:center;gap:8px">
                         <i class="fa-solid fa-camera"></i> Register Face Now
                     </button>

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "npm run build:web",
+  "outputDirectory": "dist/web",
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  },
+  "headers": [
+    { "source": "/api/(.*)", "headers": [{ "key": "Cache-Control", "value": "no-store" }, { "key": "X-Content-Type-Options", "value": "nosniff" }] },
+    { "source": "/config/.env.js", "headers": [{ "key": "Cache-Control", "value": "no-store, max-age=0" }] },
+    { "source": "/EntryExitMonitoring/admin/settings.html", "headers": [{ "key": "Cache-Control", "value": "no-store, max-age=0" }] }
+  ]
+}

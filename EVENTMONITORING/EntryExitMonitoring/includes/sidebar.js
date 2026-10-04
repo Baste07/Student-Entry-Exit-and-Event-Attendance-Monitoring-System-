@@ -62,6 +62,7 @@ async function loadHeader() {
         const res  = await fetch(`${INCLUDES_PATH}header.html`, { cache: 'no-store' });
         const html = await res.text();
         container.innerHTML = html;
+        window.AppDeployment?.applyNavigation(container);
         _startClock();
         applyDepartmentLogoToHeader();
         _forceSameTabNavigation(container);
@@ -108,6 +109,7 @@ async function loadSidebar(activePage = '') {
         const res  = await fetch(`${INCLUDES_PATH}sidebar.html`);
         const html = await res.text();
         container.innerHTML = html;
+        window.AppDeployment?.applyNavigation(container);
 
         if (activePage) {
             const active = container.querySelector(`[data-page="${activePage}"]`);

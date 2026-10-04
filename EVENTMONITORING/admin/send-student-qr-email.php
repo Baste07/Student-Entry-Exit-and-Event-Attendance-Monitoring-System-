@@ -6,10 +6,7 @@ header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/admin-mfa-auth.php';
 enforceAdminAal2Http(['POST']);
 
-// mail_config.php lives at:
-//   CAPSTONEFINAL/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/mail_config.php
-// This file lives at:
-//   CAPSTONEFINAL/EVENTMONITORING/admin/send-student-qr-email.php
+// Shared include-only SMTP helper; keep it on the server and outside direct HTTP access.
 require_once __DIR__ . '/../TimeInAndTimeOutMonitoring/students/mail_config.php';
 
 use PHPMailer\PHPMailer\Exception as PHPMailerException;
@@ -175,10 +172,10 @@ try {
 
     $mail->send();
 } catch (PHPMailerException $e) {
+    error_log('Student QR email delivery failed.');
     jsonExit(500, [
         'success' => false,
         'message' => 'Failed to send email. Check SMTP configuration.',
-        'diagnostic' => $mail->ErrorInfo ?? $e->getMessage(),
     ]);
 }
 

@@ -12,13 +12,13 @@ function getDeptLogos() {
     try {
         const user = JSON.parse(sessionStorage.getItem('user') || '{}');
         return {
-            deptLogo: user.departmentLogo || '../../auth/assets/ccslogo.png',
+            deptLogo: user.departmentLogo || '../resc/assets/ccs_logo.png',
             deptName: user.department     || 'College of Computer Studies',
             deptCode: user.departmentCode || 'CCS',
         };
     } catch (e) {
         return {
-            deptLogo: '../../auth/assets/ccslogo.png',
+            deptLogo: '../resc/assets/ccs_logo.png',
             deptName: 'College of Computer Studies',
             deptCode: 'CCS',
         };
