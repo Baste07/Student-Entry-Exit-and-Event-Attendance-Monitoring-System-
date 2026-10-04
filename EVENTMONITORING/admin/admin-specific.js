@@ -1,43 +1,3 @@
-const ADMIN_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
-let adminIdleTimer = null;
-
-function startAdminIdleTimeout() {
-    if (adminIdleTimer) clearTimeout(adminIdleTimer);
-
-    const logoutForInactivity = () => {
-        sessionStorage.removeItem('user');
-        sessionStorage.removeItem('manual_access_granted');
-        sessionStorage.removeItem('manual_access_role');
-        window.location.replace('../auth/login.html');
-    };
-
-    const resetIdleTimer = () => {
-        clearTimeout(adminIdleTimer);
-        adminIdleTimer = setTimeout(logoutForInactivity, ADMIN_IDLE_TIMEOUT_MS);
-    };
-
-    ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach(eventName => {
-        document.addEventListener(eventName, resetIdleTimer, { passive: true });
-    });
-
-    resetIdleTimer();
-}
-
-function checkAdminSession() {
-    if (window.adminMfaRouteReady && !window.adminMfaRouteComplete) {
-        window.adminMfaRouteReady.then(allowed => {
-            if (allowed) startAdminIdleTimeout();
-        });
-        return false;
-    }
-    const user = sessionStorage.getItem('user');
-    if (!user) {
-        window.location.href = '../auth/login.html';
-        return false;
-    }
-    return true;
-}
-
 function requireAdminNavigation() {
     const allowedRoute = sessionStorage.getItem('allowed_admin_route');
     sessionStorage.removeItem('allowed_admin_route');
@@ -49,7 +9,6 @@ function requireAdminNavigation() {
 
     return true;
 }
-
 function requireAdmin() {
     if (window.adminMfaRouteReady && !window.adminMfaRouteComplete) {
         window.adminMfaRouteReady.then(allowed => { if (allowed) requireAdmin(); });
@@ -243,7 +202,3 @@ function loadSidebar(activePage = '') {
         </nav>
     `;
 }
-
-document.addEventListener('DOMContentLoaded', function () {
-    if (checkAdminSession()) startAdminIdleTimeout();
-});

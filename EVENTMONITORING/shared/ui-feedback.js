@@ -12,6 +12,7 @@
     let toastContainer;
     let finishDialog = null;
     let previousFocus = null;
+    let dismissible = true;
 
     const labels = {
         success: { icon: '✓', title: 'Success' },
@@ -56,11 +57,11 @@
         confirmButton.addEventListener('click', () => closeDialog(true));
         cancelButton.addEventListener('click', () => closeDialog(false));
         overlay.addEventListener('click', event => {
-            if (event.target === overlay) closeDialog(false);
+            if (event.target === overlay && dismissible) closeDialog(false);
         });
         document.addEventListener('keydown', event => {
             if (overlay.hidden) return;
-            if (event.key === 'Escape') {
+            if (event.key === 'Escape' && dismissible) {
                 event.preventDefault();
                 closeDialog(false);
             } else if (event.key === 'Tab') {
@@ -96,10 +97,12 @@
 
     function showDialog(options) {
         initialize();
+        if (finishDialog && options.replaceExisting) closeDialog(false);
         if (finishDialog) return Promise.resolve(false);
 
         const type = labels[options.type] ? options.type : 'info';
         const confirmation = !!options.confirmation;
+        dismissible = options.dismissible !== false;
         previousFocus = document.activeElement;
         overlay.dataset.type = type;
         dialog.setAttribute('role', confirmation ? 'dialog' : 'alertdialog');
@@ -181,6 +184,12 @@
         warning: (message, title) => showDialog({ type: 'warning', message, title }),
         info: (message, title) => showDialog({ type: 'info', message, title }),
         confirm: options => showDialog({ ...(options || {}), confirmation: true }),
+        updateDialogMessage(message) {
+            if (!finishDialog) return false;
+            messageNode.textContent = message;
+            return true;
+        },
+        dismissDialog() { if (finishDialog) closeDialog(false); },
         fieldError,
         clearFormErrors
     });

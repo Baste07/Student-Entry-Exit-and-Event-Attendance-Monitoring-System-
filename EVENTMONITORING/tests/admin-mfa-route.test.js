@@ -16,11 +16,18 @@ async function visit(relativePath, { aal = 'aal1', active = true, user = true } 
     };
     let redirected = null;
     let signedOut = false;
+    const managerStarts = [];
     const document = {
         currentScript: { src: base + 'config/config.js' },
-        documentElement: { style: { visibility: '' } }
+        readyState: 'complete',
+        documentElement: { style: { visibility: '' }, dataset: {} },
+        head: { appendChild: script => { setImmediate(() => script.onload?.()); } },
+        createElement: () => ({}),
+        addEventListener: () => {}
     };
     const window = {
+        UIFeedback: {},
+        AdminInactivity: { start: async options => managerStarts.push(options.userId) },
         location: {
             pathname: '/EVENTMONITORING/' + relativePath,
             replace: url => { redirected = url; }
@@ -50,8 +57,9 @@ async function visit(relativePath, { aal = 'aal1', active = true, user = true } 
         supabase: { createClient: () => client }
     });
     await new Promise(resolve => setImmediate(resolve));
+    await new Promise(resolve => setImmediate(resolve));
     return { redirected, signedOut, visibility: document.documentElement.style.visibility,
-        profile: values.get('user') };
+        profile: values.get('user'), managerStarts };
 }
 
 test('AAL1 cannot navigate directly to admin, event, or gate pages', async () => {
@@ -73,6 +81,21 @@ test('AAL2 admin reaches module page after profile is checked', async () => {
     assert.equal(result.redirected, null);
     assert.equal(result.visibility, '');
     assert.equal(JSON.parse(result.profile).id, 'admin-id');
+    assert.deepEqual(result.managerStarts, ['admin-id']);
+});
+
+test('inactivity guard runs on management pages but never on scanner or student pages', async () => {
+    for (const route of ['portal/portal.html', 'admin/system-settings.html',
+        'TimeInAndTimeOutMonitoring/admin/eventSettings.html',
+        'EntryExitMonitoring/admin/settings.html']) {
+        assert.deepEqual((await visit(route, { aal: 'aal2' })).managerStarts, ['admin-id']);
+    }
+    for (const route of ['TimeInAndTimeOutMonitoring/students/manualAttendance.html',
+        'TimeInAndTimeOutMonitoring/students/accountRegistration.html',
+        'EntryExitMonitoring/gate/qrAttendance.html',
+        'EntryExitMonitoring/gate/entryExitScanner.html']) {
+        assert.deepEqual((await visit(route, { aal: 'aal2' })).managerStarts, []);
+    }
 });
 
 test('suspended admin is signed out even with AAL2', async () => {
