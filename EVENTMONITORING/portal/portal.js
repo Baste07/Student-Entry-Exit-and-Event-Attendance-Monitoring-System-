@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                     if (user.department) departmentName = user.department;
                 } catch (e) { /* ignore */ }
             }
-            alert(`For assistance, please contact the ${departmentName} System Administrator.`);
+            UIFeedback.info(`For assistance, please contact the ${departmentName} System Administrator.`);
         });
     }
 

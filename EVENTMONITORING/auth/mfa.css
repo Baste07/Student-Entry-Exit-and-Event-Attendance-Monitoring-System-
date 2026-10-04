@@ -9,4 +9,14 @@
 #setupKeyWrap p { margin: .4rem 0 0; }
 .mfa-code { letter-spacing: .35em; font-size: 1.2rem; text-align: center; }
 .mfa-error { color: #b42318; margin: .6rem 0; }
-.mfa-back { display: inline-block; margin-top: 1rem; }
+.mfa-back {
+	display: block;
+	width: fit-content;
+	margin: 1rem auto 0;
+	text-decoration: none;
+	transition: color .2s ease, text-decoration-color .2s ease;
+}
+.mfa-back:hover,
+.mfa-back:focus-visible {
+	text-decoration: underline;
+}

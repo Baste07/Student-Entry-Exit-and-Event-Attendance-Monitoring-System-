@@ -102,8 +102,8 @@ function applyFilters() {
 
 function updateBadges() {
     const totalEl = document.getElementById('badgeTotal');
-    const entryEl = document.getElementById('badgeEntry');
-    const exitEl  = document.getElementById('badgeExit');
+    const entryEl = document.getElementById('badgeEntries');
+    const exitEl  = document.getElementById('badgeExits');
     if (totalEl) totalEl.textContent = filteredLogs.length;
     if (entryEl) entryEl.textContent = filteredLogs.filter(l => l.log_type === 'entry').length;
     if (exitEl)  exitEl.textContent  = filteredLogs.filter(l => l.log_type === 'exit').length;

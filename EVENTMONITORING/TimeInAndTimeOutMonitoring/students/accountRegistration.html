@@ -29,18 +29,9 @@
  <nav>
     <a href="homepage.html"><i class="fa-solid fa-house"></i> Home</a>
     <a href="accountRegistration.html" class="active"><i class="fa-solid fa-camera"></i> Register</a>
-    
-    <button id="startEngineNavBtn" onclick="bootRegistrationEngine()" style="background:#2f8fce; color:#fff; border:none; padding: 8px 16px; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; gap:6px; align-items:center; display:inline-flex;">
-        <i class="fa-solid fa-power-off"></i> Start Engine
-    </button>
-
-    <button id="stopEngineBtn" onclick="stopEngine()" style="display:none; background:#0b4e78; color:#fff; border:none; padding: 8px 16px; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; gap:6px; align-items:center;">
-        <i class="fa-solid fa-power-off"></i> Stop Engine
-    </button>
-
-    <button id="switchCameraBtn" type="button" style="background:#14532d; color:#fff; border:none; padding: 8px 16px; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; gap:6px; align-items:center; display:inline-flex;">
-        <i class="fa-solid fa-repeat"></i> Use Camera for Registration
-    </button>
+    <a href="takeAttendance.html"><i class="fa-solid fa-user-check"></i> Take Attendance</a>
+    <a href="../../EntryExitMonitoring/gate/entryExitScanner.html" id="localGateLink"><i class="fa-solid fa-door-open"></i> Entry / Exit Scanner</a>
+    <a href="../../portal/portal.html" style="margin-left: 10px; border: 1.5px solid rgba(255,255,255,0.2);"><i class="fa-solid fa-shield-halved"></i> Management</a>
 </nav>
 
 
@@ -169,6 +160,17 @@
                     <button type="button" class="btn-outline" id="studentClearBtn">
                         <i class="fa-solid fa-eraser"></i> Clear
                     </button>
+                    <div class="registration-actions" aria-label="Registration controls">
+                        <button type="button" class="btn-boot" id="startEngineNavBtn" onclick="bootRegistrationEngine()">
+                            <i class="fa-solid fa-power-off"></i> Start Engine
+                        </button>
+                        <button type="button" class="btn-stop" id="stopEngineBtn" onclick="stopEngine()" style="display:none;">
+                            <i class="fa-solid fa-power-off"></i> Stop Engine
+                        </button>
+                        <button type="button" class="btn-start" id="switchCameraBtn">
+                            <i class="fa-solid fa-repeat"></i> Use Camera for Registration
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -277,7 +279,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../config/.env.js"></script>
     <script src="../../config/config.js"></script>
-    
+    <script src="../../shared/global.js"></script>
     <script src="../../shared/ui-feedback.js"></script>
     <script src="../resc/js/accountRegistration.js"></script>
 

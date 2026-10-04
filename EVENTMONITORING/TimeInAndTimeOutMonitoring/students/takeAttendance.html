@@ -328,9 +328,7 @@
     <nav>
         <a href="homepage.html"><i class="fa-solid fa-house"></i> Home</a>
         <a href="accountRegistration.html"><i class="fa-solid fa-camera"></i> Register Face</a>
-        <button id="stopEngineBtn" onclick="stopEngine()" style="display:none; background:#dc2626; color:#fff; border:none; padding:7px 14px; border-radius:7px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:600; gap:6px; align-items:center;">
-            <i class="fa-solid fa-power-off"></i> Stop Engine
-        </button>
+        <a href="../../portal/portal.html" class="nav-management"><i class="fa-solid fa-shield-halved"></i> Management</a>
     </nav>
 </header>
 
@@ -386,11 +384,15 @@
         <i class="fa-solid fa-power-off"></i> Start Engine
       </button>
 
-            <button class="btn btn-start" id="switchCameraBtn" style="background:#14532d; display:inline-flex;">
-                <i class="fa-solid fa-repeat"></i> Use Camera for Attendance
-            </button>
+      <button class="btn btn-stop" id="stopEngineBtn" onclick="stopEngine()" style="display:none;">
+        <i class="fa-solid fa-power-off"></i> Stop Engine
+      </button>
 
-            <button class="btn btn-start" id="startBtn" disabled style="display:none">
+      <button class="btn btn-start" id="switchCameraBtn" style="display:inline-flex;">
+          <i class="fa-solid fa-repeat"></i> Use Camera for Attendance
+      </button>
+
+      <button class="btn btn-start" id="startBtn" disabled style="display:none">
         <i class="fa-solid fa-play"></i> Start Session
       </button>
 

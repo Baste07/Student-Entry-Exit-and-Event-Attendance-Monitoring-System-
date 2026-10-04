@@ -25,6 +25,15 @@
     --green-active: var(--blue-active);
 }
 
+.btn-success {
+    --bs-btn-bg: var(--blue-btn);
+    --bs-btn-border-color: var(--blue-btn);
+    --bs-btn-hover-bg: var(--blue-hover);
+    --bs-btn-hover-border-color: var(--blue-hover);
+    --bs-btn-active-bg: var(--blue-active);
+    --bs-btn-active-border-color: var(--blue-active);
+}
+
 /* ===== ANIMATIONS ===== */
 @keyframes slideInUp {
     from { opacity: 0; transform: translateY(20px); }
@@ -701,6 +710,10 @@
     font-weight: 700;
     color: var(--text-main);
 }
+
+#totalDepartmentsCount { color: var(--blue-dark); }
+#activeDepartmentsCount { color: var(--blue-btn); }
+#adviserCount { color: var(--blue-active); }
 
 /* ===== PANEL & TOOLBAR ===== */
 .panel {

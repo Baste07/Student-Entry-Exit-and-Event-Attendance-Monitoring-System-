@@ -287,7 +287,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     console.error('Error parsing user:', e);
                 }
             }
-            alert(`For assistance, please contact the ${departmentName} System Administrator.`);
+            UIFeedback.info(`For assistance, please contact the ${departmentName} System Administrator.`);
         });
     }
 });

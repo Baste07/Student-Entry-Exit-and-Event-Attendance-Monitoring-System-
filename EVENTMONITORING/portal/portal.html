@@ -8,6 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="portal.css"/>
+    <link rel="stylesheet" href="../shared/ui-feedback.css">
     <link rel="stylesheet" href="../shared/logout-modal.css">
 </head>
 <body>
@@ -122,12 +123,25 @@
 
             <a href="../TimeInAndTimeOutMonitoring/students/homepage.html" class="system-card local-operations-card" data-local-operation data-audit-action="MODULE_SELECT" data-audit-module="local_gate" data-audit-label="Local Operations">
                 <span class="card-number">03</span>
-                <div class="card-icon-wrap"><i class="fa-solid fa-camera"></i></div>
+                <div class="card-icon-wrap">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 7h4l1.5-2h5L16 7h4v12H4z"/>
+                        <circle cx="12" cy="13" r="3"/>
+                    </svg>
+                </div>
+                <div class="card-bg-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M4 7h4l1.5-2h5L16 7h4v12H4z"/>
+                        <circle cx="12" cy="13" r="3"/>
+                    </svg>
+                </div>
                 <div class="card-bottom">
                     <div class="card-label">School Workstation</div>
                     <div class="card-title-text">Local Operations</div>
                     <div class="card-desc">Event attendance, entry/exit scanning, and face registration.</div>
-                    <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="card-arrow">
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </div>
                 </div>
             </a>
 
@@ -179,6 +193,7 @@
         }
     })();
 </script>
+<script src="../shared/ui-feedback.js"></script>
 <script src="portal.js"></script>
 <script src="../shared/logout-modal.js"></script>
 </body>

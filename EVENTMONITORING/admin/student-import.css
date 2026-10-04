@@ -23,6 +23,15 @@
     --green-active: var(--blue-active);
 }
 
+.btn-success {
+    --bs-btn-bg: var(--blue-btn);
+    --bs-btn-border-color: var(--blue-btn);
+    --bs-btn-hover-bg: var(--blue-hover);
+    --bs-btn-hover-border-color: var(--blue-hover);
+    --bs-btn-active-bg: var(--blue-active);
+    --bs-btn-active-border-color: var(--blue-active);
+}
+
 @keyframes slideInUp {
     from {
         opacity: 0;
@@ -87,6 +96,15 @@
     font-size: 0.9rem;
     color: var(--text-muted);
     margin-bottom: 1.5rem;
+}
+
+.form-label.text-success {
+    color: var(--text-main) !important;
+}
+
+.form-label.text-success svg {
+    color: var(--blue-mid);
+    stroke: currentColor;
 }
 
 /* ===== FORM LABELS & CONTROLS ===== */
