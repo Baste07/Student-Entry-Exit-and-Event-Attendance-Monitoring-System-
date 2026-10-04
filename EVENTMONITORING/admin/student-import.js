@@ -2,6 +2,7 @@ let parsedRows = [];
 let selectedDepartmentId = null;
 let selectedDepartmentName = '';
 let departmentsCache = [];
+const sectionLoadTokens = { departmentSelect: 0, singleDepartment: 0 };
 let singleStudentModal = null;
 let duplicateRowsModal = null;
 let editStudentModal = null;
@@ -74,7 +75,7 @@ async function loadDepartments() {
 
         const { data: depts, error } = await supabaseClient
             .from('sections')
-            .select('section_id, grade_level, section_name')
+            .select('section_id, grade_level, section_name, school_year_id')
             .order('grade_level', { ascending: true })
             .order('section_name', { ascending: true });
 
@@ -183,18 +184,19 @@ if (deleteStudentModalElement) deleteStudentModal = new bootstrap.Modal(deleteSt
     const gradeLevelSelect = document.getElementById('gradeLevelSelect');
     gradeLevelSelect?.addEventListener('change', () => {
         const gradeLevel = gradeLevelSelect.value;
-        filterSectionsByGradeLevel(gradeLevel, 'departmentSelect');
         selectedDepartmentId = null;
         selectedDepartmentName = '';
+        filterSectionsByGradeLevel(gradeLevel, 'departmentSelect');
         checkReadyToParse();
     });
 
     // ── FIX: Listen for section selection to enable Parse & Preview ──
     deptSelect?.addEventListener('change', () => {
-        selectedDepartmentId = deptSelect.value;
-        const section = departmentsCache.find(s => String(s.section_id) === String(selectedDepartmentId));
+        const section = getRegistrationSection(deptSelect.value, gradeLevelSelect?.value);
+        selectedDepartmentId = section ? section.section_id : null;
         selectedDepartmentName = section
             ? `${gradeLevelSelect?.value || ''} - ${section.section_name}`.trim() : '';
+        if (!section) deptSelect.value = '';
         checkReadyToParse();
     });
 
@@ -457,7 +459,8 @@ function checkReadyToParse() {
         console.warn('Parse button element not found');
         return;
     }
-    const isReady = !!(selectedFile && selectedDepartmentId);
+    const selectedGrade = document.getElementById('gradeLevelSelect')?.value;
+    const isReady = !!(selectedFile && getRegistrationSection(selectedDepartmentId, selectedGrade));
     parseBtn.disabled = !isReady;
     console.log('Parse button status updated - Ready:', isReady, 'File:', !!selectedFile, 'Dept:', !!selectedDepartmentId);
 }
@@ -852,6 +855,28 @@ async function startImport() {
 
     if (!activeSchoolYear || !activeSchoolYear.id) {
         showImportAlert('No active school year found. Please set one in System Settings first.', 'danger');
+        return;
+    }
+
+    const selectedGrade = document.getElementById('gradeLevelSelect')?.value;
+    if (!getRegistrationSection(selectedDepartmentId, selectedGrade)) {
+        showImportAlert('Select a section for the selected grade in the active school year.', 'warning');
+        showStep('upload');
+        return;
+    }
+    if (validRows.some(row => currentGradeFromStudentId(row.studId) !== selectedGrade)) {
+        showImportAlert('Every Student ID in this import must match the selected grade.', 'warning');
+        showStep('preview');
+        return;
+    }
+    try {
+        if (!await verifyRegistrationSection(selectedDepartmentId, selectedGrade)) {
+            showImportAlert('The selected section no longer matches this grade and school year. Select it again.', 'warning');
+            showStep('upload');
+            return;
+        }
+    } catch (error) {
+        showImportAlert('Could not verify the selected section. Please try again.', 'danger');
         return;
     }
 
@@ -1656,22 +1681,68 @@ function populateGradeLevelSelects() {
     singleGradeSelect.innerHTML = '<option value="" disabled selected>Select grade level...</option>' + optionsHtml;
 }
 
-function filterSectionsByGradeLevel(gradeLevel, sectionSelectId) {
+function getRegistrationSection(sectionId, gradeLevel) {
+    if (!sectionId || !gradeLevel || !activeSchoolYear?.id) return null;
+    return departmentsCache.find(section =>
+        String(section.section_id) === String(sectionId) &&
+        section.grade_level === gradeLevel &&
+        String(section.school_year_id) === String(activeSchoolYear.id)
+    ) || null;
+}
+
+async function verifyRegistrationSection(sectionId, gradeLevel) {
+    if (!getRegistrationSection(sectionId, gradeLevel)) return false;
+    const { data, error } = await supabaseClient.from('sections')
+        .select('section_id, grade_level, school_year_id')
+        .eq('section_id', sectionId)
+        .eq('grade_level', gradeLevel)
+        .eq('school_year_id', activeSchoolYear.id)
+        .maybeSingle();
+    if (error) throw error;
+    return !!data;
+}
+
+async function filterSectionsByGradeLevel(gradeLevel, sectionSelectId) {
     const sectionSelect = document.getElementById(sectionSelectId);
     if (!sectionSelect) return;
+    const requestToken = ++sectionLoadTokens[sectionSelectId];
+    sectionSelect.disabled = true;
+    sectionSelect.innerHTML = gradeLevel
+        ? '<option value="" selected>Loading sections...</option>'
+        : '<option value="" selected>Select grade level first...</option>';
 
-    if (!gradeLevel) {
-        sectionSelect.innerHTML = '<option value="" disabled selected>Select grade level first...</option>';
-        sectionSelect.disabled = true;
-        return;
+    if (!gradeLevel || !activeSchoolYear?.id) return;
+    const yearId = activeSchoolYear.id;
+    const gradeSelectId = sectionSelectId === 'singleDepartment' ? 'singleGradeLevel' : 'gradeLevelSelect';
+
+    try {
+        const { data, error } = await supabaseClient.from('sections')
+            .select('section_id, grade_level, section_name, school_year_id')
+            .eq('school_year_id', yearId)
+            .eq('grade_level', gradeLevel)
+            .order('section_name', { ascending: true });
+        if (error) throw error;
+        if (requestToken !== sectionLoadTokens[sectionSelectId] ||
+            document.getElementById(gradeSelectId)?.value !== gradeLevel ||
+            activeSchoolYear?.id !== yearId) return;
+
+        const sections = (data || []).filter(section =>
+            section.grade_level === gradeLevel && String(section.school_year_id) === String(yearId));
+        for (const section of sections) {
+            const cachedIndex = departmentsCache.findIndex(cached =>
+                String(cached.section_id) === String(section.section_id));
+            if (cachedIndex >= 0) departmentsCache[cachedIndex] = section;
+            else departmentsCache.push(section);
+        }
+        sectionSelect.innerHTML = '<option value="" selected>Select section...</option>' +
+            sections.map(section => `<option value="${escapeHtml(section.section_id)}">${escapeHtml(section.section_name)}</option>`).join('');
+        if (sections.length) sectionSelect.disabled = false;
+        else sectionSelect.innerHTML = '<option value="" selected>No sections for this grade in the active school year</option>';
+    } catch (error) {
+        if (requestToken !== sectionLoadTokens[sectionSelectId]) return;
+        sectionSelect.innerHTML = '<option value="" selected>Unable to load sections</option>';
+        showImportAlert('Unable to load sections. Please try again.', 'danger');
     }
-
-    const optionsHtml = departmentsCache.map(d =>
-        `<option value="${escapeHtml(d.section_id)}">${escapeHtml(d.section_name)} (section metadata: ${escapeHtml(d.grade_level)})</option>`
-    ).join('');
-
-    sectionSelect.innerHTML = '<option value="" disabled selected>Select section...</option>' + optionsHtml;
-    sectionSelect.disabled = false;
 }
 
 async function openSingleStudentModal() {
@@ -1699,8 +1770,9 @@ async function openSingleStudentModal() {
         const section = departmentsCache.find(
             d => String(d.section_id) === String(selectedDepartmentId)
         );
-        if (section) {
-            filterSectionsByGradeLevel('select', 'singleDepartment');
+        if (section && getRegistrationSection(section.section_id, section.grade_level)) {
+            singleGradeLevel.value = section.grade_level;
+            await filterSectionsByGradeLevel(section.grade_level, 'singleDepartment');
             deptSelect.value = selectedDepartmentId;
         }
     }
@@ -1752,7 +1824,7 @@ async function updateSingleStudentId() {
 
     try {
         const nextId = await generateNextStudId(gradeLevel);
-        studIdInput.value = nextId;
+        if (gradeSelect.value === gradeLevel) studIdInput.value = nextId;
     } catch (err) {
         console.error('Failed to generate Student ID:', err);
         studIdInput.value = '';
@@ -1808,6 +1880,10 @@ function proceedToGuardianStep(e) {
     }
     if (currentGradeFromStudentId(studId) !== document.getElementById('singleGradeLevel')?.value) {
         showImportAlert('Student ID prefix must match the selected current grade.', 'warning');
+        return;
+    }
+    if (!getRegistrationSection(sectionId, document.getElementById('singleGradeLevel')?.value)) {
+        showImportAlert('Select a section for this grade in the active school year.', 'warning');
         return;
     }
     if (!email) {
@@ -1982,6 +2058,10 @@ async function submitSingleStudentForm(event) {
         showImportAlert('Student ID prefix must match the selected current grade.', 'warning');
         return;
     }
+    if (!getRegistrationSection(sectionId, document.getElementById('singleGradeLevel')?.value)) {
+        showImportAlert('Select a section for this grade in the active school year.', 'warning');
+        return;
+    }
     const birthDateError = updateStudentBirthDateInput(document.getElementById('singleYearLevel'));
     if (birthDateError) {
         goBackToStudentStep();
@@ -2042,6 +2122,11 @@ async function submitSingleStudentForm(event) {
         setSingleStudentLoading(true, 'Saving student and guardians...');
 
         if (!supabaseClient) throw new Error('Database connection not available. Please refresh the page and try again.');
+
+        if (!await verifyRegistrationSection(sectionId, document.getElementById('singleGradeLevel')?.value)) {
+            showImportAlert('The selected section no longer matches this grade and school year. Select it again.', 'warning');
+            return;
+        }
 
         const { data: existingStudent, error: existingError } = await supabaseClient
             .from('students')

@@ -13,9 +13,11 @@ function codeBetween(start, end) {
     return source.slice(first, last);
 }
 const code = [
+    codeBetween('const sectionLoadTokens', 'let singleStudentModal'),
     codeBetween('const EMAIL_LIKE_PATTERN', "document.addEventListener('DOMContentLoaded'"),
     codeBetween('function validateRow(', 'function renderPreview('),
     codeBetween('async function submitEditStudentForm(', 'function deleteStudentRow('),
+    codeBetween('function getRegistrationSection(', 'async function openSingleStudentModal('),
     codeBetween('async function submitSingleStudentForm(', 'function openDuplicateRowsModal('),
 ].join('\n');
 
@@ -29,13 +31,29 @@ function harness(values) {
         document: { getElementById: id => elements.get(id) || { value: '', reset() {}, focus() {} } },
         activeSchoolYear: { id: 'year-1' },
         allStudents: [{ student_id: 'uuid-1', stud_id: '1-0016', current_grade_level: 'Grade 1', section_id: 'section-4' }],
-        selectedDepartmentName: 'Section A', departmentsCache: [],
+        selectedDepartmentName: 'Section A', departmentsCache: [
+            { section_id: 'section-1', grade_level: 'Grade 1', school_year_id: 'year-1' },
+            { section_id: 'section-4', grade_level: 'Grade 4', school_year_id: 'year-1' }
+        ],
         singleStudentModal: null, editStudentModal: null,
         getStudentBirthDateError: () => null,
         updateStudentBirthDateInput: () => null,
         setSingleStudentLoading() {}, loadAllStudentsTable: async () => {},
         showImportAlert: message => alerts.push(message),
         supabaseClient: { from(table) {
+            if (table === 'sections') {
+                const filters = {};
+                const query = {
+                    select() { return this; },
+                    eq(column, value) { filters[column] = value; return this; },
+                    async maybeSingle() {
+                        return { data: context.departmentsCache.find(section =>
+                            Object.entries(filters).every(([column, value]) => section[column] === value)) || null,
+                        error: null };
+                    }
+                };
+                return query;
+            }
             assert.equal(table, 'students');
             return {
                 select() { return { eq() { return { maybeSingle: async () => ({ data: null, error: null }) }; } }; },
@@ -69,8 +87,8 @@ test('valid Student ID prefixes determine academic grade independent of section'
         .some(error => error.includes('prefix must match')));
 });
 
-test('single registration writes ID-derived grade even with an older-grade section', async () => {
-    const h = harness({ singleDepartment: 'section-4', singleStudentId: '1-0016',
+test('single registration requires a matching initial section while edit can retain an older one', async () => {
+    const h = harness({ singleDepartment: 'section-1', singleStudentId: '1-0016',
         singleGradeLevel: 'Grade 1', singleFirstName: 'Dummy', singleLastName: 'Student',
         singleYearLevel: '2015-01-01', singleSection: 'male' });
     h.context.eventForTest = { preventDefault() {} };
@@ -78,7 +96,13 @@ test('single registration writes ID-derived grade even with an older-grade secti
     assert.equal(h.writes.length, 1);
     assert.equal(h.writes[0].payload.stud_id, '1-0016');
     assert.equal(h.writes[0].payload.current_grade_level, 'Grade 1');
-    assert.equal(h.writes[0].payload.section_id, 'section-4');
+    assert.equal(h.writes[0].payload.section_id, 'section-1');
+
+    h.elements.get('singleDepartment').value = 'section-4';
+    h.writes.length = 0;
+    await vm.runInContext('submitSingleStudentForm(eventForTest)', h.context);
+    assert.equal(h.writes.length, 0);
+    assert(h.alerts.some(message => message.includes('Select a section for this grade')));
 
     h.elements.get('singleGradeLevel').value = 'Grade 4';
     h.writes.length = 0;
