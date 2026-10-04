@@ -93,6 +93,41 @@ async function adminAal2Fetch(url, options = {}) {
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     const appRoot = APP_ROOT;
     const relativePath = decodeURIComponent(window.location.pathname.slice(appRoot.pathname.length));
+    const adminManagementPage = relativePath.endsWith('.html') &&
+        (relativePath.startsWith('admin/') || relativePath.startsWith('portal/') ||
+         relativePath.startsWith('EntryExitMonitoring/admin/') ||
+         relativePath.startsWith('TimeInAndTimeOutMonitoring/admin/')) &&
+        !relativePath.includes('/includes/');
+    function loadSharedScript(path) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = new URL(path, appRoot).href;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+    async function startAdminInactivity(userId) {
+        try {
+            if (document.readyState === 'loading') {
+                await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+            }
+            if (!window.UIFeedback) {
+                if (!document.querySelector('link[href*="shared/ui-feedback.css"]')) {
+                    const style = document.createElement('link');
+                    style.rel = 'stylesheet';
+                    style.href = new URL('shared/ui-feedback.css', appRoot).href;
+                    document.head.appendChild(style);
+                }
+                await loadSharedScript('shared/ui-feedback.js');
+            }
+            await loadSharedScript('shared/admin-inactivity.js');
+            await window.AdminInactivity.start({ client: supabaseClient, userId, appRoot,
+                projectUrl: SUPABASE_CONFIG.projectUrl });
+        } catch (error) {
+            console.error('Admin inactivity guard could not start:', error);
+        }
+    }
     const protectedPage = window.location.pathname.startsWith(appRoot.pathname) &&
         (relativePath.startsWith('admin/') || relativePath.startsWith('portal/') ||
          relativePath.startsWith('EntryExitMonitoring/') ||
@@ -128,6 +163,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
                 }));
                 window.adminMfaRouteComplete = true;
                 document.documentElement.style.visibility = '';
+                if (adminManagementPage) void startAdminInactivity(profile.admin_id);
                 return true;
             } catch (_) {
                 sessionStorage.removeItem('user');

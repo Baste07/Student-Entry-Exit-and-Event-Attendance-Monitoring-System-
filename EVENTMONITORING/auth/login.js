@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Force fresh authentication when opening the login page.
     sessionStorage.removeItem('user');
+    const inactivityMinutes = sessionStorage.getItem('admin_inactivity_notice');
+    sessionStorage.removeItem('admin_inactivity_notice');
 
     usernameInput.addEventListener('input', function () {
         errorAlert.classList.add('d-none');
@@ -67,6 +69,10 @@ document.addEventListener('DOMContentLoaded', function () {
                           <polyline points="22 4 12 13.01 9 10.01"/>`;
         errorAlert.classList.remove('d-none');
         document.getElementById('error-message').textContent = message;
+    }
+
+    if (/^([3-9]|[1-9][0-9]+)$/.test(inactivityMinutes || '')) {
+        showSuccess(`You were logged out after ${inactivityMinutes} minutes of inactivity.`);
     }
 
     const forgotModal      = document.getElementById('forgotModal');

@@ -1,6 +1,7 @@
 let allSchoolYears = [];
 let savedSmsEnabled = true;
 let savedAntiSpoofEnabled = true;
+let savedAdminInactivityMinutes = 3;
 let creatingSchoolYear = false;
 let currentRolloverPreview = null;
 const qrReissueCursorByYear = {};
@@ -19,6 +20,7 @@ function setupEventListeners() {
     document.getElementById('existingSchoolYearSelect')?.addEventListener('change', handleSelectChange);
     document.getElementById('attendanceSmsToggle')?.addEventListener('change', event => saveCapability(event, 'sms_enabled'));
     document.getElementById('antiSpoofToggle')?.addEventListener('change', event => saveCapability(event, 'anti_spoof_enabled'));
+    document.getElementById('saveAdminInactivityTimeout')?.addEventListener('click', saveAdminInactivityTimeout);
     document.getElementById('rolloverEndMonth')?.addEventListener('change', populateRolloverDays);
     document.getElementById('saveRolloverEndDate')?.addEventListener('click', saveRolloverEndDate);
     document.getElementById('rolloverSchoolYear')?.addEventListener('change', previewRollover);
@@ -50,6 +52,15 @@ async function loadSmsSetting() {
         savedAntiSpoofEnabled = AppSettings.enabled(settings, 'anti_spoof_enabled');
         renderSmsSetting(savedSmsEnabled);
         renderAntiSpoofSetting(savedAntiSpoofEnabled);
+        const minutes = Number(settings.admin_inactivity_timeout_minutes);
+        savedAdminInactivityMinutes = AppSettings.validAdminTimeoutMinutes(settings.admin_inactivity_timeout_minutes)
+            ? minutes : 3;
+        const input = document.getElementById('adminInactivityTimeout');
+        const saveButton = document.getElementById('saveAdminInactivityTimeout');
+        const timeoutStatus = document.getElementById('adminInactivityStatus');
+        if (input) { input.value = String(savedAdminInactivityMinutes); input.disabled = false; }
+        if (saveButton) saveButton.disabled = false;
+        if (timeoutStatus) timeoutStatus.textContent = `Current timeout: ${savedAdminInactivityMinutes} minutes.`;
         if (smsToggle) smsToggle.disabled = false;
         if (securityToggle) securityToggle.disabled = false;
     } catch (error) {
@@ -60,6 +71,41 @@ async function loadSmsSetting() {
         if (status) status.textContent = 'System settings unavailable. Refresh to try again.';
         const securityStatus = document.getElementById('antiSpoofStatus');
         if (securityStatus) securityStatus.textContent = 'Security setting unavailable. Refresh to try again.';
+        const timeoutStatus = document.getElementById('adminInactivityStatus');
+        if (timeoutStatus) timeoutStatus.textContent = 'Timeout setting unavailable. Refresh to try again.';
+    }
+}
+
+async function saveAdminInactivityTimeout() {
+    const input = document.getElementById('adminInactivityTimeout');
+    const button = document.getElementById('saveAdminInactivityTimeout');
+    const raw = input?.value.trim() || '';
+    if (!AppSettings.validAdminTimeoutMinutes(raw)) {
+        UIFeedback.fieldError(input, 'Enter a whole number of at least 3 minutes.');
+        return;
+    }
+    button.disabled = true;
+    try {
+        await AppSettings.save(supabaseClient, 'system', { admin_inactivity_timeout_minutes: raw });
+        const previous = savedAdminInactivityMinutes;
+        savedAdminInactivityMinutes = Number(raw);
+        document.getElementById('adminInactivityStatus').textContent =
+            `Current timeout: ${savedAdminInactivityMinutes} minutes.`;
+        window.AdminInactivity?.settingChanged();
+        try {
+            await logSystemAudit({ action: 'UPDATE', moduleName: 'system', pageName: 'system-settings.html',
+                targetTable: 'system_settings', targetId: 'admin_inactivity_timeout_minutes',
+                details: { setting: 'admin_inactivity_timeout_minutes', old_value: previous,
+                    new_value: savedAdminInactivityMinutes } });
+        } catch (auditError) {
+            console.error('Admin inactivity timeout audit could not be recorded:', auditError);
+        }
+        UIFeedback.success(`Admin inactivity timeout saved: ${savedAdminInactivityMinutes} minutes.`);
+    } catch (error) {
+        console.error('Could not save Admin inactivity timeout:', error);
+        UIFeedback.error('Could not save the Admin inactivity timeout. Please try again.');
+    } finally {
+        button.disabled = false;
     }
 }
 

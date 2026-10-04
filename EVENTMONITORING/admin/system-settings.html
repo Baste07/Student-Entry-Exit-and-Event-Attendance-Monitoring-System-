@@ -56,6 +56,25 @@
         </div>
         <div class="settings-section">
             <div class="settings-header">
+                <h2>Admin Session Security</h2>
+                <p>Set how long inactive Admin and Super Admin management sessions remain open.</p>
+            </div>
+            <div class="settings-form">
+                <div class="form-group">
+                    <label for="adminInactivityTimeout" class="form-label">Automatically log out inactive Admin sessions after</label>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <input type="number" id="adminInactivityTimeout" class="form-control" style="max-width:110px"
+                               min="3" step="1" value="3" inputmode="numeric" aria-describedby="adminInactivityHelp" disabled>
+                        <span>minutes</span>
+                        <button type="button" class="btn btn-primary" id="saveAdminInactivityTimeout" disabled>Save Timeout</button>
+                    </div>
+                    <small id="adminInactivityHelp" class="form-text text-muted">Minimum: 3 minutes. A warning appears 30 seconds before logout.</small>
+                    <small id="adminInactivityStatus" class="form-text text-muted d-block" role="status" aria-live="polite">Loading timeout...</small>
+                </div>
+            </div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-header">
                 <h2>Academic Calendar</h2>
                 <p>Manage school years and set the active year used across all modules</p>
             </div>

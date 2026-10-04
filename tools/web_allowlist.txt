@@ -160,6 +160,7 @@ portal/portal.css
 portal/portal.html
 portal/portal.js
 shared/admin-credential-check.js
+shared/admin-inactivity.js
 shared/admin-mfa.js
 shared/global.css
 shared/global.js
