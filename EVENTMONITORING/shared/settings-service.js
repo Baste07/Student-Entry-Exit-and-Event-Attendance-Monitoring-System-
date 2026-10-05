@@ -4,7 +4,7 @@
     const tables = { system: 'system_settings', gate: 'gate_settings', event: 'event_settings' };
     const defaults = {
         system: { sms_enabled: 'true', anti_spoof_enabled: 'true', school_year_end_month_day: '03-25',
-            admin_inactivity_timeout_minutes: '3' },
+            admin_inactivity_timeout_minutes: '3', admin_login_max_attempts: '3' },
         gate: {
             gateOpen: '06:00', gateClose: '18:00', lateThreshold: '07:30',
             enforceGateHours: 'false', scanMethod: 'face', autoExit: 'true',
@@ -45,6 +45,8 @@
             if (!Object.hasOwn(defaults[scope], key)) throw new Error(`Unsupported setting: ${key}`);
             if (scope === 'system' && key === 'admin_inactivity_timeout_minutes' &&
                 !validAdminTimeoutMinutes(value)) throw new Error('Inactivity timeout must be at least 3 whole minutes.');
+            if (scope === 'system' && key === 'admin_login_max_attempts' &&
+                !validAdminLoginMaxAttempts(value)) throw new Error('Maximum failed logins must be a whole number from 3 to 6.');
             return { key, value: String(value) };
         });
         if (!rows.length) return;
@@ -64,9 +66,11 @@
         const text = String(value ?? '');
         return /^([3-9]|[1-9][0-9]+)$/.test(text) && Number.isSafeInteger(Number(text));
     }
+    function validAdminLoginMaxAttempts(value) { return /^[3-6]$/.test(String(value ?? '')); }
     function effectiveSms(system, module) { return enabled(system, 'sms_enabled') && enabled(module, 'sms_enabled'); }
     function hasSaved(scope, key) { return !!savedKeys[scope]?.has(key); }
-    const api = { defaults, load, save, enabled, effectiveSms, hasSaved, validAdminTimeoutMinutes };
+    const api = { defaults, load, save, enabled, effectiveSms, hasSaved,
+        validAdminTimeoutMinutes, validAdminLoginMaxAttempts };
     root.AppSettings = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -27,7 +27,7 @@ export async function requireActiveAdminAal2(
     return { response: json(403, { success: false, message: 'Authenticator verification is required.' }) };
   }
   const actor = await gateway.getProfile(user.id.toLowerCase());
-  if (!actor || actor.status !== 'active' ||
+  if (!actor || actor.status !== 'active' || actor.login_locked !== false ||
     (superOnly ? actor.admin_level !== 'super_admin' : !['admin', 'super_admin'].includes(actor.admin_level))) {
     return { response: json(403, { success: false, message: 'This administrator action is not allowed.' }) };
   }

@@ -7,7 +7,7 @@ const path = require('node:path');
 const script = fs.readFileSync(path.join(__dirname, '../config/config.js'), 'utf8');
 const base = 'http://localhost/EVENTMONITORING/';
 
-async function visit(relativePath, { aal = 'aal1', active = true, user = true } = {}) {
+async function visit(relativePath, { aal = 'aal1', active = true, locked = false, user = true } = {}) {
     const values = new Map([['user', 'stale-unverified-value']]);
     const storage = {
         getItem: key => values.get(key) ?? null,
@@ -45,7 +45,7 @@ async function visit(relativePath, { aal = 'aal1', active = true, user = true } 
                 eq: () => ({ maybeSingle: async () => ({
                     data: { admin_id: 'admin-id', admin_name: 'Test Admin',
                         email: 'test@example.invalid', admin_level: 'admin',
-                        status: active ? 'active' : 'suspended', faculty: 'TEST' },
+                        status: active ? 'active' : 'suspended', login_locked: locked, faculty: 'TEST' },
                     error: null
                 }) })
             })
@@ -100,6 +100,13 @@ test('inactivity guard runs on management pages but never on scanner or student 
 
 test('suspended admin is signed out even with AAL2', async () => {
     const result = await visit('portal/portal.html', { aal: 'aal2', active: false });
+    assert.equal(result.redirected, base + 'auth/login.html');
+    assert.equal(result.signedOut, true);
+    assert.equal(result.profile, undefined);
+});
+
+test('locked admin is signed out even with AAL2', async () => {
+    const result = await visit('portal/portal.html', { aal: 'aal2', locked: true });
     assert.equal(result.redirected, base + 'auth/login.html');
     assert.equal(result.signedOut, true);
     assert.equal(result.profile, undefined);

@@ -6,22 +6,20 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
-import { execFileSync } from 'node:child_process';
 
 if (process.env.CONFIRM_DEVELOPMENT_BROWSER_SMOKE !== 'ehyqvyglirirktfmdezq') {
     throw new Error('Development browser smoke-test guard is not set.');
 }
 const root = path.resolve('C:/xampp/htdocs/CAPSTONEFINAL');
 const projectUrl = 'https://ehyqvyglirirktfmdezq.supabase.co';
-const keys = JSON.parse(execFileSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe', [
-    '-NoProfile', '-Command',
-    'supabase projects api-keys --project-ref ehyqvyglirirktfmdezq --output json'
-], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, SUPABASE_TELEMETRY_DISABLED: '1' } }));
-const serviceKey = keys.find(key => key.name === 'service_role')?.api_key;
-const anonKey = keys.find(key => key.name === 'anon')?.api_key;
-if (!serviceKey || !anonKey) {
-    throw new Error('Development-only API keys unavailable.');
+const localEnv = path.join(root, '.env.development.local');
+if (!fs.existsSync(localEnv)) throw new Error('Ignored Development environment file is required.');
+process.loadEnvFile(localEnv);
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const anonKey = process.env.SUPABASE_ANON_KEY || process.env.WEB_SUPABASE_ANON_KEY;
+if (process.env.SUPABASE_URL !== projectUrl ||
+    !serviceKey?.startsWith('sb_secret_') || !anonKey?.startsWith('sb_publishable_')) {
+    throw new Error('Development URL, public key, and server secret must match the Development-only configuration.');
 }
 const email = `codex-browser-${crypto.randomBytes(6).toString('hex')}@example.com`;
 const password = crypto.randomBytes(24).toString('hex');
@@ -36,11 +34,26 @@ let fixtureStudent;
 let fixtureStudId;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+function totp(secret) {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let bits = '';
+    for (const letter of secret.toUpperCase().replace(/=+$/, '')) {
+        const value = alphabet.indexOf(letter);
+        if (value < 0) throw new Error('Development test authenticator has invalid encoding.');
+        bits += value.toString(2).padStart(5, '0');
+    }
+    const key = Buffer.from((bits.match(/.{8}/g) || []).map(byte => Number.parseInt(byte, 2)));
+    const counter = Buffer.alloc(8);
+    counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+    const digest = crypto.createHmac('sha1', key).update(counter).digest();
+    const offset = digest[digest.length - 1] & 15;
+    return ((digest.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, '0');
+}
 async function api(method, pathname, body) {
     const response = await fetch(projectUrl + pathname, {
         method,
         headers: {
-            apikey: serviceKey, Authorization: `Bearer ${serviceKey}`,
+            apikey: serviceKey,
             'Content-Type': 'application/json', Accept: 'application/json'
         },
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -181,6 +194,21 @@ try {
     })()`);
     if (!loggedIn) throw new Error('Headless browser Auth login failed.');
     console.log('PASS: Browser Supabase Auth session established');
+    const factor = await cdp.eval(`(async () => {
+        const { data, error } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
+        return error ? null : { id: data?.id, secret: data?.totp?.secret };
+    })()`);
+    if (!factor?.id || !factor.secret) throw new Error('Development test authenticator enrollment failed.');
+    const verified = await cdp.eval(`(async () => {
+        const { error } = await supabaseClient.auth.mfa.challengeAndVerify({
+            factorId: ${JSON.stringify(factor.id)}, code: ${JSON.stringify(totp(factor.secret))}
+        });
+        if (error) return false;
+        const assurance = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+        return assurance.data?.currentLevel === 'aal2';
+    })()`);
+    if (!verified) throw new Error('Development test authenticator verification failed.');
+    console.log('PASS: Browser Supabase Auth session reached AAL2');
 
     const pages = [
         ['Super Admin System Settings', '/admin/system-settings.html',

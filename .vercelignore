@@ -1,4 +1,7 @@
 .artifacts/
+# Local environment files can contain Development or LOCAL_GATE server keys.
+# Vercel receives its configuration from scoped project environment variables.
+**/.env*
 /TEST/
 /dist/
 /.student-rollover-clean-dev/

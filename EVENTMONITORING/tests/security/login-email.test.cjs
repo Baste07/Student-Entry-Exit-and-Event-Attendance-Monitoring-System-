@@ -24,11 +24,9 @@ function loginPage(profiles = {}, assuranceLevel = 'aal1', pageUrl = 'http://loc
     const calls = { signIns: [], resets: [], recoveryOptions: [], signOuts: 0, completed: [], redirects: [] };
     const client = {
         auth: {
-            async signInWithPassword({ email }) {
-                calls.signIns.push(email);
-                const profile = profiles[email];
-                return profile ? { data: { user: { id: profile.admin_id } }, error: null }
-                    : { data: null, error: { message: 'Invalid credentials' } };
+            async setSession({ access_token }) {
+                const profile = Object.values(profiles).find(item => item.admin_id === access_token);
+                return { data: { user: profile ? { id: profile.admin_id } : null }, error: null };
             },
             async signOut() { calls.signOuts++; },
             async resetPasswordForEmail(email, options) {
@@ -60,10 +58,21 @@ function loginPage(profiles = {}, assuranceLevel = 'aal1', pageUrl = 'http://loc
             getElementById: element,
             addEventListener(name, handler) { if (name === 'DOMContentLoaded') handler(); }
         },
-        sessionStorage: { removeItem() {} },
-        window: { location: { href: pageUrl,
+        sessionStorage: { removeItem() {}, getItem() { return null; } },
+        window: { AppDeployment: { apiRoute: () => '/api/admin-login' }, location: { href: pageUrl,
             replace(path) { calls.redirects.push(path); } } },
         supabaseClient: client,
+        AppDeployment: { apiRoute: () => '/api/admin-login' },
+        async fetch(_url, options) {
+            const { email } = JSON.parse(options.body);
+            calls.signIns.push(email);
+            const profile = profiles[email];
+            const result = profile
+                ? { success: true, userId: profile.admin_id,
+                    access_token: profile.admin_id, refresh_token: 'test-refresh' }
+                : { success: false, message: 'Invalid email or password.' };
+            return { ok: !!profile, async json() { return result; } };
+        },
         AdminMFA: { async completeLogin(profile) { calls.completed.push(profile.admin_level); } },
         console: { log() {}, error() {} },
         URL,
@@ -111,9 +120,9 @@ test('login sends valid addresses to Auth, including unknown users, but blocks m
 
 test('active Admin and Super Admin proceed to MFA; suspended Admin is denied', async () => {
     const profiles = {
-        'admin@gmail.com': { admin_id: 'normal', status: 'active', admin_level: 'admin' },
-        'super@example.com': { admin_id: 'super', status: 'active', admin_level: 'super_admin' },
-        'suspended@yahoo.com': { admin_id: 'suspended', status: 'suspended', admin_level: 'admin' }
+        'admin@gmail.com': { admin_id: 'normal', status: 'active', admin_level: 'admin', login_locked: false },
+        'super@example.com': { admin_id: 'super', status: 'active', admin_level: 'super_admin', login_locked: false },
+        'suspended@yahoo.com': { admin_id: 'suspended', status: 'suspended', admin_level: 'admin', login_locked: false }
     };
     const page = loginPage(profiles);
     page.element('password').value = 'not-a-real-password';

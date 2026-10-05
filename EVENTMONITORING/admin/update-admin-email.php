@@ -48,11 +48,11 @@ function adminEmailTakenByAnother(string $email, string $targetId, callable $req
 /** A self-change must leave another usable recovery Super Admin. */
 function adminEmailHasRecoverySuper(string $targetId, callable $request): ?bool
 {
-    $profiles = $request('GET', '/rest/v1/admins?select=admin_id&admin_level=eq.super_admin&status=eq.active');
+    $profiles = $request('GET', '/rest/v1/admins?select=admin_id,login_locked&admin_level=eq.super_admin&status=eq.active');
     if (($profiles['status'] ?? 0) !== 200 || !is_array($profiles['data'] ?? null)) return null;
     foreach ($profiles['data'] as $profile) {
         $id = strtolower((string) ($profile['admin_id'] ?? ''));
-        if ($id === '' || $id === $targetId) continue;
+        if ($id === '' || $id === $targetId || ($profile['login_locked'] ?? true) !== false) continue;
         $factor = hasVerifiedTotpFactor($id, $request);
         if ($factor === null) return null;
         if (!$factor) continue;

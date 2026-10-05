@@ -2,6 +2,7 @@ let allSchoolYears = [];
 let savedSmsEnabled = true;
 let savedAntiSpoofEnabled = true;
 let savedAdminInactivityMinutes = 3;
+let savedAdminLoginMaxAttempts = 3;
 let creatingSchoolYear = false;
 let currentRolloverPreview = null;
 const qrReissueCursorByYear = {};
@@ -21,6 +22,7 @@ function setupEventListeners() {
     document.getElementById('attendanceSmsToggle')?.addEventListener('change', event => saveCapability(event, 'sms_enabled'));
     document.getElementById('antiSpoofToggle')?.addEventListener('change', event => saveCapability(event, 'anti_spoof_enabled'));
     document.getElementById('saveAdminInactivityTimeout')?.addEventListener('click', saveAdminInactivityTimeout);
+    document.getElementById('saveAdminLoginMaxAttempts')?.addEventListener('click', saveAdminLoginMaxAttempts);
     document.getElementById('rolloverEndMonth')?.addEventListener('change', populateRolloverDays);
     document.getElementById('saveRolloverEndDate')?.addEventListener('click', saveRolloverEndDate);
     document.getElementById('rolloverSchoolYear')?.addEventListener('change', previewRollover);
@@ -61,6 +63,14 @@ async function loadSmsSetting() {
         if (input) { input.value = String(savedAdminInactivityMinutes); input.disabled = false; }
         if (saveButton) saveButton.disabled = false;
         if (timeoutStatus) timeoutStatus.textContent = `Current timeout: ${savedAdminInactivityMinutes} minutes.`;
+        savedAdminLoginMaxAttempts = AppSettings.validAdminLoginMaxAttempts(settings.admin_login_max_attempts)
+            ? Number(settings.admin_login_max_attempts) : 3;
+        const maxAttemptsInput = document.getElementById('adminLoginMaxAttempts');
+        const maxAttemptsSave = document.getElementById('saveAdminLoginMaxAttempts');
+        const maxAttemptsStatus = document.getElementById('adminLoginMaxAttemptsStatus');
+        if (maxAttemptsInput) { maxAttemptsInput.value = String(savedAdminLoginMaxAttempts); maxAttemptsInput.disabled = false; }
+        if (maxAttemptsSave) maxAttemptsSave.disabled = false;
+        if (maxAttemptsStatus) maxAttemptsStatus.textContent = `Current limit: ${savedAdminLoginMaxAttempts} failed attempts.`;
         if (smsToggle) smsToggle.disabled = false;
         if (securityToggle) securityToggle.disabled = false;
     } catch (error) {
@@ -73,6 +83,40 @@ async function loadSmsSetting() {
         if (securityStatus) securityStatus.textContent = 'Security setting unavailable. Refresh to try again.';
         const timeoutStatus = document.getElementById('adminInactivityStatus');
         if (timeoutStatus) timeoutStatus.textContent = 'Timeout setting unavailable. Refresh to try again.';
+        const maxAttemptsStatus = document.getElementById('adminLoginMaxAttemptsStatus');
+        if (maxAttemptsStatus) maxAttemptsStatus.textContent = 'Login limit unavailable. Refresh to try again.';
+    }
+}
+
+async function saveAdminLoginMaxAttempts() {
+    const input = document.getElementById('adminLoginMaxAttempts');
+    const button = document.getElementById('saveAdminLoginMaxAttempts');
+    const raw = input?.value.trim() || '';
+    if (!AppSettings.validAdminLoginMaxAttempts(raw)) {
+        UIFeedback.fieldError(input, 'Enter a whole number from 3 to 6.');
+        return;
+    }
+    button.disabled = true;
+    try {
+        await AppSettings.save(supabaseClient, 'system', { admin_login_max_attempts: raw });
+        const previous = savedAdminLoginMaxAttempts;
+        savedAdminLoginMaxAttempts = Number(raw);
+        document.getElementById('adminLoginMaxAttemptsStatus').textContent =
+            `Current limit: ${savedAdminLoginMaxAttempts} failed attempts.`;
+        try {
+            await logSystemAudit({ action: 'UPDATE', moduleName: 'system', pageName: 'system-settings.html',
+                targetTable: 'system_settings', targetId: 'admin_login_max_attempts',
+                details: { setting: 'admin_login_max_attempts', old_value: previous,
+                    new_value: savedAdminLoginMaxAttempts } });
+        } catch (auditError) {
+            console.error('Admin login limit audit could not be recorded:', auditError);
+        }
+        UIFeedback.success(`Admin login limit saved: ${savedAdminLoginMaxAttempts} attempts.`);
+    } catch (error) {
+        console.error('Could not save Admin login limit:', error);
+        UIFeedback.error('Could not save the Admin login limit. Please try again.');
+    } finally {
+        button.disabled = false;
     }
 }
 

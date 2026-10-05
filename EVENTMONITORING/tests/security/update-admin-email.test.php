@@ -45,7 +45,7 @@ function emailTransport(array &$state): callable
         if ($verb === 'GET' && str_starts_with($path, '/rest/v1/admins?admin_id=eq.' . EMAIL_ACTOR)) {
             return ['status' => 200, 'data' => [[
                 'admin_id' => EMAIL_ACTOR, 'admin_level' => $state['actor_level'],
-                'status' => $state['actor_status'],
+                'status' => $state['actor_status'], 'login_locked' => false,
             ]]];
         }
         if ($verb === 'GET' && $path === '/auth/v1/admin/users/' . EMAIL_ACTOR . '/factors') {
@@ -194,7 +194,8 @@ $tests = [
         $usable = static function (string $verb, string $path): array {
             if (str_starts_with($path, '/rest/v1/admins?')) {
                 return ['status' => 200, 'data' => [
-                    ['admin_id' => EMAIL_ACTOR], ['admin_id' => EMAIL_OTHER],
+                    ['admin_id' => EMAIL_ACTOR, 'login_locked' => false],
+                    ['admin_id' => EMAIL_OTHER, 'login_locked' => false],
                 ]];
             }
             if (str_ends_with($path, '/factors')) {

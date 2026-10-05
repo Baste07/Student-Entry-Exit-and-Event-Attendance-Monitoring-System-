@@ -34,6 +34,7 @@ function renderAdminsSkeleton() {
             <td><span class="skeleton-block skeleton-line"></span></td>
             <td><span class="skeleton-block skeleton-line"></span></td>
             <td><span class="skeleton-block skeleton-line"></span></td>
+            <td><span class="skeleton-block skeleton-line"></span></td>
         </tr>
     `).join('');
 }
@@ -94,7 +95,7 @@ async function loadAdmins() {
 
         const { data: admins, error } = await supabaseClient
             .from('admins')
-            .select('admin_id,admin_name,email,faculty,admin_level,status,created_at')
+            .select('admin_id,admin_name,email,faculty,admin_level,status,created_at,failed_login_attempts,login_locked,login_locked_at')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -106,6 +107,9 @@ async function loadAdmins() {
             faculty: admin.faculty || 'N/A',
             level: admin.admin_level || 'admin',
             status: normalizeStatus(admin.status, 'active'),
+            failedLoginAttempts: Number(admin.failed_login_attempts || 0),
+            loginLocked: admin.login_locked === true,
+            loginLockedAt: admin.login_locked_at || null,
             mfaEnabled: null,
             created_at: admin.created_at,
             rawData: admin
@@ -149,7 +153,7 @@ function displayAdmins(admins) {
     if (admins.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                <td colspan="8" style="text-align:center;padding:2rem;color:var(--text-muted);">
                     No admins found
                 </td>
             </tr>
@@ -191,6 +195,9 @@ function displayAdmins(admins) {
                         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 6 10 7 10-7"/></svg>
                     </button>
                 `);
+                if (admin.loginLocked) {
+                    buttons.push(`<button type="button" class="btn-icon btn-unlock-admin" title="Unlock login" aria-label="Unlock login for ${escapeHtml(admin.name)}">Unlock</button>`);
+                }
             }
             
             if (admin.status === 'suspended') {
@@ -228,6 +235,9 @@ function displayAdmins(admins) {
             <td>${escapeHtml(admin.faculty)}</td>
             <td><span class="badge ${levelBadgeClass}">${levelText}</span></td>
             <td><span class="badge ${statusBadgeClass}">${statusText}</span></td>
+            <td>${admin.loginLocked
+                ? `<span class="badge badge-suspended">Locked</span><small class="d-block">${admin.failedLoginAttempts} failed attempts${admin.loginLockedAt ? ` · ${escapeHtml(new Date(admin.loginLockedAt).toLocaleString())}` : ''}</small>`
+                : '<span class="badge badge-active">Active</span>'}</td>
             <td>${admin.mfaEnabled === true ? 'Enabled' : admin.mfaEnabled === false ? 'Setup Required' : admin.mfaEnabled === 'unavailable' ? 'Unavailable' : 'Checking…'}</td>
             <td>${actionButtonsHtml}</td>
         `;
@@ -235,8 +245,27 @@ function displayAdmins(admins) {
         row.querySelector('.btn-delete-admin')?.addEventListener('click', () => deleteAdmin(admin.id));
         row.querySelector('.btn-reset-mfa')?.addEventListener('click', () => resetAdminMfa(admin.id));
         row.querySelector('.btn-change-admin-email')?.addEventListener('click', () => openAdminEmailModal(admin.id));
+        row.querySelector('.btn-unlock-admin')?.addEventListener('click', () => unlockAdminLogin(admin.id));
         tbody.appendChild(row);
     });
+}
+
+async function unlockAdminLogin(adminId) {
+    const admin = allAdmins.find(item => item.id === adminId);
+    if (!isUserSuperAdmin || !admin?.loginLocked) return;
+    if (!await UIFeedback.confirm({
+        title: 'Unlock Administrator Login',
+        message: `Unlock ${admin.name}'s login and reset their failed password count to zero?`,
+        confirmText: 'Unlock Account', type: 'warning'
+    })) return;
+    try {
+        const { data, error } = await supabaseClient.rpc('unlock_admin_login', { p_admin_id: adminId });
+        if (error || data?.success !== true) throw error || new Error('The account could not be unlocked.');
+        await loadAdmins();
+        UIFeedback.success(`${admin.name}'s login is unlocked.`, 'Account unlocked');
+    } catch (error) {
+        UIFeedback.error(error.message || 'The account could not be unlocked.', 'Unlock failed');
+    }
 }
 
 function openAdminEmailModal(adminId) {

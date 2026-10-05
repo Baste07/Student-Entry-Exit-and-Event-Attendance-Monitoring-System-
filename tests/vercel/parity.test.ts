@@ -18,10 +18,10 @@ const IDS = {
 } as const;
 const FACTOR = '77777777-7777-4777-8777-777777777777';
 const profiles: AdminProfile[] = [
-  { admin_id: IDS.normal, email: 'normal@example.invalid', admin_level: 'admin', status: 'active' },
-  { admin_id: IDS.super, email: 'super@example.invalid', admin_level: 'super_admin', status: 'active' },
-  { admin_id: IDS.target, email: 'target@example.invalid', admin_level: 'admin', status: 'active' },
-  { admin_id: IDS.suspended, email: 'suspended@example.invalid', admin_level: 'super_admin', status: 'suspended' }
+  { admin_id: IDS.normal, email: 'normal@example.invalid', admin_level: 'admin', status: 'active', login_locked: false },
+  { admin_id: IDS.super, email: 'super@example.invalid', admin_level: 'super_admin', status: 'active', login_locked: false },
+  { admin_id: IDS.target, email: 'target@example.invalid', admin_level: 'admin', status: 'active', login_locked: false },
+  { admin_id: IDS.suspended, email: 'suspended@example.invalid', admin_level: 'super_admin', status: 'suspended', login_locked: false }
 ];
 
 class Fixture implements AdminGateway {
@@ -100,6 +100,15 @@ test('QR endpoint allows active AAL2 Admin but denies all AAL1 and suspended cal
   assert.equal(await status(handler, qrBody, token(IDS.suspended)), 403);
   assert.equal(await status(handler, qrBody, token(IDS.normal)), 200);
   assert.equal(await status(handler, qrBody, token(IDS.super)), 200);
+});
+
+test('a locked AAL2 Admin cannot use privileged APIs even with a valid Auth token', async () => {
+  const fixture = new Fixture();
+  fixture.profiles.set(IDS.super, { ...profiles[1], login_locked: true });
+  assert.equal(await status(createAdmin, createBody, token(IDS.super), fixture), 403);
+  fixture.profiles.set(IDS.normal, { ...profiles[0], login_locked: true });
+  const handler: Handler = (req, gateway) => sendStudentQrEmail(req, gateway, async () => {});
+  assert.equal(await status(handler, qrBody, token(IDS.normal), fixture), 403);
 });
 
 test('create uses one UID, never stores the supplied password, and rolls back failed profile creation', async () => {

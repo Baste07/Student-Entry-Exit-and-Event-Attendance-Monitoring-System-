@@ -43,7 +43,7 @@ function createTransport(array &$state): callable
         if ($verb === 'GET' && str_starts_with($path, '/rest/v1/admins?admin_id=eq.')) {
             return ['status' => 200, 'data' => [[
                 'admin_id' => CREATE_CALLER_ID,
-                'admin_level' => $state['level'], 'status' => $state['status'],
+                'admin_level' => $state['level'], 'status' => $state['status'], 'login_locked' => false,
             ]]];
         }
         if ($verb === 'GET' && str_starts_with($path, '/rest/v1/admins?email=eq.')) {
