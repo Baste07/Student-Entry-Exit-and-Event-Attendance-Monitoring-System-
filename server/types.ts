@@ -7,6 +7,7 @@ export interface AdminProfile {
   faculty?: string;
   admin_level: AdminLevel;
   status: string;
+  login_locked?: boolean;
   password?: string;
   updated_at?: string;
 }

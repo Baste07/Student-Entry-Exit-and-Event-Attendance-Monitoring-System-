@@ -27,13 +27,19 @@ class Element {
         this.children = [];
         const markup = value.match(/<button\b[^>]*class="[^"]*\bbtn-delete-admin\b[^"]*"[^>]*>/s)?.[0];
         this.deleteButton = markup ? new Element() : null;
+        const unlockMarkup = value.match(/<button\b[^>]*class="[^"]*\bbtn-unlock-admin\b[^"]*"[^>]*>/s)?.[0];
+        this.unlockButton = unlockMarkup ? new Element() : null;
         if (this.deleteButton) {
             this.deleteButton.markup = markup;
             this.deleteButton.disabled = /\sdisabled(?:\s|>|=)/.test(markup);
         }
     }
 
-    querySelector(selector) { return selector === '.btn-delete-admin' ? this.deleteButton : null; }
+    querySelector(selector) {
+        if (selector === '.btn-delete-admin') return this.deleteButton;
+        if (selector === '.btn-unlock-admin') return this.unlockButton;
+        return null;
+    }
     addEventListener(name, listener) { this.listeners[name] = listener; }
     appendChild(child) { this.children.push(child); }
 }
@@ -50,6 +56,7 @@ function harness(options = {}) {
     const alerts = [];
     const confirmations = [];
     const authCalls = [];
+    const rpcCalls = [];
     const user = options.user || currentAdmin;
     const authResult = options.authResult || { data: { session: { access_token: 'test-token', user: { id: 'self' } } }, error: null };
     const context = vm.createContext({
@@ -73,7 +80,8 @@ function harness(options = {}) {
             }
         },
         supabaseClient: {
-            auth: { async getSession() { authCalls.push(true); return authResult; } }
+            auth: { async getSession() { authCalls.push(true); return authResult; } },
+            async rpc(name, args) { rpcCalls.push({ name, args }); return { data: { success: true }, error: null }; }
         },
         window: { AppDeployment: { apiRoute: path => path } },
         async fetch(url, init) {
@@ -85,7 +93,7 @@ function harness(options = {}) {
     vm.runInContext(source, context, { filename: 'usermanagement.js' });
     vm.runInContext('allAdmins = fixtureAdmins; initializeUserSession(); updateStatistics(); applyFilters();', context);
     return {
-        context, nodes, filters, requests, alerts, confirmations, authCalls,
+        context, nodes, filters, requests, alerts, confirmations, authCalls, rpcCalls,
         rows: () => nodes.adminsTableBody.children,
         button: id => nodes.adminsTableBody.children.find(row => row.dataset.adminId === id)?.deleteButton,
         ids: () => Array.from(vm.runInContext('allAdmins.map(admin => admin.id)', context)),
@@ -108,6 +116,25 @@ test('regular admins and the current account cannot be deleted through the handl
     assert.equal(app.confirmations.length, 0);
     assert.match(app.alerts[0], /own account/);
     assert.equal(app.button('self'), null);
+});
+
+test('only a confirmed Super Admin can invoke the account-unlock RPC', async () => {
+    const admins = fixtures.map(admin => admin.id === 'target'
+        ? { ...admin, loginLocked: true, failedLoginAttempts: 3, loginLockedAt: '2026-10-05T00:00:00Z' }
+        : admin);
+    const cancelled = harness({ admins, confirm: false });
+    await cancelled.context.unlockAdminLogin('target');
+    assert.equal(cancelled.rpcCalls.length, 0);
+    const regular = harness({ admins, user: { ...currentAdmin, adminLevel: 'admin' } });
+    await regular.context.unlockAdminLogin('target');
+    assert.equal(regular.rpcCalls.length, 0);
+    const superAdmin = harness({ admins });
+    vm.runInContext('loadAdmins = async () => {}', superAdmin.context);
+    await superAdmin.context.unlockAdminLogin('target');
+    assert.equal(superAdmin.rpcCalls.length, 1);
+    assert.equal(superAdmin.rpcCalls[0].name, 'unlock_admin_login');
+    assert.equal(superAdmin.rpcCalls[0].args.p_admin_id, 'target');
+    assert.match(superAdmin.alerts[0], /unlocked/);
 });
 
 test('canceling confirmation preserves the account without requesting a session or deletion', async () => {

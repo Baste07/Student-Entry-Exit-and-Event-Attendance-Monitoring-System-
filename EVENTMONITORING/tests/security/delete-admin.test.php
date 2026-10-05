@@ -47,6 +47,7 @@ function transportFor(array &$state): callable
         if ($method === 'GET' && strpos($path, '/rest/v1/admins?admin_id=eq.' . CALLER_ID) === 0) {
             return ['status' => 200, 'data' => [[
                 'admin_id' => CALLER_ID, 'admin_level' => $state['role'], 'status' => $state['status'],
+                'login_locked' => false,
             ]]];
         }
         if ($method === 'GET' && strpos($path, '/rest/v1/admins?admin_id=eq.' . TARGET_ID) === 0) {

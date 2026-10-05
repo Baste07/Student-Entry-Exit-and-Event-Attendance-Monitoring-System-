@@ -11,7 +11,7 @@ const APP_ROOT = typeof document !== 'undefined' && document.currentScript
     ? new URL('../', document.currentScript.src) : null;
 const WEB_API_ROUTES = new Set([
     'create-admin.php', 'delete-admin.php', 'admin-mfa-factors.php',
-    'update-admin-email.php', 'send-student-qr-email.php'
+    'update-admin-email.php', 'send-student-qr-email.php', 'admin-login.php'
 ]);
 function adminApiRoute(localPath) {
     if (DEPLOYMENT_MODE !== 'WEB') return localPath;
@@ -141,9 +141,9 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
                 const { data: identity, error: identityError } = await supabaseClient.auth.getUser();
                 if (identityError || !identity?.user?.id) throw new Error('No session');
                 const { data: profile, error: profileError } = await supabaseClient
-                    .from('admins').select('admin_id,admin_name,email,admin_level,status,faculty')
+                    .from('admins').select('admin_id,admin_name,email,admin_level,status,faculty,login_locked')
                     .eq('admin_id', identity.user.id).maybeSingle();
-                if (profileError || !profile || profile.status !== 'active' ||
+                if (profileError || !profile || profile.status !== 'active' || profile.login_locked !== false ||
                     !['admin', 'super_admin'].includes(profile.admin_level)) {
                     await supabaseClient.auth.signOut();
                     throw new Error('No active admin profile');

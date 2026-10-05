@@ -18,7 +18,8 @@ function usable(user: AuthAccount): boolean {
 async function recoverySuperExists(gateway: AdminGateway, targetId: string): Promise<boolean> {
   const profiles = await gateway.listProfiles();
   for (const profile of profiles) {
-    if (profile.admin_level !== 'super_admin' || profile.status !== 'active' || profile.admin_id === targetId) continue;
+    if (profile.admin_level !== 'super_admin' || profile.status !== 'active' ||
+        profile.login_locked !== false || profile.admin_id === targetId) continue;
     if (!await verifiedTotp(gateway, profile.admin_id)) continue;
     const user = await gateway.getAuthUser(profile.admin_id);
     if (!user || user.id !== profile.admin_id) throw new BackendError(502);

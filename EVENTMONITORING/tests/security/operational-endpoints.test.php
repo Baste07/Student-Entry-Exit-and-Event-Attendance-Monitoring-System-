@@ -33,6 +33,7 @@ function profileRequest(string $level, string $status, int &$calls): callable
         if (str_starts_with($path, '/rest/v1/admins?admin_id=eq.')) {
             return ['status' => 200, 'data' => [[
                 'admin_id' => ACTOR_ID, 'admin_level' => $level, 'status' => $status,
+                'login_locked' => false,
             ]]];
         }
         throw new RuntimeException('Unexpected authorization lookup.');

@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { AdminGateway, AdminProfile, AuditRecord, AuthAccount, Factor, StudentRecord } from './types.js';
 import { BackendError } from './types.js';
 
-function serverClient(): SupabaseClient {
+export function serverClient(): SupabaseClient {
   const url = process.env.SUPABASE_URL?.trim() || '';
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || '';
   if (!/^https:\/\/[^/]+\.supabase\.co\/?$/i.test(url) || !key) throw new BackendError(503);

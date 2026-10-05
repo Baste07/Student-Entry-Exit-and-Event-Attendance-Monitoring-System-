@@ -237,22 +237,27 @@ async function writeLoginAudit(userObj, tableName) {
 }
 
 async function loginUser(username, password) {
-    console.log('[loginUser] FUNCTION CALLED - username:', username);
-
     if (!supabaseClient) {
         throw new Error('Database connection not available. Please check configuration.');
     }
 
-    // 1. Authenticate with Supabase FIRST
-    // This securely checks the email/password against Supabase Auth, bypassing the RLS read block.
-    const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
-        email: username,
-        password: password
+    // The same-origin backend verifies the password with Supabase Auth and
+    // atomically records the result before releasing a session to the browser.
+    const response = await fetch(window.AppDeployment.apiRoute('../auth/admin-login.php'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: username, password })
     });
-
-    if (authError) {
-        console.error('[Auth Error]', authError.message);
-        throw new Error('Invalid credentials. Please check your email and password.');
+    const result = await response.json().catch(() => null);
+    if (!response.ok || result?.success !== true || !result.access_token || !result.refresh_token) {
+        throw new Error(result?.message || 'Sign-in service is temporarily unavailable. Please try again.');
+    }
+    const { data: authData, error: authError } = await supabaseClient.auth.setSession({
+        access_token: result.access_token, refresh_token: result.refresh_token
+    });
+    if (authError || authData?.user?.id !== result.userId) {
+        await supabaseClient.auth.signOut({ scope: 'local' });
+        throw new Error('Your administrator session could not be established. Please try again.');
     }
 
     // 2. Now that we are logged in, we have permission to read the admins table!
@@ -260,7 +265,7 @@ async function loginUser(username, password) {
 
     const { data: adminData, error: adminError } = await supabaseClient
         .from('admins')
-        .select('admin_id,admin_name,email,admin_level,status,faculty')
+        .select('admin_id,admin_name,email,admin_level,status,faculty,login_locked')
         .eq('admin_id', userId)
         .maybeSingle();
 
@@ -271,9 +276,10 @@ async function loginUser(username, password) {
         throw new Error('Admin profile not found in database.');
     }
     
-    if (adminData.status !== 'active') {
+    if (adminData.status !== 'active' || adminData.login_locked !== false) {
         await supabaseClient.auth.signOut();
-        throw new Error('Your account is not active. Please contact the administrator.');
+        throw new Error(adminData.login_locked ? 'This account is locked. Contact a Super Admin to unlock it.'
+            : 'Your account is not active. Please contact the administrator.');
     }
     const { data: assurance, error: assuranceError } =
         await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();

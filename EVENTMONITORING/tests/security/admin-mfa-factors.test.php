@@ -31,7 +31,7 @@ function mfaTransport(array &$state): callable
         if ($verb === 'GET' && str_contains($path, 'admin_id=eq.' . MFA_ACTOR)) {
             return ['status' => 200, 'data' => [[
                 'admin_id' => MFA_ACTOR, 'admin_level' => $state['actor_level'],
-                'status' => $state['actor_status'],
+                'status' => $state['actor_status'], 'login_locked' => false,
             ]]];
         }
         if ($verb === 'GET' && str_contains($path, 'admin_id=eq.' . MFA_TARGET)) {

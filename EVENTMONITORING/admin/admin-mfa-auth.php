@@ -33,12 +33,13 @@ function verifiedAdminBearer(string $authorization, callable $request, bool $sup
         return ['status' => 403, 'message' => 'Authenticator verification is required.', 'actor' => null];
     }
     $actor = $request('GET', '/rest/v1/admins?admin_id=eq.' . strtolower($id)
-        . '&select=admin_id,admin_level,status&limit=1');
+        . '&select=admin_id,admin_level,status,login_locked&limit=1');
     if (($actor['status'] ?? 0) !== 200 || !is_array($actor['data'] ?? null)) {
         return ['status' => 502, 'message' => 'Could not verify admin permissions.', 'actor' => null];
     }
     $profile = $actor['data'][0] ?? null;
     if (!$profile || ($profile['status'] ?? '') !== 'active' ||
+        ($profile['login_locked'] ?? true) !== false ||
         !in_array(($profile['admin_level'] ?? ''), $superOnly ? ['super_admin'] : ['admin', 'super_admin'], true)) {
         return ['status' => 403, 'message' => 'This administrator action is not allowed.', 'actor' => null];
     }

@@ -55,7 +55,13 @@ try {
   }
   const result = await fetch(base + '/api/create-admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   if (result.status !== 503) throw new Error(`Function did not fail closed without server credentials: ${result.status}`);
-  console.log('Node-only WEB HTTP smoke passed: pages, API route, and PHP/local exclusions');
+  const loginGet = await fetch(base + '/api/admin-login');
+  if (loginGet.status !== 405) throw new Error(`Admin login method guard failed: ${loginGet.status}`);
+  const loginInvalid = await fetch(base + '/api/admin-login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+  });
+  if (loginInvalid.status !== 400) throw new Error(`Admin login validation failed: ${loginInvalid.status}`);
+  console.log('Node-only WEB HTTP smoke passed: pages, API routes, and PHP/local exclusions');
 } finally {
   await new Promise(resolveClose => server.close(resolveClose));
   if (oldUrl !== undefined) process.env.SUPABASE_URL = oldUrl;

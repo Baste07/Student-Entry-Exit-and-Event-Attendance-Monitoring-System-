@@ -126,6 +126,23 @@ test('timeout setting rejects 2 and accepts 3 and larger integers', async () => 
     await settings.save(db, 'system', { admin_inactivity_timeout_minutes: '15' });
 });
 
+test('Admin password-attempt setting accepts only whole numbers from 3 through 6', async () => {
+    const writes = [];
+    const db = { from: () => ({ upsert: rows => ({ select: async () => {
+        writes.push(rows);
+        return { data: rows, error: null };
+    } }) }) };
+    for (const value of ['2', '7', '3.5', '', '03']) {
+        assert.equal(settings.validAdminLoginMaxAttempts(value), false);
+        await assert.rejects(settings.save(db, 'system', { admin_login_max_attempts: value }), /3 to 6/);
+    }
+    for (const value of ['3', '6']) {
+        assert.equal(settings.validAdminLoginMaxAttempts(value), true);
+        await settings.save(db, 'system', { admin_login_max_attempts: value });
+    }
+    assert.equal(writes.length, 2);
+});
+
 test('System Settings rejects an invalid value before sending a write', async () => {
     const code = fs.readFileSync(path.join(__dirname, '../../admin/system-settings.js'), 'utf8');
     const input = { value: '2' };
@@ -160,6 +177,38 @@ test('System Settings rejects an invalid value before sending a write', async ()
     assert.equal(writes[0].rows.admin_inactivity_timeout_minutes, '3');
     assert.equal(notified, 1);
     assert.match(status.textContent, /3 minutes/);
+});
+
+test('System Settings does not write an out-of-range Admin login limit', async () => {
+    const code = fs.readFileSync(path.join(__dirname, '../../admin/system-settings.js'), 'utf8');
+    const input = { value: '2' };
+    const button = { disabled: false };
+    const status = { textContent: '' };
+    const writes = [];
+    const errors = [];
+    const context = {
+        document: {
+            addEventListener() {},
+            getElementById(id) {
+                return { adminLoginMaxAttempts: input, saveAdminLoginMaxAttempts: button,
+                    adminLoginMaxAttemptsStatus: status }[id];
+            }
+        },
+        AppSettings: {
+            validAdminLoginMaxAttempts: settings.validAdminLoginMaxAttempts,
+            async save(_client, scope, rows) { writes.push({ scope, rows }); }
+        },
+        UIFeedback: { fieldError: (_field, message) => errors.push(message), success() {}, error() {} },
+        supabaseClient: {}, logSystemAudit: async () => {}, console
+    };
+    vm.runInNewContext(code, context);
+    await context.saveAdminLoginMaxAttempts();
+    assert.equal(writes.length, 0);
+    assert.match(errors[0], /3 to 6/);
+    input.value = '6';
+    await context.saveAdminLoginMaxAttempts();
+    assert.equal(writes[0].rows.admin_login_max_attempts, '6');
+    assert.match(status.textContent, /6 failed attempts/);
 });
 
 test('user interaction resets idle time; background activity does not', async () => {

@@ -4,10 +4,10 @@ const AdminMFA = Object.freeze({
         const { data: identity, error: identityError } = await client.auth.getUser();
         if (identityError || !identity?.user?.id) throw new Error('Please sign in again.');
         const { data: profile, error } = await client.from('admins')
-            .select('admin_id,admin_name,email,admin_level,status,faculty')
+            .select('admin_id,admin_name,email,admin_level,status,faculty,login_locked')
             .eq('admin_id', identity.user.id).maybeSingle();
         if (error) throw error;
-        if (!profile || profile.status !== 'active' ||
+        if (!profile || profile.status !== 'active' || profile.login_locked !== false ||
             !['admin', 'super_admin'].includes(profile.admin_level)) {
             await client.auth.signOut();
             sessionStorage.removeItem('user');
@@ -26,7 +26,8 @@ const AdminMFA = Object.freeze({
         const assurance = await this.assurance(client);
         if (assurance.currentLevel !== 'aal2') throw new Error('Authenticator verification is required.');
         const { data: identity, error } = await client.auth.getUser();
-        if (error || identity?.user?.id !== profile.admin_id || profile.status !== 'active') {
+        if (error || identity?.user?.id !== profile.admin_id || profile.status !== 'active' ||
+            profile.login_locked !== false) {
             throw new Error('Your administrator session could not be verified.');
         }
         const user = {
