@@ -1,0 +1,15 @@
+# The web app intentionally publishes config/.env.js with a public Supabase key.
+# Every other .env variant can contain server credentials and must stay private.
+<FilesMatch "(?i)^\.env(?:$|\.(?!js$).+)$">
+    Require all denied
+</FilesMatch>
+
+# Apache's default dotfile rule covers .htaccess, but not these directories.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule "(^|/)\.(git|vercel|artifacts|agents|codex|supabase|aws)(/|$)" - [F,L,NC]
+    RewriteRule "(^|/)\.(npmrc|mcp\.json)(/|$)" - [F,L,NC]
+    RewriteRule "(^|/)camera_owner\.json$" - [F,L,NC]
+    # Only the generated browser config may use the .env.js name.
+    RewriteRule "^(?!EVENTMONITORING/config/\.env\.js$)(?:.*/)?\.env\.js$" - [F,L,NC]
+</IfModule>

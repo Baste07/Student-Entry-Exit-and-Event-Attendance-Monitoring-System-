@@ -136,14 +136,13 @@ echo.
 echo  NEXT STEPS:
 echo  1. Configure your .env file in the students\ folder:
 echo.
-echo     SUPABASE_URL=https://wjyoruvcyjnwsimeqrgl.supabase.co
-echo     SUPABASE_KEY=^<your-service-role-key^>   ^<^<^< REQUIRED: get from Supabase
-echo     REBUILD_SECRET=r3bU1d_Xv9Qe7s2KzF4gH6pT0aW8yN3b
+echo     SUPABASE_URL=^<your-project-URL^>
+echo     SUPABASE_KEY=^<your-server-side-sb_secret-key^>
+echo     REBUILD_SECRET=^<a-unique-random-local-secret^>
 echo     ATTENDANCE_TRIGGER=http://127.0.0.1:5000/trigger_rebuild
 echo.
-echo     Find your Service Role key at:
-echo     https://supabase.com/dashboard/project/wjyoruvcyjnwsimeqrgl
-echo     Go to: Settings ^> API ^> Project API Keys ^> service_role (secret)
+echo     Find a server-side secret key in the correct project's Dashboard:
+echo     Settings ^> API Keys ^> Secret keys. Never expose it through Apache.
 echo.
 echo  2. Run START_ATTENDANCE.bat to launch the attendance engine (port 5000).
 echo  3. Run START_REGISTRATION.bat to launch the registration engine (port 5001).
