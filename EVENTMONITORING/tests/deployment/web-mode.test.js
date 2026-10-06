@@ -41,6 +41,8 @@ test('WEB mode hides local controls and resolves the application root from the s
         'https://school.example/EVENTMONITORING/api/create-admin');
     assert.equal(window.AppDeployment.apiRoute('../../admin/send-student-qr-email.php'),
         'https://school.example/EVENTMONITORING/api/send-student-qr-email');
+    assert.equal(window.AppDeployment.apiRoute('update-admin-password.php'),
+        'https://school.example/EVENTMONITORING/api/update-admin-password');
     assert.throws(() => window.AppDeployment.apiRoute('../../trigger_attendance.php'), /Unsupported WEB API route/);
 });
 

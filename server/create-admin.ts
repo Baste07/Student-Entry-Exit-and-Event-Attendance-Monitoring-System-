@@ -3,6 +3,7 @@ import { BackendError } from './types.js';
 import { requireActiveSuperAdminAal2 } from './admin-auth.js';
 import { bodyObject, json, trimmed, uuidPattern } from './responses.js';
 import { methodOnly } from './http.js';
+import { ADMIN_PASSWORD_MESSAGE, validAdminPassword } from './admin-password-policy.js';
 
 export async function createAdmin(request: Request, gateway: AdminGateway): Promise<Response> {
   const method = methodOnly(request);
@@ -16,9 +17,11 @@ export async function createAdmin(request: Request, gateway: AdminGateway): Prom
   const level = body.level;
   if (!name || name.length > 200 || !faculty || faculty.length > 200 ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 ||
-    typeof password !== 'string' || password.length < 8 || password.length > 256 ||
     (level !== 'admin' && level !== 'super_admin')) {
     return json(400, { success: false, message: 'Check the name, email, faculty, password, and admin level.' });
+  }
+  if (!validAdminPassword(password, email, name)) {
+    return json(400, { success: false, message: ADMIN_PASSWORD_MESSAGE });
   }
   const authorization = await requireActiveSuperAdminAal2(request, gateway);
   if ('response' in authorization) return authorization.response;
@@ -30,7 +33,7 @@ export async function createAdmin(request: Request, gateway: AdminGateway): Prom
   } catch { return json(502, { success: false, message: 'Could not check for an existing account.' }); }
   let id: string;
   try {
-    const user = await gateway.createAuthUser(email, password);
+    const user = await gateway.createAuthUser(email, password as string);
     if (!uuidPattern.test(user.id)) throw new BackendError(502);
     id = user.id.toLowerCase();
   } catch {

@@ -11,7 +11,7 @@ const APP_ROOT = typeof document !== 'undefined' && document.currentScript
     ? new URL('../', document.currentScript.src) : null;
 const WEB_API_ROUTES = new Set([
     'create-admin.php', 'delete-admin.php', 'admin-mfa-factors.php',
-    'update-admin-email.php', 'send-student-qr-email.php', 'admin-login.php'
+    'update-admin-email.php', 'update-admin-password.php', 'send-student-qr-email.php', 'admin-login.php'
 ]);
 function adminApiRoute(localPath) {
     if (DEPLOYMENT_MODE !== 'WEB') return localPath;

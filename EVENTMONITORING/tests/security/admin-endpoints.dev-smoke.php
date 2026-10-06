@@ -34,7 +34,7 @@ $body = json_encode([
     'email' => $email,
     'faculty' => 'TEST',
     'level' => 'admin',
-    'password' => bin2hex(random_bytes(16)),
+    'password' => 'Aa1!' . bin2hex(random_bytes(16)),
 ], JSON_THROW_ON_ERROR);
 $normalCreate = handleCreateAdminRequest('POST', 'Bearer ' . $normalToken, $body, $request);
 if ($normalCreate['status'] !== 403) {

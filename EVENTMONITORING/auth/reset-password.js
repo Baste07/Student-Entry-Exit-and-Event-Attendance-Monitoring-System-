@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const mfaCode = document.getElementById('recoveryMfaCode');
     const statusAlert = document.getElementById('status-alert');
     const statusMsg = document.getElementById('status-message');
+    let recoveryEmail = '';
     let completed = false;
     let verifiedFactorId = null;
     let checkingRecovery = false;
@@ -53,6 +54,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const { data: identity, error: identityError } = await supabaseClient.auth.getUser();
             if (identityError || identity?.user?.id !== recoveryUserId) throw new Error('Recovery identity is unavailable.');
+            recoveryEmail = identity.user.email || '';
             const { data: factors, error: factorError } = await supabaseClient.auth.mfa.listFactors();
             if (factorError) throw factorError;
             const { data: assurance, error: assuranceError } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -83,6 +85,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!completed) showStatus('This recovery session has ended. Request a new link from the login page.');
     });
     allowRecovery();
+    newPassword.addEventListener('input', () => window.AdminPasswordPolicy.render(
+        document.getElementById('newPasswordChecklist'), newPassword.value));
     setTimeout(() => {
         if (!recoverySessionReady) {
             showStatus('This password recovery link is invalid or expired. Request a new link from the login page.');
@@ -94,8 +98,8 @@ document.addEventListener('DOMContentLoaded', function () {
             showStatus('Request a new password recovery link from the login page.');
             return;
         }
-        if (newPassword.value.length < 8) {
-            showStatus('Password must be at least 8 characters.');
+        if (!window.AdminPasswordPolicy.valid(newPassword.value, recoveryEmail, '')) {
+            showStatus(window.AdminPasswordPolicy.message);
             return;
         }
         if (newPassword.value !== confirmPassword.value) {
@@ -129,12 +133,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (assuranceError || assurance?.currentLevel !== 'aal2') {
                     throw new Error('insufficient_aal');
                 }
+                verifiedFactorId = null;
+                mfaWrap.hidden = true;
+                mfaCode.disabled = true;
+                mfaCode.value = '';
             }
-            const { error } = await supabaseClient.auth.updateUser({ password: newPassword.value });
-            if (error) throw error;
+            const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+            if (sessionError || !sessionData?.session?.access_token) throw new Error('recovery_session_invalid');
+            const response = await fetch(window.AppDeployment.apiRoute('update-admin-password.php'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${sessionData.session.access_token}` },
+                body: JSON.stringify({ password: newPassword.value })
+            });
+            if (!response.ok) {
+                const result = await response.json();
+                if (response.status === 400) {
+                    showStatus(result?.message || window.AdminPasswordPolicy.message);
+                    resetBtn.disabled = false;
+                    resetBtn.textContent = 'Update Password';
+                    return;
+                }
+                throw new Error(response.status === 403 ? 'insufficient_aal' : 'password_update_failed');
+            }
             completed = true;
             recoverySessionReady = false;
             newPassword.value = '';
+            window.AdminPasswordPolicy.render(document.getElementById('newPasswordChecklist'), '');
             confirmPassword.value = '';
             mfaCode.value = '';
             disableRecovery();

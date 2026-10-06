@@ -5,7 +5,7 @@ export type Authorization = { actor: AdminProfile; token: string } | { response:
 
 /** Auth verifies the token first; only then may its signed AAL claim be read. */
 export async function requireActiveAdminAal2(
-  request: Request, gateway: AdminGateway, superOnly = false
+  request: Request, gateway: AdminGateway, superOnly = false, allowRecoveryWithoutTotp = false
 ): Promise<Authorization> {
   const header = request.headers.get('authorization')?.trim() || '';
   const match = /^Bearer ([A-Za-z0-9._~-]+)$/i.exec(header);
@@ -23,8 +23,15 @@ export async function requireActiveAdminAal2(
   } catch {
     return { response: json(403, { success: false, message: 'Authenticator verification is required.' }) };
   }
-  if (claims.sub !== user.id || claims.role !== 'authenticated' || claims.aal !== 'aal2') {
+  if (claims.sub !== user.id || claims.role !== 'authenticated') {
     return { response: json(403, { success: false, message: 'Authenticator verification is required.' }) };
+  }
+  if (claims.aal !== 'aal2') {
+    const recovery = Array.isArray(claims.amr) && claims.amr.some(item =>
+      typeof item === 'object' && item !== null && (item as { method?: unknown }).method === 'recovery');
+    if (!allowRecoveryWithoutTotp || claims.aal !== 'aal1' || !recovery || await verifiedTotp(gateway, user.id)) {
+      return { response: json(403, { success: false, message: 'Authenticator verification is required.' }) };
+    }
   }
   const actor = await gateway.getProfile(user.id.toLowerCase());
   if (!actor || actor.status !== 'active' || actor.login_locked !== false ||
@@ -36,6 +43,10 @@ export async function requireActiveAdminAal2(
 
 export function requireActiveSuperAdminAal2(request: Request, gateway: AdminGateway): Promise<Authorization> {
   return requireActiveAdminAal2(request, gateway, true);
+}
+
+export function requireActiveAdminPasswordUpdate(request: Request, gateway: AdminGateway): Promise<Authorization> {
+  return requireActiveAdminAal2(request, gateway, false, true);
 }
 
 export async function verifiedTotp(gateway: AdminGateway, id: string): Promise<boolean> {

@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { AdminGateway, AdminProfile, AuditRecord, AuthAccount, Factor, StudentRecord } from '../../server/types.js';
 import { createAdmin } from '../../server/create-admin.js';
+import { updateAdminPassword } from '../../server/update-admin-password.js';
+import { validAdminPassword } from '../../server/admin-password-policy.js';
 import { deleteAdmin } from '../../server/delete-admin.js';
 import { adminMfaFactors } from '../../server/admin-mfa-factors.js';
 import { updateAdminEmail } from '../../server/update-admin-email.js';
@@ -18,10 +20,10 @@ const IDS = {
 } as const;
 const FACTOR = '77777777-7777-4777-8777-777777777777';
 const profiles: AdminProfile[] = [
-  { admin_id: IDS.normal, email: 'normal@example.invalid', admin_level: 'admin', status: 'active', login_locked: false },
-  { admin_id: IDS.super, email: 'super@example.invalid', admin_level: 'super_admin', status: 'active', login_locked: false },
-  { admin_id: IDS.target, email: 'target@example.invalid', admin_level: 'admin', status: 'active', login_locked: false },
-  { admin_id: IDS.suspended, email: 'suspended@example.invalid', admin_level: 'super_admin', status: 'suspended', login_locked: false }
+  { admin_id: IDS.normal, email: 'normal@example.invalid', admin_name: 'Normal Operator', admin_level: 'admin', status: 'active', login_locked: false },
+  { admin_id: IDS.super, email: 'super@example.invalid', admin_name: 'Super Operator', admin_level: 'super_admin', status: 'active', login_locked: false },
+  { admin_id: IDS.target, email: 'target@example.invalid', admin_name: 'Target Operator', admin_level: 'admin', status: 'active', login_locked: false },
+  { admin_id: IDS.suspended, email: 'suspended@example.invalid', admin_name: 'Suspended Operator', admin_level: 'super_admin', status: 'suspended', login_locked: false }
 ];
 
 class Fixture implements AdminGateway {
@@ -31,6 +33,7 @@ class Fixture implements AdminGateway {
   audits: AuditRecord[] = [];
   failProfileInsert = false;
   failAuthUpdate = false;
+  passwordUpdates = 0;
   student: StudentRecord = { student_id: IDS.student, stud_id: '2-0001', first_name: 'Test', middle_name: null,
     last_name: 'Student', birth_date: '2015-01-01', gender: 'Female', email: 'student@example.invalid',
     current_grade_level: 'Grade 2', sections: { section_name: 'Section A' } };
@@ -46,6 +49,11 @@ class Fixture implements AdminGateway {
   async listFactors(id: string) { return this.factors.get(id) || []; }
   async deleteFactor(id: string, factorId: string) { this.factors.set(id, (this.factors.get(id) || []).filter(f => f.id !== factorId)); }
   async createAuthUser(email: string) { const user = { id: IDS.newUser, email, email_confirmed_at: '2026-01-01' }; this.users.set(user.id, user); return user; }
+  async updateOwnPassword(tokenValue: string, password: string) {
+    assert.ok(issuedTokens.has(tokenValue));
+    assert.ok(password.length >= 12);
+    this.passwordUpdates++;
+  }
   async deleteAuthUser(id: string): Promise<'deleted' | 'missing'> { const present = this.users.delete(id); return present ? 'deleted' : 'missing'; }
   async updateAuthEmail(id: string, email: string) { if (this.failAuthUpdate) throw new Error('rejected'); this.users.set(id, { ...this.users.get(id)!, email, email_confirmed_at: '2026-01-01' }); }
   async insertProfile(profile: AdminProfile) { if (this.failProfileInsert) throw new Error('failed'); this.profiles.set(profile.admin_id, profile); }
@@ -56,8 +64,9 @@ class Fixture implements AdminGateway {
 }
 
 const issuedTokens = new Map<string, string>();
-function token(id: string, aal: 'aal1' | 'aal2' = 'aal2'): string {
-  const value = ['eyJhbGciOiJIUzI1NiJ9', Buffer.from(JSON.stringify({ sub: id, role: 'authenticated', aal })).toString('base64url'), 'signature'].join('.');
+function token(id: string, aal: 'aal1' | 'aal2' = 'aal2', recovery = false): string {
+  const value = ['eyJhbGciOiJIUzI1NiJ9', Buffer.from(JSON.stringify({ sub: id, role: 'authenticated', aal,
+    amr: recovery ? [{ method: 'recovery' }] : [{ method: 'password' }] })).toString('base64url'), 'signature'].join('.');
   issuedTokens.set(value, id);
   return value;
 }
@@ -71,7 +80,7 @@ type Handler = (request: Request, gateway: AdminGateway) => Promise<Response>;
 async function status(handler: Handler, payload: unknown, bearer?: string, fixture = new Fixture()) {
   return (await handler(request(payload, bearer), fixture)).status;
 }
-const createBody = { name: 'New Admin', email: 'new@example.invalid', faculty: 'Science', level: 'admin', password: 'temporaryStrongPassword123' };
+const createBody = { name: 'New Admin', email: 'new@example.invalid', faculty: 'Science', level: 'admin', password: 'TemporaryStrongPassword123!' };
 const deleteBody = { adminId: IDS.target };
 const mfaBody = { action: 'status', adminId: IDS.target };
 const emailBody = { adminId: IDS.target, email: 'changed@example.invalid', confirmEmail: true };
@@ -120,6 +129,40 @@ test('create uses one UID, never stores the supplied password, and rolls back fa
   const failed = new Fixture(); failed.failProfileInsert = true;
   assert.equal(await status(createAdmin, createBody, token(IDS.super), failed), 502);
   assert.equal(failed.users.has(IDS.newUser), false);
+});
+
+test('Admin password policy rejects weak passwords and identity substrings at the API', async () => {
+  const good = 'SecureRandomPhrase123!';
+  assert.equal(validAdminPassword(good, 'new@example.invalid', 'New Admin'), true);
+  assert.equal(validAdminPassword('😀Abcdefgh1!', 'new@example.invalid', 'New Admin'), false);
+  for (const password of ['Short1!', 'nouppercasephrase123!', 'NOLOWERCASEPHRASE123!',
+    'NoNumberInThisPhrase!', 'NoSpecialCharacter123', 'NewAdminSecure123!',
+    'new@example.invalidA1!', 'newSomethingSecure123!']) {
+    assert.equal(validAdminPassword(password, 'new@example.invalid', 'New Admin'), false);
+    const fixture = new Fixture();
+    const response = await createAdmin(request({ ...createBody, password }, token(IDS.super)), fixture);
+    assert.equal(response.status, 400);
+    assert.equal(fixture.users.has(IDS.newUser), false);
+    assert.equal(JSON.stringify(await response.json()).includes(password), false);
+  }
+  assert.equal(await status(createAdmin, { ...createBody, password: good }, token(IDS.super)), 201);
+});
+
+test('Admin password update requires an active caller and AAL2, except recovery without TOTP', async () => {
+  const body = { password: 'AnotherSecurePhrase123!' };
+  const fixture = new Fixture();
+  assert.equal(await status(updateAdminPassword, body, undefined, fixture), 401);
+  assert.equal(await status(updateAdminPassword, body, token(IDS.normal, 'aal1'), fixture), 403);
+  assert.equal(await status(updateAdminPassword, body, token(IDS.super, 'aal1', true), fixture), 403);
+  assert.equal(await status(updateAdminPassword, body, token(IDS.suspended), fixture), 403);
+  assert.equal(await status(updateAdminPassword, body, token(IDS.normal, 'aal1', true), fixture), 200);
+  assert.equal(await status(updateAdminPassword, body, token(IDS.super), fixture), 200);
+  assert.equal(fixture.passwordUpdates, 2);
+  assert.equal(await status(updateAdminPassword, { password: 'short' }, token(IDS.super), fixture), 400);
+  assert.equal(fixture.passwordUpdates, 2);
+  fixture.profiles.set(IDS.super, { ...fixture.profiles.get(IDS.super)!, admin_name: '' });
+  assert.equal(await status(updateAdminPassword, body, token(IDS.super), fixture), 502);
+  assert.equal(fixture.passwordUpdates, 2);
 });
 
 test('Admin creation and email change accept valid domains and reject malformed addresses', async () => {

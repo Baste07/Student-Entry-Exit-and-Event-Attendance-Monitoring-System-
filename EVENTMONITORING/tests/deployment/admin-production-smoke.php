@@ -42,8 +42,8 @@ $superEmail = $prefix . '-super@example.com';
 $normalEmail = $prefix . '-normal@example.com';
 $targetEmail = $prefix . '-target@example.com';
 $superPassword = bin2hex(random_bytes(24));
-$normalPassword = bin2hex(random_bytes(24));
-$targetPassword = bin2hex(random_bytes(24));
+$normalPassword = 'Aa1!' . bin2hex(random_bytes(24));
+$targetPassword = 'Aa1!' . bin2hex(random_bytes(24));
 $tracked = [];
 $baseline = $request('GET', '/rest/v1/admins?select=admin_id');
 if ($baseline['status'] !== 200 || !is_array($baseline['data'])) {

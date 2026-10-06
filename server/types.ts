@@ -62,6 +62,7 @@ export interface AdminGateway {
   listFactors(id: string): Promise<Factor[]>;
   deleteFactor(userId: string, factorId: string): Promise<void>;
   createAuthUser(email: string, password: string): Promise<AuthAccount>;
+  updateOwnPassword(token: string, password: string): Promise<void>;
   deleteAuthUser(id: string): Promise<'deleted' | 'missing'>;
   updateAuthEmail(id: string, email: string): Promise<void>;
   insertProfile(profile: AdminProfile): Promise<void>;

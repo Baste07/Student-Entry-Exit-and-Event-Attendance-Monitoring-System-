@@ -10,7 +10,8 @@ if (isset($_SERVER['SCRIPT_FILENAME'])
 require_once __DIR__ . '/../config/supabase-server.php';
 
 /** The Auth API validates the bearer before any JWT claim is considered. */
-function verifiedAdminBearer(string $authorization, callable $request, bool $superOnly = true): array
+function verifiedAdminBearer(string $authorization, callable $request, bool $superOnly = true,
+    bool $allowRecoveryWithoutTotp = false): array
 {
     if (!preg_match('/^Bearer ([A-Za-z0-9._~-]+)$/i', trim($authorization), $match)) {
         return ['status' => 401, 'message' => 'Please sign in again.', 'actor' => null];
@@ -29,11 +30,21 @@ function verifiedAdminBearer(string $authorization, callable $request, bool $sup
     // Do not trust JSON from the caller. The same bearer was just validated by
     // Supabase Auth, and its signed claims must match the returned identity.
     if (!is_array($claims) || ($claims['sub'] ?? null) !== $id ||
-        ($claims['role'] ?? null) !== 'authenticated' || ($claims['aal'] ?? null) !== 'aal2') {
+        ($claims['role'] ?? null) !== 'authenticated') {
         return ['status' => 403, 'message' => 'Authenticator verification is required.', 'actor' => null];
     }
+    if (($claims['aal'] ?? null) !== 'aal2') {
+        $recovery = false;
+        foreach (is_array($claims['amr'] ?? null) ? $claims['amr'] : [] as $method) {
+            if (is_array($method) && ($method['method'] ?? null) === 'recovery') $recovery = true;
+        }
+        if (!$allowRecoveryWithoutTotp || ($claims['aal'] ?? null) !== 'aal1' || !$recovery
+            || hasVerifiedTotpFactor(strtolower($id), $request) !== false) {
+            return ['status' => 403, 'message' => 'Authenticator verification is required.', 'actor' => null];
+        }
+    }
     $actor = $request('GET', '/rest/v1/admins?admin_id=eq.' . strtolower($id)
-        . '&select=admin_id,admin_level,status,login_locked&limit=1');
+        . '&select=admin_id,email,admin_name,admin_level,status,login_locked&limit=1');
     if (($actor['status'] ?? 0) !== 200 || !is_array($actor['data'] ?? null)) {
         return ['status' => 502, 'message' => 'Could not verify admin permissions.', 'actor' => null];
     }
