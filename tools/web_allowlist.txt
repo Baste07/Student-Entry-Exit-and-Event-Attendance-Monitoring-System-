@@ -153,6 +153,8 @@ auth/mfa.html
 auth/mfa.js
 auth/reset-password.html
 auth/reset-password.js
+shared/admin-password-policy.css
+shared/admin-password-policy.js
 config/config.js
 config/supabase-server.php
 index.html

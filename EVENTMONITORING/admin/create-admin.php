@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/supabase-server.php';
 require_once __DIR__ . '/admin-mfa-auth.php';
+require_once __DIR__ . '/admin-password-policy.php';
 
 function createAdminResponse(int $status, string $message, bool $success = false): array
 {
@@ -30,9 +31,11 @@ function handleCreateAdminRequest(string $method, string $authorization, string 
     $level = $payload['level'] ?? null;
     if ($name === '' || strlen($name) > 200 || $faculty === '' || strlen($faculty) > 200
         || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 254
-        || !is_string($password) || strlen($password) < 8 || strlen($password) > 256
         || !in_array($level, ['admin', 'super_admin'], true)) {
         return createAdminResponse(400, 'Check the name, email, faculty, password, and admin level.');
+    }
+    if (!validAdminPassword($password, $email, $name)) {
+        return createAdminResponse(400, ADMIN_PASSWORD_MESSAGE);
     }
 
     try {

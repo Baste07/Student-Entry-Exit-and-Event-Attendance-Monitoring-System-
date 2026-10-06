@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="admin-specific.css"/>
     <link rel="stylesheet" href="usermanagement.css"/>
     <link rel="stylesheet" href="../shared/ui-feedback.css"/>
+    <link rel="stylesheet" href="../shared/admin-password-policy.css"/>
 </head>
 <body>
 
@@ -147,8 +148,14 @@
                         
                         <div class="col-md-6" id="passwordField">
                             <label for="adminPassword" class="form-label">Password <span class="text-danger">*</span></label>
-                            <input type="password" id="adminPassword" class="form-control" placeholder="Set initial password" autocomplete="new-password" required>
-                            <div class="form-text">Must be at least 8 characters.</div>
+                            <input type="password" id="adminPassword" class="form-control" placeholder="Set initial password" minlength="12" autocomplete="new-password" required>
+                            <ul id="adminPasswordChecklist" class="admin-password-checklist" aria-label="Password requirements">
+                                <li data-password-rule="length">12 or more characters</li>
+                                <li data-password-rule="uppercase">Uppercase letter</li>
+                                <li data-password-rule="lowercase">Lowercase letter</li>
+                                <li data-password-rule="number">Number</li>
+                                <li data-password-rule="special">Special character</li>
+                            </ul>
                         </div>
                         
                         <div class="col-md-6" id="confirmPasswordField">
@@ -205,7 +212,8 @@
 <script src="../shared/global.js"></script>
 <script src="../shared/ui-feedback.js"></script>
 <script src="admin-specific.js"></script>
-<script src="usermanagement.js?v=20261005-lockout"></script>
+<script src="../shared/admin-password-policy.js"></script>
+<script src="usermanagement.js?v=20261006-password-policy"></script>
 <script>
     requireAdmin();
     loadHeader();

@@ -645,7 +645,10 @@ async function submitAdminForm(e) {
             const passwordConfirm = document.getElementById('adminPasswordConfirm').value;
             
             if (!password) { UIFeedback.fieldError(document.getElementById('adminPassword'), 'Password is required.'); return; }
-            if (password.length < 8) { UIFeedback.fieldError(document.getElementById('adminPassword'), 'Password must be at least 8 characters.'); return; }
+            if (!window.AdminPasswordPolicy.valid(password, email, name)) {
+                UIFeedback.fieldError(document.getElementById('adminPassword'), window.AdminPasswordPolicy.message);
+                return;
+            }
             if (password !== passwordConfirm) { UIFeedback.fieldError(document.getElementById('adminPasswordConfirm'), 'Passwords do not match.'); return; }
             
             const { data: authSession, error: sessionError } = await supabaseClient.auth.getSession();
@@ -710,5 +713,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     setupAddUserButton();
     
     document.getElementById('adminForm')?.addEventListener('submit', submitAdminForm);
+    const adminPassword = document.getElementById('adminPassword');
+    adminPassword?.addEventListener('input', () => window.AdminPasswordPolicy.render(
+        document.getElementById('adminPasswordChecklist'), adminPassword.value));
     document.getElementById('adminEmailForm')?.addEventListener('submit', submitAdminEmailForm);
 });

@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { SupabaseAdminGateway } from '../../.artifacts/vercel-test/server/supabase-admin.js';
 import { createAdmin } from '../../.artifacts/vercel-test/server/create-admin.js';
+import { updateAdminPassword } from '../../.artifacts/vercel-test/server/update-admin-password.js';
 import { deleteAdmin } from '../../.artifacts/vercel-test/server/delete-admin.js';
 import { adminMfaFactors } from '../../.artifacts/vercel-test/server/admin-mfa-factors.js';
 import { updateAdminEmail } from '../../.artifacts/vercel-test/server/update-admin-email.js';
@@ -25,6 +26,7 @@ if (process.env.SUPABASE_URL !== devUrl ||
 if (process.env.SUPABASE_SERVICE_ROLE_KEY.length < 20 || process.env.SUPABASE_ANON_KEY.length < 20) {
   throw new Error('Development project keys are masked or unavailable');
 }
+process.env.WEB_SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 process.env.ADMIN_EMAIL_CHANGE_ENABLED = '1';
 process.env.ADMIN_EMAIL_CHANGE_PROJECT_REF = ref;
 const options = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
@@ -33,7 +35,7 @@ const gateway = new SupabaseAdminGateway(service);
 const temp = [];
 const tempStudents = [];
 const nonce = randomBytes(8).toString('hex');
-const password = randomBytes(24).toString('base64url');
+const password = 'Aa1!' + randomBytes(24).toString('base64url');
 let cleanupFailed = false;
 
 function otp(secret) {
@@ -64,16 +66,18 @@ async function makeIdentity(kind, level, status = 'active', enroll = true, withP
   const signed = await client.auth.signInWithPassword({ email, password });
   if (signed.error || !signed.data.session) throw new Error('Development password sign-in failed');
   const aal1Token = signed.data.session.access_token;
+  let totpSecret = null;
   if (enroll) {
     const enrollment = await client.auth.mfa.enroll({ factorType: 'totp' });
     if (enrollment.error || !enrollment.data?.totp?.secret) throw new Error('Development MFA enrollment failed');
+    totpSecret = enrollment.data.totp.secret;
     const code = otp(enrollment.data.totp.secret);
     const verified = await client.auth.mfa.challengeAndVerify({ factorId: enrollment.data.id, code });
     if (verified.error) throw new Error('Development MFA verification failed');
   }
   const session = await client.auth.getSession();
   if (!session.data.session?.access_token) throw new Error('Development session unavailable');
-  return { id, email, token: session.data.session.access_token, aal1Token };
+  return { id, email, token: session.data.session.access_token, aal1Token, totpSecret };
 }
 function req(token, body) {
   return new Request('https://development.invalid/api/test', { method: 'POST', headers: {
@@ -192,7 +196,21 @@ try {
   }
   const emailAudit = audits.data.find(row => row.action === 'ADMIN_EMAIL_CHANGED' && row.target_id === target.admin_id);
   if (JSON.stringify(emailAudit?.details).includes(changedEmail)) throw new Error('Audit leaked raw email');
+  const passwordCase = await makeIdentity('password-policy', 'admin');
+  const replacement = 'Bb2!' + randomBytes(24).toString('base64url');
+  check(await updateAdminPassword(req(passwordCase.aal1Token, { password: replacement }), gateway), 403, 'AAL1 password update denied');
+  check(await updateAdminPassword(req(passwordCase.token, { password: 'weak' }), gateway), 400, 'Weak password update denied');
+  check(await updateAdminPassword(req(passwordCase.token, { password: replacement }), gateway), 200, 'AAL2 password update accepted');
+  const newLoginClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, options);
+  const newLogin = await newLoginClient.auth.signInWithPassword({ email: passwordCase.email, password: replacement });
+  if (newLogin.error || !newLogin.data.session) throw new Error('Updated Admin password login failed');
+  const factorsAfter = await gateway.listFactors(passwordCase.id);
+  const factorId = factorsAfter.find(factor => factor.factor_type === 'totp' && factor.status === 'verified')?.id;
+  if (!factorId || !passwordCase.totpSecret) throw new Error('Password update lost verified TOTP');
+  const newMfa = await newLoginClient.auth.mfa.challengeAndVerify({ factorId, code: otp(passwordCase.totpSecret) });
+  if (newMfa.error) throw new Error('Updated Admin password TOTP challenge failed');
   console.log('Development Auth/AAL2, Admin CRUD, MFA reset, email change, audit and UUID QR endpoint checks passed');
+  console.log('Development Admin password policy/update, fresh login, and retained TOTP passed');
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'Development integration failed');
   process.exitCode = 1;

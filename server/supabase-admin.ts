@@ -80,6 +80,25 @@ export class SupabaseAdminGateway implements AdminGateway {
     if (error || !data.user) failed(error);
     return data.user as AuthAccount;
   }
+  async updateOwnPassword(token: string, password: string): Promise<void> {
+    const url = process.env.SUPABASE_URL?.trim() || '';
+    const key = process.env.WEB_SUPABASE_ANON_KEY?.trim() || '';
+    if (!/^https:\/\/[^/]+\.supabase\.co\/?$/i.test(url) || !key) throw new BackendError(503);
+    let publicKey = key.startsWith('sb_publishable_');
+    if (!publicKey && key.split('.').length === 3) {
+      try { publicKey = (JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString('utf8')) as { role?: string }).role === 'anon'; }
+      catch { publicKey = false; }
+    }
+    if (!publicKey) throw new BackendError(503);
+    // A public API key plus the caller's bearer preserves Supabase's own
+    // recovery, reauthentication, and MFA checks. The secret key is not used.
+    const response = await fetch(`${url.replace(/\/$/, '')}/auth/v1/user`, {
+      method: 'PUT',
+      headers: { 'apikey': key, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    if (!response.ok) throw new BackendError(response.status === 401 || response.status === 403 ? 403 : 502);
+  }
   async deleteAuthUser(id: string): Promise<'deleted' | 'missing'> {
     const { error } = await this.client.auth.admin.deleteUser(id, false);
     if (error) {

@@ -75,7 +75,7 @@ function createWith(array &$state, string $level = 'admin', ?string $token = nul
 {
     return handleCreateAdminRequest('POST', 'Bearer ' . ($token ?? createJwt()), json_encode([
         'name' => 'Test Admin', 'email' => $email, 'faculty' => 'Science',
-        'level' => $level, 'password' => 'test-password-123',
+        'level' => $level, 'password' => 'SecureRandomPhrase123!',
     ]), createTransport($state));
 }
 
@@ -86,6 +86,19 @@ $tests = [
         requireCreate(handleCreateAdminRequest('POST', '', '{}', createTransport($state))['status'] === 401, 'Bearer required.');
         requireCreate(handleCreateAdminRequest('POST', 'Bearer ' . createJwt(), '{}', createTransport($state))['status'] === 400, 'Fields required.');
         requireCreate($state['calls'] === [], 'Validation should precede network calls.');
+    },
+    'weak and identity-derived passwords never reach Auth' => static function (): void {
+        foreach (['shortA1!', '😀Abcdefgh1!', 'alllowercasephrase123!', 'ALLUPPERCASEPHRASE123!',
+            'NoNumberInThisPhrase!', 'NoSpecialCharacter123', 'TestAdminSecure123!',
+            'test@example.eduA1!'] as $password) {
+            $state = createFixture();
+            $result = handleCreateAdminRequest('POST', 'Bearer ' . createJwt(), json_encode([
+                'name' => 'Test Admin', 'email' => 'test@example.edu', 'faculty' => 'Science',
+                'level' => 'admin', 'password' => $password,
+            ]), createTransport($state));
+            requireCreate($result['status'] === 400 && $state['calls'] === [], 'Invalid password must be rejected before Auth.');
+            requireCreate(!str_contains(json_encode($result['body']), $password), 'Password must not be returned.');
+        }
     },
     'normal and suspended admins cannot create accounts' => static function (): void {
         foreach ([['level' => 'admin'], ['status' => 'suspended']] as $options) {
