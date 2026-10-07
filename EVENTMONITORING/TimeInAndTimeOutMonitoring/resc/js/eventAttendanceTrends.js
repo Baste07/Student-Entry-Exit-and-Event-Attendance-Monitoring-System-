@@ -7,10 +7,11 @@ const PAGE_SIZE = 500;
 const EVENT_CHUNK_SIZE = 80;
 const DETAIL_LIMIT = 200;
 const MANILA_TIME_ZONE = 'Asia/Manila';
-const ANALYTICS_PAGE_VERSION = '20260926';
+const ANALYTICS_PAGE_VERSION = '20261008';
 const state = {
     events: [], participants: [], attendance: [], charts: {}, loadedRange: null,
-    view: null, detailTab: 'late', requestId: 0
+    view: null, completedView: null, performance: null, detailTab: 'late',
+    activeTab: 'overview', requestId: 0
 };
 
 if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => {
@@ -20,9 +21,20 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
     document.getElementById('trendDateTo').value = manilaDate();
     document.getElementById('btnApplyTrends').addEventListener('click', loadRange);
     document.getElementById('btnResetTrends').addEventListener('click', resetFilters);
-    document.getElementById('trendEventType').addEventListener('change', populateEventOptions);
-    document.getElementById('trendStatus').addEventListener('change', populateEventOptions);
-    document.getElementById('trendGrade').addEventListener('change', populateSectionOptions);
+    for (const id of ['trendEventType', 'trendStatus']) field(id).addEventListener('change', () => {
+        populateEventOptions();
+        render();
+    });
+    field('trendGrade').addEventListener('change', () => {
+        field('trendSection').value = '';
+        populateSectionOptions();
+        render();
+    });
+    for (const id of ['trendEvent', 'trendSection', 'trendGrouping']) field(id).addEventListener('change', render);
+    for (const id of ['trendDateFrom', 'trendDateTo']) field(id).addEventListener('change', loadRange);
+    for (const tab of ['overview', 'performance', 'breakdown', 'trends']) {
+        field(`analytics${tab[0].toUpperCase() + tab.slice(1)}Tab`).addEventListener('click', () => selectTab(tab));
+    }
     document.getElementById('btnExportExcel').addEventListener('click', exportExcel);
     document.getElementById('btnExportPdf').addEventListener('click', exportPdf);
     document.getElementById('detailSearch').addEventListener('input', renderDetails);
@@ -236,6 +248,57 @@ function summarizeAnalytics(events, normalized) {
     return { eventRows, sectionRows: [...sections.values()], details, totals, arrivals, unscheduledArrivals, ...normalized };
 }
 
+// Rate uses the expected student roster; turnout counts distinct recorded people.
+// Grade/section filters narrow turnout to the selected roster because employee and
+// out-of-roster attendance rows do not carry a reliable student-grade snapshot.
+function performanceAnalytics(events, normalized, attendance, filters = {}, today = manilaDate()) {
+    const summary = summarizeAnalytics(events, normalized);
+    const rosterKeys = new Set(normalized.records.map(record => record.key));
+    const eventIds = new Set(events.map(event => String(event.event_id)));
+    const restrictedRoster = Boolean(filters.grade || filters.section);
+    const turnout = new Map();
+    let scanRows = 0;
+    for (const row of attendance) {
+        const eventId = String(row.event_id);
+        if (!eventIds.has(eventId) || validTimestamp(row.time_in) === null) continue;
+        let person = null;
+        if (row.student_id) {
+            if (restrictedRoster && !rosterKeys.has(rosterKey(eventId, row.student_id))) continue;
+            person = `student:${row.student_id}`;
+        } else if (row.employee_id && !restrictedRoster) person = `employee:${row.employee_id}`;
+        if (!person) continue;
+        if (!turnout.has(eventId)) turnout.set(eventId, new Set());
+        turnout.get(eventId).add(person);
+        scanRows++;
+    }
+    const rows = summary.eventRows.map(row => ({
+        ...row,
+        rate: row.expected ? percentage(row.attended, row.expected) : null,
+        recordedTurnout: turnout.get(String(row.event.event_id))?.size || 0
+    }));
+    const completed = rows.filter(row => row.event.status === 'completed'
+        && /^\d{4}-\d{2}-\d{2}$/.test(row.event.event_date || '')
+        && row.event.event_date <= today
+        && (!row.event.end_date || row.event.end_date <= today));
+    const rated = completed.filter(row => row.expected > 0);
+    const ranked = [...rated].sort((a, b) => b.rate - a.rate
+        || a.event.event_date.localeCompare(b.event.event_date)
+        || String(a.event.event_id).localeCompare(String(b.event.event_id)));
+    // Ties follow the displayed one-decimal rate, avoiding equal-looking winners.
+    const displayedRate = row => Number(row.rate.toFixed(1));
+    const best = ranked.length ? ranked.filter(row => displayedRate(row) === displayedRate(ranked[0])) : [];
+    const lowest = ranked.length ? ranked.filter(row => displayedRate(row) === displayedRate(ranked[ranked.length - 1])) : [];
+    const maxTurnout = completed.reduce((maximum, row) => Math.max(maximum, row.recordedTurnout), 0);
+    const largest = maxTurnout ? completed.filter(row => row.recordedTurnout === maxTurnout) : [];
+    const attention = rated.filter(row => row.rate < 70);
+    const totals = rated.reduce((sum, row) => {
+        for (const key of ['expected', 'attended', 'noShows', 'onTime', 'late']) sum[key] += row[key];
+        return sum;
+    }, { expected: 0, attended: 0, noShows: 0, onTime: 0, late: 0 });
+    totals.rate = totals.expected ? percentage(totals.attended, totals.expected) : null;
+    return { rows, completed, rated, ranked, best, lowest, largest, attention, totals, scanRows };
+}
+
 function weekKey(day) {
     const date = new Date(`${day}T00:00:00Z`);
     date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
@@ -309,7 +372,7 @@ async function loadRange() {
         const ids = activeEvents.map(event => event.event_id);
         const [participants, attendance] = ids.length ? await Promise.all([
             fetchForEvents('event_participants', 'event_id,student_id,participant_id,students(student_id,stud_id,current_grade_level,first_name,middle_name,last_name,section_id,sections(section_id,section_name))', ids, 'participant_id'),
-            fetchForEvents('event_attendance', 'attendance_id,event_id,student_id,time_in,time_out,remarks', ids, 'attendance_id')
+            fetchForEvents('event_attendance', 'attendance_id,event_id,student_id,employee_id,time_in,time_out,remarks', ids, 'attendance_id')
         ]) : [[], []];
         if (request !== state.requestId) return;
         Object.assign(state, { events: activeEvents, participants, attendance, loadedRange: rangeKey });
@@ -381,49 +444,93 @@ function render() {
     field('trendResults').hidden = events.length === 0;
     field('btnExportExcel').disabled = events.length === 0;
     field('btnExportPdf').disabled = events.length === 0;
-    if (!events.length) { state.view = null; return; }
+    if (!events.length) {
+        state.view = null;
+        state.completedView = null;
+        state.performance = null;
+        return;
+    }
     const eventIds = new Set(events.map(event => String(event.event_id)));
-    const normalized = normalizeAnalytics(events, state.participants.filter(row => eventIds.has(String(row.event_id))), state.attendance.filter(row => eventIds.has(String(row.event_id))), {
-        grade: value('trendGrade'), section: value('trendSection')
-    });
+    const participants = state.participants.filter(row => eventIds.has(String(row.event_id)));
+    const attendance = state.attendance.filter(row => eventIds.has(String(row.event_id)));
+    const filters = { grade: value('trendGrade'), section: value('trendSection') };
+    const normalized = normalizeAnalytics(events, participants, attendance, filters);
     state.view = summarizeAnalytics(events, normalized);
-    renderKpis(state.view);
-    renderCharts(state.view);
-    renderSummary(state.view);
+    state.performance = performanceAnalytics(events, normalized, attendance, filters);
+    field('btnExportExcel').disabled = state.performance.completed.length === 0;
+    field('btnExportPdf').disabled = state.performance.completed.length === 0;
+    const completedIds = new Set(state.performance.completed.map(row => String(row.event.event_id)));
+    const completedEvents = events.filter(event => completedIds.has(String(event.event_id)));
+    state.completedView = summarizeAnalytics(completedEvents, normalizeAnalytics(completedEvents, participants, attendance, filters));
+    renderOverview();
+    renderPerformance();
+    renderBreakdown();
+    renderTrends();
     renderDetails();
+    selectTab(state.activeTab);
 }
 
-function renderKpis(view) {
-    const totals = view.totals;
-    const ongoing = view.eventRows.some(row => row.event.status === 'ongoing');
+function selectTab(tab) {
+    state.activeTab = tab;
+    for (const name of ['overview', 'performance', 'breakdown', 'trends']) {
+        const id = `analytics${name[0].toUpperCase() + name.slice(1)}`;
+        const selected = name === tab;
+        field(`${id}Tab`).classList.toggle('active', selected);
+        field(`${id}Tab`).setAttribute('aria-pressed', String(selected));
+        field(`${id}Panel`).hidden = !selected;
+    }
+    renderActiveChart();
+}
+function eventLabel(row) { return row.event.event_name || 'Unnamed event'; }
+function listEventNames(rows) {
+    return rows.map(row => eventLabel(row)).join(', ');
+}
+function renderOverview() {
+    const report = state.performance;
+    const totals = report.totals;
     const selected = value('trendEvent');
-    const event = selected ? view.eventRows.find(row => String(row.event.event_id) === selected)?.event : null;
-    setText('viewTitle', event ? event.event_name || 'Unnamed event' : `${view.eventRows.length} event${view.eventRows.length === 1 ? '' : 's'} selected`);
-    setText('viewSubtitle', event ? `${displayDate(event.event_date)} · ${event.status || 'Unknown status'}` : 'Student-event assignments are counted once per event.');
-    setText('statExpected', totals.expected.toLocaleString());
-    setText('statAttended', totals.attended.toLocaleString());
-    setText('statAttendanceRate', percentLabel(totals.attendanceRate));
-    setText('statNoShows', totals.noShows.toLocaleString());
-    setText('statOnTime', totals.onTime.toLocaleString());
-    setText('statLate', totals.late.toLocaleString());
-    setText('statCompletion', percentLabel(totals.completionRate));
-    setText('statAverageLate', totals.averageLateMinutes === null ? 'N/A' : `${totals.averageLateMinutes.toFixed(1)} min`);
-    setText('attendanceRateNote', ongoing ? 'Attendance so far · attended ÷ expected' : 'Attended ÷ expected');
-    setText('noShowNote', `${percentLabel(totals.noShowRate)} of expected · completed events only`);
-    setText('onTimeRate', `${percentLabel(totals.onTimeRate)} of attendees`);
-    setText('lateRate', `${percentLabel(totals.lateRate)} of attendees`);
-    setText('completionLabel', ongoing ? 'Time-Out Completion So Far' : 'Time-Out Completion');
-    setText('completionNote', `${totals.timedOut} timed out ÷ ${totals.attended} timed in`);
-
+    const event = selected ? report.rows.find(row => String(row.event.event_id) === selected) : null;
+    setText('viewTitle', event ? eventLabel(event) : `${report.rows.length} event${report.rows.length === 1 ? '' : 's'} selected`);
+    const from = value('trendDateFrom'), to = value('trendDateTo');
+    setText('viewSubtitle', `${from || 'All dates'} to ${to || 'today'} · ${report.completed.length} completed event${report.completed.length === 1 ? '' : 's'} in performance · Manila dates`);
+    setText('statAttendanceRate', totals.rate === null ? 'N/A' : percentLabel(totals.rate));
+    setText('attendanceRateNote', totals.expected
+        ? `${totals.attended} of ${totals.expected} expected students attended across ${report.rated.length} completed event${report.rated.length === 1 ? '' : 's'} with participant lists.`
+        : 'No completed event with an expected-student list matches these filters.');
+    setText('statBestEvent', report.best.length ? (report.best.length === 1 ? eventLabel(report.best[0]) : `${report.best.length} tied events`) : 'N/A');
+    setText('bestEventNote', report.best.length
+        ? `${listEventNames(report.best)}: ${percentLabel(report.best[0].rate)}; ${report.best.map(row => `${row.attended} of ${row.expected}`).join('; ')} expected students attended.`
+        : 'A completed event needs an expected-student list for this comparison.');
+    setText('statLargestTurnout', report.largest.length ? (report.largest.length === 1 ? eventLabel(report.largest[0]) : `${report.largest.length} tied events`) : 'N/A');
+    setText('largestTurnoutNote', report.largest.length
+        ? `${listEventNames(report.largest)}: ${report.largest[0].recordedTurnout} unique people recorded a Time-In.`
+        : 'No completed event has a recorded Time-In.');
+    setText('statAttention', report.rated.length ? String(report.attention.length) : 'N/A');
+    setText('attentionNote', report.rated.length
+        ? `${report.attention.length} of ${report.rated.length} completed events with participant lists were below the stated 70% attendance threshold.`
+        : 'The 70% threshold needs a completed event with an expected-student list.');
     const notes = [];
-    if (!totals.expected) notes.push('No assigned participants match these filters.');
-    if (totals.pending) notes.push(`${totals.pending} roster slot${totals.pending === 1 ? '' : 's'} in ongoing or upcoming events are awaiting check-in, not classified as no-shows.`);
-    if (ongoing) notes.push('Time-Out completion for ongoing events is still in progress.');
-    if (view.outsideRoster) notes.push(`${view.outsideRoster} recorded student check-in${view.outsideRoster === 1 ? '' : 's'} without a matching roster assignment are excluded from participation rates.`);
-    if (view.duplicateParticipants || view.duplicateAttendance) notes.push(`Duplicate source rows were counted once (${view.duplicateParticipants} roster, ${view.duplicateAttendance} attendance).`);
-    if (view.unscheduledArrivals) notes.push(`${view.unscheduledArrivals} arrival${view.unscheduledArrivals === 1 ? '' : 's'} without a usable scheduled start are omitted from the arrival chart.`);
-    if (!notes.length) notes.push('No Show means an assigned student in a completed event with no Time-In. Missing Time-Out is counted separately.');
+    notes.push(`${report.scanRows} matching valid Time-In record${report.scanRows === 1 ? '' : 's'} were considered for turnout. Attendance-rate and turnout metrics count each person once per event, not once per scan.`);
+    if (!report.completed.length) notes.push('No completed events in the selected period. Ongoing, upcoming, cancelled, and future-dated events are not scored as completed.');
+    if (report.completed.some(row => !row.expected)) notes.push('A completed event without a participant roster has no attendance percentage or no-show count.');
+    if (state.view.outsideRoster) notes.push(`${state.view.outsideRoster} student check-in${state.view.outsideRoster === 1 ? '' : 's'} outside the expected roster are excluded from attendance rates but included in recorded turnout when grade and section are unfiltered.`);
+    if (state.view.duplicateParticipants || state.view.duplicateAttendance) notes.push(`Duplicate source rows were counted once for unique-person metrics (${state.view.duplicateParticipants} roster, ${state.view.duplicateAttendance} attendance).`);
+    if (value('trendGrade') || value('trendSection')) notes.push('Grade and section filters use each student’s current profile. Recorded turnout is limited to the matching roster because other check-ins have no reliable grade snapshot.');
+    notes.push('Attendance rate measures expected students with a Time-In. Recorded turnout counts unique people with a Time-In, including people outside the expected-student list when grade and section are unfiltered.');
     setText('analyticsNote', notes.join(' '));
+    field('eventInsight').hidden = !event;
+    if (!event) return;
+    setText('insightTitle', `${eventLabel(event)} · ${displayDate(event.event.event_date)}`);
+    setText('insightExpected', event.expected.toLocaleString());
+    setText('insightAttended', event.attended.toLocaleString());
+    const isCompleted = report.completed.includes(event);
+    setText('insightRate', isCompleted && event.expected ? percentLabel(event.rate) : 'N/A');
+    setText('insightNoShow', isCompleted && event.expected ? event.noShows.toLocaleString() : 'N/A');
+    setText('insightExplanation', !isCompleted
+        ? 'This event is not yet a completed, past event. Attendance and no-show performance is not finalized.'
+        : !event.expected
+            ? 'There is no expected-student list for this event, so an attendance percentage or no-show count cannot be calculated reliably.'
+            : `${event.attended} of ${event.expected} expected students recorded a Time-In (${percentLabel(event.rate)}). ${event.noShows} had no recorded attendance. This describes the records, not the reason for attendance.`);
 }
 
 function destroyCharts() {
@@ -458,67 +565,92 @@ function rateChartOptions(horizontal, rows) {
         },
         scales: {
             [scale]: { min: 0, max: 100, ticks: { callback: value => `${value}%` } },
-            [horizontal ? 'y' : 'x']: { ticks: { autoSkip: !horizontal, maxRotation: horizontal ? 0 : 45 } }
+            [horizontal ? 'y' : 'x']: { ticks: {
+                autoSkip: !horizontal, maxRotation: horizontal ? 0 : 45,
+                callback: horizontal ? function (tick) {
+                    const label = this.getLabelForValue(tick);
+                    const limit = window.innerWidth <= 520 ? 18 : 34;
+                    return label.length > limit ? `${label.slice(0, limit - 1)}…` : label;
+                } : undefined
+            } }
         }
     };
 }
-function renderCharts(view) {
-    const points = trendPoints(view.eventRows, value('trendGrouping'));
-    createChart('trend', 'attendanceTrendChart', 'trendChartEmpty', {
-        type: 'line', data: { labels: points.map(point => point.label), datasets: [{ label: 'Attendance rate', data: points.map(point => point.rate), borderColor: '#176aa4', backgroundColor: 'rgba(47,143,206,.14)', pointRadius: 4, fill: true, tension: .2, spanGaps: false }] },
-        options: rateChartOptions(false, points)
-    }, points.some(point => point.expected));
-
-    const sectionRows = view.sectionRows.filter(row => row.expected).map(row => ({ ...row, rate: percentage(row.attended, row.expected) }))
-        .sort((a, b) => b.rate - a.rate || a.label.localeCompare(b.label));
-    createChart('section', 'sectionChart', 'sectionChartEmpty', {
-        type: 'bar', data: { labels: sectionRows.map(row => row.label), datasets: [{ label: 'Attendance rate', data: sectionRows.map(row => row.rate), backgroundColor: '#22a6b8', borderRadius: 5 }] },
-        options: rateChartOptions(true, sectionRows)
-    }, sectionRows.length > 0);
-
-    const totals = view.totals;
-    const statusLabels = ['On Time', 'Late', 'No Show'];
-    const statusValues = [totals.onTime, totals.late, totals.noShows];
-    const statusColors = ['#059669', '#f59e0b', '#dc5b5b'];
-    if (totals.pending) { statusLabels.push('Awaiting Check-In'); statusValues.push(totals.pending); statusColors.push('#87a9c0'); }
-    createChart('status', 'statusChart', 'statusChartEmpty', {
-        type: 'doughnut', data: { labels: statusLabels, datasets: [{ data: statusValues, backgroundColor: statusColors, borderWidth: 2, borderColor: '#fff' }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: false, cutout: '58%', plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: context => ` ${context.label}: ${context.parsed} roster slots` } } } }
-    }, totals.expected > 0);
-
-    const arrivalLabels = ['>30 min early', '15–30 min early', '0–15 min early', '0–15 min after', '15–30 min after', '>30 min after'];
-    createChart('arrival', 'arrivalChart', 'arrivalChartEmpty', {
-        type: 'bar', data: { labels: arrivalLabels, datasets: [{ label: 'Arrivals', data: view.arrivals, backgroundColor: ['#30a7bd', '#30a7bd', '#30a7bd', '#2f8fce', '#e6a73f', '#e27758'], borderRadius: 5 }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { ticks: { maxRotation: 45 } } } }
-    }, view.arrivals.some(Boolean));
-
-    const comparisons = view.eventRows.filter(row => row.expected).map(row => ({ ...row, rate: percentage(row.attended, row.expected) }))
-        .sort((a, b) => b.rate - a.rate || a.event.event_date.localeCompare(b.event.event_date));
-    createChart('events', 'attendanceByEventChart', 'eventChartEmpty', {
-        type: 'bar', data: { labels: comparisons.map(row => `${row.event.event_name || 'Unnamed event'} · ${displayDate(row.event.event_date)}`), datasets: [{ label: 'Attendance rate', data: comparisons.map(row => row.rate), backgroundColor: '#2f8fce', borderRadius: 5 }] },
-        options: rateChartOptions(true, comparisons)
-    }, comparisons.length > 0);
-
-    createChart('completion', 'checkInOutChart', 'completionChartEmpty', {
-        type: 'doughnut', data: { labels: ['Timed Out', 'Awaiting Time-Out'], datasets: [{ data: [totals.timedOut, totals.missingTimeOut], backgroundColor: ['#176aa4', '#a8cadf'], borderWidth: 2, borderColor: '#fff' }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: false, cutout: '58%', plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: context => ` ${context.label}: ${context.parsed} attendees` } } } }
-    }, totals.attended > 0);
+function performanceExplanation(report) {
+    const best = report.best, lowest = report.lowest;
+    if (!report.rated.length) return 'No completed event with an expected-student list is available for an attendance-rate comparison.';
+    if (report.rated.length === 1) return `Only ${eventLabel(best[0])} has a comparable attendance rate: ${percentLabel(best[0].rate)}, with ${best[0].attended} of ${best[0].expected} expected students attending. More completed events are needed to compare performance.`;
+    if (best.length === report.rated.length) return `All ${report.rated.length} completed events with participant lists tied at ${percentLabel(best[0].rate)} attendance. Recorded turnout is a separate count and may differ between them.`;
+    return `${listEventNames(best)} ${best.length === 1 ? 'had' : 'tied for'} the highest attendance rate at ${percentLabel(best[0].rate)}. ${best.map(row => `${row.attended} of ${row.expected}`).join('; ')} expected students attended. ${listEventNames(lowest)} ${lowest.length === 1 ? 'had' : 'tied for'} the lowest rate at ${percentLabel(lowest[0].rate)}. Largest recorded turnout is counted separately and may be a different event.`;
 }
-
-function renderSummary(view) {
-    const body = field('eventTrendTableBody');
-    body.innerHTML = view.eventRows.map(row => {
-        const event = row.event;
-        const rate = percentage(row.attended, row.expected);
-        const completion = percentage(row.timedOut, row.attended);
-        const noShow = event.status === 'completed' ? String(row.noShows) : 'In progress';
-        return `<tr><td><strong>${escapeHtml(event.event_name || 'Unnamed event')}</strong></td><td>${escapeHtml(displayDate(event.event_date))}</td><td>${escapeHtml(event.status || 'Unknown')}</td><td>${row.expected}</td><td>${row.attended}</td><td class="${rate >= 80 ? 'rate-good' : 'rate-low'}">${row.expected ? percentLabel(rate) : 'N/A'}</td><td>${row.onTime}</td><td>${row.late}</td><td>${noShow}</td><td>${row.timedOut}</td><td>${row.attended ? percentLabel(completion) : 'N/A'}</td></tr>`;
-    }).join('');
+function renderPerformance() {
+    const report = state.performance;
+    const explanation = performanceExplanation(report);
+    setText('performanceExplanation', `${explanation}${report.ranked.length > 20 ? ' The chart shows the first 20 events by rate; the comparison table lists all completed events.' : ''}`);
+    field('eventTrendTableBody').innerHTML = report.completed.length
+        ? report.completed.map(row => `<tr><td><strong>${escapeHtml(eventLabel(row))}</strong></td><td>${escapeHtml(displayDate(row.event.event_date))}</td><td>${row.expected}</td><td>${row.attended}</td><td>${row.expected ? percentLabel(row.rate) : 'N/A — no expected list'}</td><td>${row.expected ? row.noShows : 'N/A'}</td><td>${row.recordedTurnout}</td></tr>`).join('')
+        : '<tr><td colspan="7" class="muted">No completed events match these filters.</td></tr>';
+}
+function renderBreakdown() {
+    const totals = state.performance.totals;
+    setText('breakdownExplanation', totals.expected
+        ? `${totals.onTime} expected students arrived on time, ${totals.late} arrived after the grace period, and ${totals.noShows} had no recorded Time-In. ${percentLabel(percentage(totals.noShows, totals.expected))} of the ${totals.expected} expected student-event places had no recorded attendance. Missing Time-Out is separate from no attendance.`
+        : 'No completed event with an expected-student list is available for a reliable attendance breakdown.');
+}
+function trendNarrative(report) {
+    const chronological = [...report.rated].sort((a, b) => a.event.event_date.localeCompare(b.event.event_date)
+        || String(a.event.event_id).localeCompare(String(b.event.event_id)));
+    if (chronological.length < 3) return `Only ${chronological.length} comparable completed event${chronological.length === 1 ? ' is' : 's are'} available, so an attendance trend cannot be determined yet.`;
+    const recent = chronological.slice(-3).map(row => row.rate);
+    if (recent[1] - recent[0] >= 1 && recent[2] - recent[1] >= 1) return 'The last three comparable events each had a higher attendance rate than the one before it.';
+    if (recent[0] - recent[1] >= 1 && recent[1] - recent[2] >= 1) return 'The last three comparable events each had a lower attendance rate than the one before it.';
+    if (Math.max(...recent) - Math.min(...recent) <= 5) return 'Attendance rates across the last three comparable events stayed within five percentage points of one another.';
+    return 'Attendance rates across the last three comparable events varied; there is no consistent increase or decline.';
+}
+function renderTrends() {
+    setText('trendExplanation', trendNarrative(state.performance));
+}
+function renderActiveChart() {
+    destroyCharts();
+    const report = state.performance;
+    if (!report) return;
+    if (state.activeTab === 'performance') {
+        const rows = report.ranked.slice(0, 20);
+        field('attendanceByEventChart').parentElement.style.height = `${Math.max(300, Math.min(1000, rows.length * 48 + 80))}px`;
+        createChart('events', 'attendanceByEventChart', 'eventChartEmpty', {
+            type: 'bar',
+            data: { labels: rows.map(row => `${eventLabel(row)} · ${displayDate(row.event.event_date)}`),
+                datasets: [{ label: 'Attendance rate', data: rows.map(row => row.rate),
+                    backgroundColor: rows.map(row => report.best.includes(row) ? '#0b4e78' : report.lowest.includes(row) ? '#d97706' : '#6baed6'),
+                    borderRadius: 5, maxBarThickness: 28 }] },
+            options: rateChartOptions(true, rows)
+        }, rows.length > 0);
+    } else if (state.activeTab === 'breakdown') {
+        const totals = report.totals;
+        createChart('status', 'statusChart', 'statusChartEmpty', {
+            type: 'doughnut',
+            data: { labels: ['On time', 'Late', 'No recorded attendance'],
+                datasets: [{ data: [totals.onTime, totals.late, totals.noShows], backgroundColor: ['#059669', '#d97706', '#d45d60'], borderWidth: 2, borderColor: '#fff' }] },
+            options: { responsive: true, maintainAspectRatio: false, animation: false, cutout: '58%', plugins: { legend: { position: 'bottom' } } }
+        }, totals.expected > 0);
+    } else if (state.activeTab === 'trends') {
+        const chronological = [...report.rated].sort((a, b) => a.event.event_date.localeCompare(b.event.event_date));
+        const points = trendPoints(chronological, value('trendGrouping'));
+        createChart('trend', 'attendanceTrendChart', 'trendChartEmpty', {
+            type: 'line',
+            data: { labels: points.map(point => point.label), datasets: [{
+                label: 'Attendance rate', data: points.map(point => point.rate),
+                borderColor: '#176aa4', backgroundColor: 'rgba(47,143,206,.14)',
+                pointRadius: 4, fill: true, tension: .2, spanGaps: false
+            }] },
+            options: rateChartOptions(false, points)
+        }, points.length > 0);
+    }
 }
 
 function renderDetails() {
-    if (!state.view) return;
-    const view = state.view;
+    if (!state.completedView) return;
+    const view = state.completedView;
     setText('lateCount', view.details.late.length);
     setText('noShowCount', view.details.noShow.length);
     setText('missingCount', view.details.missing.length);
@@ -545,23 +677,21 @@ function renderDetails() {
 }
 
 function exportRows() {
-    return (state.view?.eventRows || []).map(row => ({
+    return (state.performance?.completed || []).map(row => ({
         'Event': row.event.event_name || 'Unnamed event',
         'Event Date': row.event.event_date,
         'Status': row.event.status || 'Unknown',
-        'Expected': row.expected,
-        'Attended': row.attended,
-        'Attendance Rate': row.expected ? percentLabel(percentage(row.attended, row.expected)) : 'N/A',
+        'Expected Students': row.expected,
+        'Expected Students Who Attended': row.attended,
+        'Attendance Rate': row.expected ? percentLabel(row.rate) : 'N/A',
+        'Recorded Turnout': row.recordedTurnout,
         'On Time': row.onTime,
         'Late': row.late,
-        'No Shows': row.event.status === 'completed' ? row.noShows : 'In progress',
-        'Awaiting Check-In': row.pending,
-        'Timed Out': row.timedOut,
-        'Completion Rate': row.attended ? percentLabel(percentage(row.timedOut, row.attended)) : 'N/A'
+        'No Recorded Attendance': row.expected ? row.noShows : 'N/A'
     }));
 }
 function exportExcel() {
-    if (!state.view) return;
+    if (!state.performance?.completed.length) return;
     if (!window.XLSX) return UIFeedback.error('The Excel export library is unavailable. Please refresh and try again.');
     try {
         const workbook = XLSX.utils.book_new();
@@ -574,7 +704,7 @@ function exportExcel() {
     }
 }
 function exportPdf() {
-    if (!state.view) return;
+    if (!state.performance?.completed.length) return;
     if (!window.jspdf?.jsPDF) return UIFeedback.error('The PDF export library is unavailable. Please refresh and try again.');
     try {
         const rows = exportRows();
@@ -583,7 +713,7 @@ function exportPdf() {
         pdf.setFontSize(16);
         pdf.text('Event Attendance Analytics', 14, 16);
         pdf.setFontSize(9);
-        pdf.text(`Filtered events: ${rows.length}   Expected: ${state.view.totals.expected}   Attended: ${state.view.totals.attended}   Rate: ${percentLabel(state.view.totals.attendanceRate)}`, 14, 23);
+        pdf.text(`Completed events: ${rows.length}   Expected: ${state.performance.totals.expected}   Attended: ${state.performance.totals.attended}   Rate: ${state.performance.totals.rate === null ? 'N/A' : percentLabel(state.performance.totals.rate)}`, 14, 23);
         pdf.autoTable({ startY: 29, head: [Object.keys(rows[0])], body: rows.map(Object.values), styles: { fontSize: 7 }, headStyles: { fillColor: [11, 78, 120] } });
         pdf.save('event_attendance_analytics.pdf');
         UIFeedback.success('Filtered event analytics exported to PDF.');
@@ -605,5 +735,6 @@ function showFailure(message) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { normalizeAnalytics, summarizeAnalytics, trendPoints, lateInfo, percentage, eventStartMs };
+    module.exports = { normalizeAnalytics, summarizeAnalytics, performanceAnalytics, performanceExplanation,
+        trendNarrative, trendPoints, lateInfo, percentage, percentLabel, eventStartMs };
 }
