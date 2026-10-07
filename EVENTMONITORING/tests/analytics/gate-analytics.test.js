@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const Gate = require('../../EntryExitMonitoring/resc/js/gate-analytics.js');
 
 function log(id, type, action, time, method = 'face', section = 'Grade 7') {
@@ -184,4 +185,155 @@ test('page scripts reference controls present in their matching pages', () => {
             assert.deepEqual([...new Set(ids)].filter(id => !html.includes(`id="${id}"`)), [], `${script} references missing controls`);
         }
     }
+});
+
+test('weekday averages count one arrival per student per Manila date across months', () => {
+    const days = [
+        ['2026-09-28', '2026-10-05', 1], // Monday
+        ['2026-09-29', '2026-10-06', 2], // Tuesday
+        ['2026-09-30', '2026-10-07', 1],
+        ['2026-10-01', '2026-10-08', 1],
+        ['2026-10-02', '2026-10-09', 1]
+    ];
+    const raw = [];
+    for (const [first, second, count] of days) {
+        for (const date of [first, second]) {
+            for (let student = 0; student < count; student++) {
+                raw.push(log(`student-${student}`, 'student', 'entry', `${date}T06:35:00+08:00`));
+            }
+        }
+    }
+    // The same student exits, then enters again on Tuesday. This is another
+    // transaction, not another unique arrival on that date.
+    raw.push(log('student-0', 'student', 'exit', '2026-10-06T12:00:00+08:00'));
+    raw.push(log('student-0', 'student', 'entry', '2026-10-06T13:00:00+08:00'));
+    const view = Gate.studentActivity(Gate.normalize(raw, Date.parse('2026-11-01T00:00:00Z')).rows);
+    assert.equal(view.busiest.day, 'Tuesday');
+    assert.equal(view.reliable, true);
+    assert.equal(view.busiest.average, 2);
+    assert.equal(view.busiest.observedDates, 2);
+    assert.equal(view.busiest.totalUniqueArrivals, 4);
+    assert.equal(view.busiest.entryScans, 5);
+    assert.equal(view.weekdayAverage, 1.2);
+    assert.ok(Math.abs(view.busiest.differencePercent - 66.6667) < .01);
+    assert.equal(view.totalUniqueArrivals, 12);
+    assert.equal(view.observedDates, 10);
+    assert.equal(view.averageDailyStudents, 1.2);
+    assert.equal(view.peakArrival.label, '6:30 AM–7:00 AM');
+    assert.equal(view.peakArrival.arrivals, 12);
+    assert.equal(view.daily.find(day => day.date === '2026-10-06').uniqueArrivals, 2);
+    assert.equal(view.daily.find(day => day.date === '2026-10-06').entryScans, 3);
+
+    const source = fs.readFileSync(path.resolve(__dirname, '../../EntryExitMonitoring/resc/js/gate-report-analytics.js'), 'utf8');
+    const context = { document: { addEventListener() {} }, Intl };
+    vm.createContext(context);
+    vm.runInContext(source, context);
+    const explanation = vm.runInContext('gateWeekdayExplanation', context)(view);
+    assert.match(explanation, /Tuesday is the busiest school day/);
+    assert.match(explanation, /Based on 2 observed Tuesdays, an average of 2 unique students/);
+    assert.match(explanation, /66\.7% higher than the weekday average/);
+});
+
+test('first arrivals and last exits use half-hour periods, not repeat scans', () => {
+    const raw = [
+        log('A', 'student', 'entry', '2026-10-06T06:35:00+08:00'),
+        log('A', 'student', 'exit', '2026-10-06T12:00:00+08:00'),
+        log('A', 'student', 'entry', '2026-10-06T13:05:00+08:00'),
+        log('A', 'student', 'exit', '2026-10-06T16:45:00+08:00'),
+        log('B', 'student', 'entry', '2026-10-06T06:40:00+08:00'),
+        log('B', 'student', 'exit', '2026-10-06T16:35:00+08:00'),
+        log('staff', 'employee', 'entry', '2026-10-06T06:37:00+08:00')
+    ];
+    const view = Gate.studentActivity(Gate.normalize(raw, Date.parse('2026-11-01T00:00:00Z')).rows);
+    assert.equal(view.entryScans, 3);
+    assert.equal(view.exitScans, 3);
+    assert.equal(view.totalUniqueArrivals, 2);
+    assert.equal(view.peakArrival.label, '6:30 AM–7:00 AM');
+    assert.equal(view.peakArrival.arrivals, 2);
+    assert.equal(view.peakExit.label, '4:30 PM–5:00 PM');
+    assert.equal(view.peakExit.departures, 2);
+    assert.equal(Gate.halfHourLabel(47), '11:30 PM–12:00 AM');
+});
+
+test('sparse or weekend-only data never invents school-day zeros or a reliable winner', () => {
+    const raw = [log('A', 'student', 'entry', '2026-10-03T07:00:00+08:00')];
+    const rows = Gate.normalize(raw, Date.parse('2026-11-01T00:00:00Z')).rows;
+    const view = Gate.studentActivity(rows, { from: '2026-10-03', to: '2026-10-04' });
+    assert.deepEqual(view.weekdays.map(day => day.day), ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']);
+    assert.equal(view.weekdays[0].average, null);
+    assert.equal(view.weekdays[5].observedDates, 1);
+    assert.equal(view.reliable, false);
+    assert.equal(view.observedDates, 1);
+    assert.equal(Gate.studentActivity([]).busiest, null);
+});
+
+test('grade and action filters update student analysis without including employees', () => {
+    const raw = [
+        log('A', 'student', 'entry', '2026-10-06T07:00:00+08:00', 'qr', 'Grade 1'),
+        log('B', 'student', 'entry', '2026-10-06T07:05:00+08:00', 'face', 'Grade 2'),
+        log('E', 'employee', 'entry', '2026-10-06T07:10:00+08:00'),
+        log('A', 'student', 'exit', '2026-10-06T16:00:00+08:00', 'qr', 'Grade 1')
+    ];
+    const rows = Gate.normalize(raw, Date.parse('2026-11-01T00:00:00Z')).rows;
+    assert.equal(Gate.studentActivity(Gate.filterRows(rows, { grade: 'Grade 1' })).totalUniqueArrivals, 1);
+    assert.equal(Gate.studentActivity(Gate.filterRows(rows, { grade: 'Grade 2' })).totalUniqueArrivals, 1);
+    assert.equal(Gate.studentActivity(Gate.filterRows(rows, { personType: 'employee' })).totalUniqueArrivals, 0);
+    assert.equal(Gate.studentActivity(Gate.filterRows(rows, { action: 'exit' })).totalUniqueArrivals, 0);
+    assert.equal(Gate.studentActivity(Gate.filterRows(rows, { method: 'qr' })).entryScans, 1);
+});
+
+test('Manila midnight and year boundaries remain separate observed arrival dates', () => {
+    const raw = [
+        log('A', 'student', 'entry', '2026-12-31T23:55:00+08:00'),
+        log('A', 'student', 'entry', '2027-01-01T00:10:00+08:00'),
+        log('A', 'student', 'entry', '2027-01-01T00:20:00+08:00')
+    ];
+    const view = Gate.studentActivity(Gate.normalize(raw, Date.parse('2027-02-01T00:00:00Z')).rows);
+    assert.deepEqual(view.daily.map(day => [day.date, day.uniqueArrivals]),
+        [['2026-12-31', 1], ['2027-01-01', 1]]);
+    assert.equal(view.totalUniqueArrivals, 2);
+    assert.equal(view.entryScans, 3);
+    assert.equal(view.reliable, false);
+});
+
+test('changing a grade filter updates overview, weekday chart, and explanation together', () => {
+    const raw = [
+        log('A', 'student', 'entry', '2026-10-06T07:00:00+08:00', 'qr', 'Grade 1'),
+        log('B', 'student', 'entry', '2026-10-06T07:05:00+08:00', 'qr', 'Grade 2'),
+        log('C', 'student', 'entry', '2026-10-06T07:10:00+08:00', 'qr', 'Grade 2')
+    ];
+    const rows = Gate.normalize(raw, Date.parse('2026-11-01T00:00:00Z')).rows;
+    const elements = new Map();
+    const element = id => {
+        if (!elements.has(id)) elements.set(id, { value: '', textContent: '', innerHTML: '',
+            style: {}, hidden: false, classList: { toggle() {} }, setAttribute() {} });
+        return elements.get(id);
+    };
+    element('reportType').value = 'analytics';
+    element('reportFrom').value = '2026-10-06';
+    element('reportTo').value = '2026-10-06';
+    const configs = [];
+    const context = {
+        GateAnalytics: Gate, Intl,
+        document: { addEventListener() {}, getElementById: element, querySelector() { return { style: {} }; } },
+        window: { Chart: class { constructor(_canvas, config) { configs.push(config); } destroy() {} } }
+    };
+    vm.createContext(context);
+    vm.runInContext(fs.readFileSync(path.resolve(__dirname, '../../EntryExitMonitoring/resc/js/gate-report-analytics.js'), 'utf8'), context);
+    context.rowsForTest = rows;
+    vm.runInContext('gateAnalyticsSource = rowsForTest', context);
+    element('gradeFilter').value = 'Grade 1';
+    vm.runInContext('renderGateAnalytics()', context);
+    assert.equal(element('gateAverageDaily').textContent, '1');
+    assert.match(element('gateWeekdayExplanation').textContent, /highest observed average \(1 unique student arrivals\).*Based on 1 observed Tuesday/);
+    assert.equal(configs.at(-1).data.datasets[0].data[1], 1);
+    element('gradeFilter').value = 'Grade 2';
+    vm.runInContext('renderGateAnalytics()', context);
+    assert.equal(element('gateAverageDaily').textContent, '2');
+    assert.match(element('gateWeekdayExplanation').textContent, /highest observed average \(2 unique student arrivals\).*Based on 1 observed Tuesday/);
+    assert.equal(configs.at(-1).data.datasets[0].data[1], 2);
+    element('actionFilter').value = 'exit';
+    vm.runInContext('renderGateAnalytics()', context);
+    assert.equal(element('gateAverageDaily').textContent, '—');
+    assert.match(element('gateWeekdayExplanation').textContent, /not enough Entry & Exit data/);
 });

@@ -11,10 +11,10 @@ function escapeReportHtml(value) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (document.body?.dataset.gateReportsVersion !== '20260925d') {
+    if (document.body?.dataset.gateReportsVersion !== '20261008a') {
         const url = new URL(window.location.href);
-        if (url.searchParams.get('gate_reports_version') !== '20260925d') {
-            url.searchParams.set('gate_reports_version', '20260925d');
+        if (url.searchParams.get('gate_reports_version') !== '20261008a') {
+            url.searchParams.set('gate_reports_version', '20261008a');
             sessionStorage.setItem('allowed_admin_route', url.pathname);
             window.location.replace(url.href);
         } else {
