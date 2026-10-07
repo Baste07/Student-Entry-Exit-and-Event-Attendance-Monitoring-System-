@@ -7,6 +7,7 @@ const GateAnalytics = (() => {
     const LOG_COLUMNS = 'id,student_id,employee_id,log_type,scan_method,log_timestamp,created_at,students(stud_id,current_grade_level,first_name,last_name,section_id,sections(section_name)),employees(emp_no,first_name,last_name,faculty,role)';
     const dateFormatter = new Intl.DateTimeFormat('en-US', { timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
     const hourFormatter = new Intl.DateTimeFormat('en-US', { timeZone: ZONE, hour: '2-digit', hourCycle: 'h23' });
+    const minuteFormatter = new Intl.DateTimeFormat('en-US', { timeZone: ZONE, minute: '2-digit' });
     const weekdayFormatter = new Intl.DateTimeFormat('en-US', { timeZone: ZONE, weekday: 'long' });
 
     function manilaDate(value = new Date()) {
@@ -38,7 +39,7 @@ const GateAnalytics = (() => {
             rows.push({
                 id: log.id, key, type, action: log.log_type,
                 method: log.scan_method || 'unknown', timestamp, createdAt: Number.isFinite(createdAt) ? createdAt : timestamp, date: manilaDate(new Date(timestamp)),
-                hour: manilaHour(new Date(timestamp)), weekday: weekdayFormatter.format(new Date(timestamp)),
+                hour: manilaHour(new Date(timestamp)), minute: Number(minuteFormatter.format(new Date(timestamp))), weekday: weekdayFormatter.format(new Date(timestamp)),
                 name: [type === 'student' ? student.first_name : employee.first_name, type === 'student' ? student.last_name : employee.last_name].filter(Boolean).join(' ') || 'Unknown person',
                 identifier: type === 'student' ? student.stud_id || '' : employee.emp_no ?? '',
                 grade: type === 'student' ? student.current_grade_level || '' : '',
@@ -137,6 +138,79 @@ const GateAnalytics = (() => {
         const clock = value => `${String(value % 24).padStart(2, '0')}:00`;
         return `${clock(hour)}–${clock(hour + 1)}`;
     }
+    const SCHOOL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const WEEKEND_DAYS = ['Saturday', 'Sunday'];
+    function halfHourLabel(bucket) {
+        const time = minutes => {
+            const hour = Math.floor(minutes / 60) % 24;
+            return `${hour % 12 || 12}:${String(minutes % 60).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
+        };
+        return `${time(bucket * 30)}–${time((bucket + 1) * 30)}`;
+    }
+    // Arrival = first Entry per student and Manila date; departure = last Exit.
+    // The weekday denominator contains observed arrival dates only, never assumed school days.
+    function studentActivity(rows, period = {}) {
+        const dates = new Map();
+        let entryScans = 0;
+        let exitScans = 0;
+        for (const row of rows) {
+            if (row.type !== 'student') continue;
+            if (!dates.has(row.date)) dates.set(row.date, { date: row.date, day: row.weekday,
+                arrivals: new Map(), departures: new Map(), entryScans: 0, exitScans: 0 });
+            const date = dates.get(row.date);
+            if (row.action === 'entry') {
+                entryScans++; date.entryScans++;
+                const previous = date.arrivals.get(row.key);
+                if (!previous || row.timestamp < previous.timestamp) date.arrivals.set(row.key, row);
+            } else if (row.action === 'exit') {
+                exitScans++; date.exitScans++;
+                const previous = date.departures.get(row.key);
+                if (!previous || row.timestamp > previous.timestamp) date.departures.set(row.key, row);
+            }
+        }
+        const daily = [...dates.values()].sort((a, b) => a.date.localeCompare(b.date))
+            .map(date => ({ date: date.date, day: date.day, uniqueArrivals: date.arrivals.size,
+                entryScans: date.entryScans, exitScans: date.exitScans }));
+        const weekendObserved = daily.some(date => WEEKEND_DAYS.includes(date.day));
+        const selectedDays = period.from && period.to
+            ? (new Date(`${period.to}T00:00:00Z`) - new Date(`${period.from}T00:00:00Z`)) / 86400000 + 1 : 0;
+        const weekendOnlyPeriod = selectedDays > 0 && selectedDays <= 2 &&
+            Array.from({ length: selectedDays }, (_, index) => {
+                const date = new Date(`${period.from}T00:00:00Z`);
+                date.setUTCDate(date.getUTCDate() + index);
+                return WEEKEND_DAYS.includes(weekdayFormatter.format(date));
+            }).every(Boolean);
+        const weekdayNames = [...SCHOOL_DAYS, ...(weekendObserved || weekendOnlyPeriod ? WEEKEND_DAYS : [])];
+        const weekdayRows = weekdayNames.map(day => {
+            const observed = daily.filter(date => date.day === day && date.uniqueArrivals > 0);
+            const total = observed.reduce((sum, date) => sum + date.uniqueArrivals, 0);
+            return { day, observedDates: observed.length, totalUniqueArrivals: total,
+                average: observed.length ? total / observed.length : null,
+                entryScans: daily.filter(date => date.day === day).reduce((sum, date) => sum + date.entryScans, 0) };
+        });
+        const schoolRows = weekdayRows.filter(row => SCHOOL_DAYS.includes(row.day) && row.average !== null);
+        const weekdayAverage = schoolRows.length ? schoolRows.reduce((sum, row) => sum + row.average, 0) / schoolRows.length : null;
+        const ranked = weekdayRows.filter(row => row.average !== null)
+            .sort((a, b) => b.average - a.average || weekdayNames.indexOf(a.day) - weekdayNames.indexOf(b.day));
+        ranked.forEach((row, index) => { row.rank = index ? (row.average === ranked[index - 1].average ? ranked[index - 1].rank : index + 1) : 1; });
+        for (const row of weekdayRows) row.differencePercent = weekdayAverage && row.average !== null
+            ? (row.average - weekdayAverage) / weekdayAverage * 100 : null;
+        const reliable = SCHOOL_DAYS.every(day => weekdayRows.find(row => row.day === day)?.observedDates >= 2) &&
+            ranked[0]?.observedDates >= 2 &&
+            ranked.length > 1 && ranked[0].average > ranked[1].average;
+        const buckets = Array.from({ length: 48 }, (_, bucket) => ({ bucket, label: halfHourLabel(bucket), arrivals: 0, departures: 0 }));
+        for (const date of dates.values()) {
+            for (const row of date.arrivals.values()) buckets[row.hour * 2 + Math.floor(row.minute / 30)].arrivals++;
+            for (const row of date.departures.values()) buckets[row.hour * 2 + Math.floor(row.minute / 30)].departures++;
+        }
+        const peak = field => buckets.reduce((best, bucket) => bucket[field] > (best?.[field] || 0) ? bucket : best, null);
+        const observedDates = daily.filter(date => date.uniqueArrivals > 0).length;
+        const totalUniqueArrivals = daily.reduce((sum, date) => sum + date.uniqueArrivals, 0);
+        return { daily, weekdays: weekdayRows, ranked, weekdayAverage, reliable,
+            busiest: ranked[0] || null, leastActive: [...schoolRows].sort((a, b) => a.average - b.average)[0] || null,
+            observedDates, totalUniqueArrivals, averageDailyStudents: observedDates ? totalUniqueArrivals / observedDates : null,
+            entryScans, exitScans, buckets, peakArrival: peak('arrivals'), peakExit: peak('departures') };
+    }
     function durationLabel(ms) {
         if (!Number.isFinite(ms) || ms < 0) return '—';
         const minutes = Math.floor(ms / 60000);
@@ -162,7 +236,8 @@ const GateAnalytics = (() => {
         }
         return result;
     }
-    return { manilaDate, normalize, filterRows, pairVisits, summary, hourLabel, durationLabel, displayTime, fetchLogs };
+    return { manilaDate, normalize, filterRows, pairVisits, summary, studentActivity, halfHourLabel,
+        hourLabel, durationLabel, displayTime, fetchLogs };
 })();
 
 if (typeof window !== 'undefined') window.GateAnalytics = GateAnalytics;

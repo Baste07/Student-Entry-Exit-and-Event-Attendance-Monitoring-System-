@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Attendance Analytics | Monitoring System</title>
+    <title>Event Analytics | Monitoring System</title>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="../../shared/global.css">
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
-    <link rel="stylesheet" href="../resc/css/eventAttendanceTrends.css?v=20260926">
+    <link rel="stylesheet" href="../resc/css/eventAttendanceTrends.css?v=20261008">
     <link rel="stylesheet" href="../../shared/ui-feedback.css">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
     <link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
@@ -18,16 +18,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
-<body data-event-analytics-version="20260926">
+<body data-event-analytics-version="20261008">
     <div id="header-container"></div>
     <div id="sidebar-container"></div>
-
     <main class="main-content">
         <div class="container">
             <div class="page-header">
                 <div class="header-titles">
-                    <h1><i class="fa-solid fa-chart-line"></i> Event Attendance Analytics</h1>
-                    <p>Understand participation, punctuality, and time-out completion from recorded event attendance.</p>
+                    <h1><i class="fa-solid fa-chart-line"></i> Event Analytics</h1>
+                    <p>See how many expected students attended and compare completed events.</p>
                 </div>
                 <div class="page-actions">
                     <button type="button" class="btn-report excel" id="btnExportExcel" disabled><i class="fa-solid fa-file-excel"></i> Excel</button>
@@ -35,62 +34,78 @@
                 </div>
             </div>
 
-            <section class="controls-card" aria-label="Analytics filters">
+            <section class="controls-card" aria-label="Event analytics filters">
                 <div class="section-heading"><h2><i class="fa-solid fa-sliders-h"></i> Filters</h2><span id="rangeHint">The last 12 months are shown by default. Clear the dates to include all history.</span></div>
                 <div class="filter-grid">
                     <div class="control-group"><label for="trendEvent">Event</label><select id="trendEvent"><option value="">All Events</option></select></div>
+                    <div class="control-group"><label for="trendEventType">Event Type</label><select id="trendEventType"><option value="">All Types</option></select></div>
+                    <div class="control-group"><label for="trendStatus">Event Status</label><select id="trendStatus"><option value="">All Non-Cancelled Statuses</option><option value="completed">Completed</option><option value="ongoing">Ongoing</option><option value="upcoming">Upcoming</option></select></div>
                     <div class="control-group"><label for="trendGrade">Grade</label><select id="trendGrade"><option value="">All Grades</option></select></div>
                     <div class="control-group"><label for="trendSection">Section</label><select id="trendSection"><option value="">All Sections</option></select></div>
                     <div class="control-group"><label for="trendDateFrom">Date From</label><input type="date" id="trendDateFrom"></div>
                     <div class="control-group"><label for="trendDateTo">Date To</label><input type="date" id="trendDateTo"></div>
-                    <div class="control-group"><label for="trendEventType">Event Type</label><select id="trendEventType"><option value="">All Types</option></select></div>
-                    <div class="control-group"><label for="trendStatus">Event Status</label><select id="trendStatus"><option value="">All Non-Cancelled Statuses</option><option value="completed">Completed</option><option value="ongoing">Ongoing</option><option value="upcoming">Upcoming</option></select></div>
                     <div class="control-group"><label for="trendGrouping">Trend Grouping</label><select id="trendGrouping"><option value="event">Each Event</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
                 </div>
-                <div class="filter-actions"><button type="button" class="btn-generate" id="btnApplyTrends"><i class="fa-solid fa-chart-column"></i> Apply Filters</button><button type="button" class="btn-reset" id="btnResetTrends">Reset</button></div>
+                <div class="filter-actions"><button type="button" class="btn-generate" id="btnApplyTrends"><i class="fa-solid fa-chart-column"></i> Apply Filters</button><button type="button" class="btn-reset" id="btnResetTrends">Reset Filters</button></div>
             </section>
 
-            <section class="trend-loading" id="trendLoading" role="status" hidden><i class="fa-solid fa-spinner fa-spin"></i> Loading attendance analytics…</section>
+            <section class="trend-loading" id="trendLoading" role="status" hidden><i class="fa-solid fa-spinner fa-spin"></i> Loading event analytics...</section>
             <section class="trend-message error" id="trendError" role="alert" hidden></section>
             <section class="trend-message empty" id="trendEmpty" hidden><i class="fa-solid fa-chart-line"></i><p>No events match these filters. Adjust the filters or date range to see analytics.</p></section>
 
             <div id="trendResults" hidden>
-                <div class="context-strip"><strong id="viewTitle">All selected events</strong><span id="viewSubtitle"></span></div>
-                <div class="stats-grid" aria-label="Attendance metrics">
-                    <article class="stat-card"><i class="fa-solid fa-users blue"></i><div><span>Expected Participants</span><strong id="statExpected">0</strong><small>Student-event roster slots</small></div></article>
-                    <article class="stat-card"><i class="fa-solid fa-user-check green"></i><div><span>Attended</span><strong id="statAttended">0</strong><small>Roster members with Time-In</small></div></article>
-                    <article class="stat-card"><i class="fa-solid fa-percent purple"></i><div><span>Attendance Rate</span><strong id="statAttendanceRate">0%</strong><small id="attendanceRateNote">Attended ÷ expected</small></div></article>
-                    <article class="stat-card"><i class="fa-solid fa-user-xmark amber"></i><div><span>No Shows</span><strong id="statNoShows">0</strong><small id="noShowNote">Completed events only</small></div></article>
-                    <article class="stat-card"><i class="fa-solid fa-clock green"></i><div><span>On Time</span><strong id="statOnTime">0</strong><small id="onTimeRate">0% of attendees</small></div></article>
-                    <article class="stat-card"><i class="fa-solid fa-hourglass-half amber"></i><div><span>Late</span><strong id="statLate">0</strong><small id="lateRate">0% of attendees</small></div></article>
-                    <article class="stat-card"><i class="fa-solid fa-right-left blue"></i><div><span id="completionLabel">Time-Out Completion</span><strong id="statCompletion">0%</strong><small id="completionNote">Timed out ÷ timed in</small></div></article>
-                    <article class="stat-card"><i class="fa-solid fa-stopwatch purple"></i><div><span>Average Lateness</span><strong id="statAverageLate">N/A</strong><small>Among late arrivals only</small></div></article>
-                </div>
+                <div class="context-strip"><strong id="viewTitle">Selected events</strong><span id="viewSubtitle"></span></div>
+                <nav class="analytics-tabs" aria-label="Event analytics sections">
+                    <button type="button" id="analyticsOverviewTab" class="active" aria-controls="analyticsOverviewPanel" aria-pressed="true">Overview</button>
+                    <button type="button" id="analyticsPerformanceTab" aria-controls="analyticsPerformancePanel" aria-pressed="false">Event Performance</button>
+                    <button type="button" id="analyticsBreakdownTab" aria-controls="analyticsBreakdownPanel" aria-pressed="false">Attendance Breakdown</button>
+                    <button type="button" id="analyticsTrendsTab" aria-controls="analyticsTrendsPanel" aria-pressed="false">Trends</button>
+                </nav>
 
-                <div class="analytics-note" id="analyticsNote"></div>
-                <div class="chart-card trend-chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-chart-line"></i> Attendance Trend</h2><p>Chronological attendance rate; grouped rates use total attended ÷ total expected.</p></div><div class="chart-wrap"><canvas id="attendanceTrendChart" aria-label="Attendance rate over time"></canvas><div class="chart-empty" id="trendChartEmpty" hidden>No roster data for this chart.</div></div></div>
-                <div class="chart-grid">
-                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-school"></i> Attendance by Grade / Section</h2><p>Rate compares groups fairly; hover for expected and attended counts.</p></div><div class="chart-wrap"><canvas id="sectionChart" aria-label="Attendance rate by grade and section"></canvas><div class="chart-empty" id="sectionChartEmpty" hidden>No section data for these filters.</div></div></div>
-                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-chart-pie"></i> Attendance Status</h2><p>Roster slots appear in one category each.</p></div><div class="chart-wrap"><canvas id="statusChart" aria-label="On-time, late, no-show and pending composition"></canvas><div class="chart-empty" id="statusChartEmpty" hidden>No participants for these filters.</div></div></div>
-                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-clock"></i> Arrival Relative to Event Start</h2><p>Time-In compared with each event's scheduled start, in Manila time.</p></div><div class="chart-wrap"><canvas id="arrivalChart" aria-label="Arrival time distribution"></canvas><div class="chart-empty" id="arrivalChartEmpty" hidden>No arrivals with a scheduled start.</div></div></div>
-                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-chart-bar"></i> Event Comparison</h2><p>Attendance rate by event; hover for raw participant counts.</p></div><div class="chart-wrap"><canvas id="attendanceByEventChart" aria-label="Attendance rate by event"></canvas><div class="chart-empty" id="eventChartEmpty" hidden>No events with a participant roster.</div></div></div>
-                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-right-left"></i> Time-In / Time-Out Completion</h2><p>Awaiting Time-Out is separate from No Show. Ongoing events are in progress.</p></div><div class="chart-wrap"><canvas id="checkInOutChart" aria-label="Time-out completion"></canvas><div class="chart-empty" id="completionChartEmpty" hidden>No Time-In records for these filters.</div></div></div>
-                </div>
+                <section id="analyticsOverviewPanel" class="analytics-panel" role="region" aria-labelledby="analyticsOverviewTab">
+                    <div class="section-heading"><h2>Overview</h2><p>Completed events with an expected-student list are used for attendance rates.</p></div>
+                    <div class="stats-grid" aria-label="Event attendance overview">
+                        <article class="stat-card"><i class="fa-solid fa-percent blue"></i><div><span>Overall Attendance Rate</span><strong id="statAttendanceRate">—</strong><small id="attendanceRateNote">No completed event with a roster yet.</small></div></article>
+                        <article class="stat-card"><i class="fa-solid fa-trophy green"></i><div><span>Best Attended Event</span><strong id="statBestEvent">—</strong><small id="bestEventNote">Highest percentage of expected students who attended.</small></div></article>
+                        <article class="stat-card"><i class="fa-solid fa-users purple"></i><div><span>Largest Recorded Turnout</span><strong id="statLargestTurnout">—</strong><small id="largestTurnoutNote">Most unique people with a recorded Time-In.</small></div></article>
+                        <article class="stat-card"><i class="fa-solid fa-circle-exclamation amber"></i><div><span>Events Needing Attention</span><strong id="statAttention">—</strong><small id="attentionNote">Completed rostered events below 70% attendance.</small></div></article>
+                    </div>
+                    <div class="analytics-note" id="analyticsNote"></div>
+                    <article class="insight-card" id="eventInsight" hidden>
+                        <h3 id="insightTitle">Selected event</h3>
+                        <div class="insight-metrics">
+                            <div><span>Expected students</span><strong id="insightExpected">—</strong></div>
+                            <div><span>Attended from roster</span><strong id="insightAttended">—</strong></div>
+                            <div><span>Attendance rate</span><strong id="insightRate">—</strong></div>
+                            <div><span>No recorded attendance</span><strong id="insightNoShow">—</strong></div>
+                        </div>
+                        <p id="insightExplanation"></p>
+                    </article>
+                </section>
 
-                <section class="table-card"><div class="chart-card-head"><h2><i class="fa-solid fa-table"></i> Event Participation Summary</h2><p>Each row counts unique roster members for one event. Events are ordered by date.</p></div><div class="table-scroll"><table><thead><tr><th>Event</th><th>Date</th><th>Status</th><th>Expected</th><th>Attended</th><th>Rate</th><th>On Time</th><th>Late</th><th>No Shows</th><th>Timed Out</th><th>Completion</th></tr></thead><tbody id="eventTrendTableBody"></tbody></table></div></section>
+                <section id="analyticsPerformancePanel" class="analytics-panel" role="region" aria-labelledby="analyticsPerformanceTab" hidden>
+                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-chart-bar"></i> Event Performance</h2><p>Attendance rate compares the share of expected students who attended each event. Recorded turnout is a separate count of everyone with a Time-In.</p></div><div class="chart-wrap performance-chart"><canvas id="attendanceByEventChart" aria-label="Attendance rate by completed event" role="img"></canvas><div class="chart-empty" id="eventChartEmpty" hidden>No completed event with an expected-student list matches these filters.</div></div><p class="plain-explanation" id="performanceExplanation" aria-live="polite"></p></div>
+                    <section class="table-card"><div class="chart-card-head"><h2>Completed Event Comparison</h2><p>Each expected student and each recorded person is counted once per event. Events without an expected-student list have no attendance rate.</p></div><div class="table-scroll"><table><thead><tr><th>Event</th><th>Date</th><th>Expected students</th><th>Expected students who attended</th><th>Attendance rate</th><th>No recorded attendance</th><th>Recorded turnout</th></tr></thead><tbody id="eventTrendTableBody"></tbody></table></div></section>
+                </section>
 
-                <section class="table-card detail-card"><div class="section-heading"><div><h2><i class="fa-solid fa-list"></i> Participant Details</h2><p>Completed-event no-shows and missing time-outs are listed separately.</p></div><label class="detail-search">Search details <input id="detailSearch" type="search" placeholder="Student or event…"></label></div><div class="detail-tabs" role="tablist" aria-label="Participant detail lists"><button type="button" class="detail-tab active" id="tabLate" data-detail="late" role="tab" aria-selected="true">Late <span id="lateCount">0</span></button><button type="button" class="detail-tab" id="tabNoShow" data-detail="noShow" role="tab" aria-selected="false">No Shows <span id="noShowCount">0</span></button><button type="button" class="detail-tab" id="tabMissing" data-detail="missing" role="tab" aria-selected="false">Missing Time-Out <span id="missingCount">0</span></button></div><div class="table-scroll"><table><thead id="detailTableHead"></thead><tbody id="detailTableBody"></tbody></table></div><small id="detailLimitNote"></small></section>
+                <section id="analyticsBreakdownPanel" class="analytics-panel" role="region" aria-labelledby="analyticsBreakdownTab" hidden>
+                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-chart-pie"></i> Attendance Breakdown</h2><p>For expected students in completed events: on time, late, or no recorded Time-In. “Late” uses the configured event grace period.</p></div><div class="chart-wrap"><canvas id="statusChart" aria-label="On-time, late and no-recorded-attendance counts" role="img"></canvas><div class="chart-empty" id="statusChartEmpty" hidden>No completed event roster is available for a breakdown.</div></div><p class="plain-explanation" id="breakdownExplanation" aria-live="polite"></p></div>
+                    <section class="table-card detail-card"><div class="section-heading"><div><h2><i class="fa-solid fa-list"></i> Participant Details</h2><p>Late arrivals, completed-event no-shows, and missing Time-Outs are listed separately.</p></div><label class="detail-search">Search details <input id="detailSearch" type="search" placeholder="Student or event..."></label></div><div class="detail-tabs" role="tablist" aria-label="Participant detail lists"><button type="button" class="detail-tab active" id="tabLate" data-detail="late" role="tab" aria-selected="true">Late <span id="lateCount">0</span></button><button type="button" class="detail-tab" id="tabNoShow" data-detail="noShow" role="tab" aria-selected="false">No Shows <span id="noShowCount">0</span></button><button type="button" class="detail-tab" id="tabMissing" data-detail="missing" role="tab" aria-selected="false">Missing Time-Out <span id="missingCount">0</span></button></div><div class="table-scroll"><table><thead id="detailTableHead"></thead><tbody id="detailTableBody"></tbody></table></div><small id="detailLimitNote"></small></section>
+                </section>
+
+                <section id="analyticsTrendsPanel" class="analytics-panel" role="region" aria-labelledby="analyticsTrendsTab" hidden>
+                    <div class="chart-card"><div class="chart-card-head"><h2><i class="fa-solid fa-chart-line"></i> Attendance Trends</h2><p>Completed events with an expected-student list, ordered by event date. Grouped rates use total rostered attendees divided by total expected students.</p></div><div class="chart-wrap"><canvas id="attendanceTrendChart" aria-label="Completed-event attendance rates over time" role="img"></canvas><div class="chart-empty" id="trendChartEmpty" hidden>At least one completed event with a roster is needed for this chart.</div></div><p class="plain-explanation" id="trendExplanation" aria-live="polite"></p></div>
+                </section>
             </div>
         </div>
     </main>
-
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../config/.env.js"></script>
     <script src="../../config/config.js"></script>
     <script src="../../shared/settings-service.js"></script>
     <script src="../includes/sidebar.js"></script>
     <script src="../../shared/ui-feedback.js"></script>
-    <script src="../resc/js/eventAttendanceTrends.js?v=20260926"></script>
+    <script src="../resc/js/eventAttendanceTrends.js?v=20261008"></script>
     <script src="../../shared/logout-modal.js"></script>
     <script>loadHeader(); loadSidebar('event-attendance-trends');</script>
 </body>
