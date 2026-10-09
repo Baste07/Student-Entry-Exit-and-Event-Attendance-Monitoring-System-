@@ -10,6 +10,7 @@ import mediapipe as mp
 
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from student_face_embedding_store import new_student_face_folder
 
 
 # ============================================================
@@ -619,7 +620,7 @@ def upload_student_images(
     """
     Upload processed photos to:
 
-        facial_data/students/student_<stud_id>/
+        facial_data/students/student_<stud_id>/registration_<batch>/
 
     and update facial_dataset_path.
     """
@@ -644,9 +645,7 @@ def upload_student_images(
 
         return False
 
-    cloud_folder = (
-        f"students/student_{stud_id}"
-    )
+    cloud_folder = new_student_face_folder(stud_id)
 
     print("\n" + "=" * 60)
 

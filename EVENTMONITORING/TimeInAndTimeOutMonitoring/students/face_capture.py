@@ -61,6 +61,7 @@ from flask import Flask, Response, request, jsonify
 from flask_cors import CORS
 from local_admin_auth import require_admin_aal2
 from supabase import create_client, Client
+from student_face_embedding_store import new_student_face_folder
 
 # 5. Disable Flask logging
 import logging
@@ -703,7 +704,9 @@ def upload_to_supabase():
         table_name   = "professors"
         id_column    = "employee_id"
     else:
-        cloud_folder = f"students/student_{session['id_number']}"
+        # A new batch folder prevents partial re-registration from mixing
+        # newly uploaded numbered images with old images in Storage.
+        cloud_folder = new_student_face_folder(session['id_number'])
         table_name   = "students"
         id_column    = "stud_id"  # <-- CHANGED from "lrn" to "stud_id"
 

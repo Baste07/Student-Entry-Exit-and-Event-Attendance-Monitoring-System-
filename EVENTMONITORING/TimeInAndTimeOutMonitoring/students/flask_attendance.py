@@ -5,13 +5,13 @@ import sys, os
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 # 2. THE MAGIC FIX: Redirect all "screen" text into a log file so pythonw.exe doesn't crash!
-log_path = os.path.join(script_dir, "engine_log.txt")
+log_path = os.getenv("LOCAL_GATE_ENGINE_LOG_FILE", os.path.join(script_dir, "engine_log.txt"))
 sys.stdout = open(log_path, "w", encoding="utf-8", buffering=1)
 sys.stderr = sys.stdout # Send errors to the same file
 
 # 3. Load the hidden credentials
 from dotenv import load_dotenv
-env_path = os.path.join(script_dir, '.env')
+env_path = os.getenv("LOCAL_GATE_ENV_FILE", os.path.join(script_dir, '.env'))
 load_dotenv(env_path, override=True)
 
 # 4. Standard Imports (Cleaned up, no duplicates)
@@ -74,9 +74,14 @@ from local_admin_auth import require_admin_aal2, local_service_or_admin
 from supabase import create_client, Client
 from sms_notifications import generate_attendance_sms, resolve_guardian_phone, send_sms
 from runtime_settings import RuntimeSettings
+from student_face_embedding_store import (
+    checked_vector, fetch_student_embedding_rows, replace_student_embeddings,
+    verified_student_embeddings,
+)
 
 warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+ISOLATED_FACE_TEST = os.getenv("LOCAL_GATE_FACE_TEST_MODE") == "1"
 
 # 5. Disable Flask's aggressive logging that causes crashes in hidden mode
 import logging
@@ -87,10 +92,12 @@ log.disabled = True
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 BUCKET_NAME  = "facial_data"
-FACE_CACHE_FILE = os.path.join(script_dir, "face_encodings_cache.npz")
+FACE_CACHE_FILE = os.getenv("LOCAL_GATE_FACE_CACHE_FILE", os.path.join(script_dir, "face_encodings_cache.npz"))
 FACE_CACHE_VERSION = 2   # ← bumped to 2 so old v1 caches are auto-discarded
 FORCE_FACE_CACHE_REBUILD = os.getenv("FORCE_FACE_CACHE_REBUILD", "0") == "1"
-MAX_IMAGES_PER_PERSON = int(os.getenv("MAX_IMAGES_PER_PERSON", "1"))
+# Registration captures up to five processed images. Use every usable image
+# by default so the persistent student set and local recognition cache agree.
+MAX_IMAGES_PER_PERSON = min(5, max(1, int(os.getenv("MAX_IMAGES_PER_PERSON", "5"))))
 DEBUG_SCAN_LOGS = os.getenv("DEBUG_SCAN_LOGS", "0") == "1"
 REBUILD_SECRET = os.getenv("REBUILD_SECRET", "")
 REBUILD_MIN_INTERVAL = float(os.getenv("REBUILD_MIN_INTERVAL", "3.0"))
@@ -464,10 +471,10 @@ def _set_engine_boot_state(**updates):
         engine_boot_state["last_update"] = datetime.datetime.now().isoformat()
 
 
-_init_anti_spoof()
-
-# Claim camera ownership only if it is currently unowned/stale.
-_claim_camera_owner(force=False)
+if not ISOLATED_FACE_TEST:
+    _init_anti_spoof()
+    # Claim camera ownership only if it is currently unowned/stale.
+    _claim_camera_owner(force=False)
 
 # Last rebuild summary visible via /engine_status
 last_rebuild_summary = None
@@ -994,14 +1001,14 @@ def _fetch_face_rows():
 
     return students_data, teachers_data
 
-def load_encodings_from_storage(cloud_folder, meta, enc_store, meta_store):
+def load_encodings_from_storage(cloud_folder, meta, enc_store, meta_store, sample_store=None):
     try:
         images = _list_face_images_for_folder(cloud_folder)
         if not images:
             print(f"    ✗ No files in: {cloud_folder}")
             return 0
         count = 0
-        for img_file in images:
+        for image_slot, img_file in enumerate(images, start=1):
             file_path = f"{cloud_folder}/{img_file.get('name', '')}"
             try:
                 img_bytes = supabase.storage.from_(BUCKET_NAME).download(file_path)
@@ -1012,8 +1019,17 @@ def load_encodings_from_storage(cloud_folder, meta, enc_store, meta_store):
                 rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 encs = face_recognition.face_encodings(rgb_img)
                 if encs:
-                    enc_store.append(encs[0])
+                    vector = checked_vector(encs[0])
+                    if vector is None:
+                        continue
+                    enc_store.append(vector)
                     meta_store.append(meta)
+                    if sample_store is not None:
+                        sample_store.append({
+                            "image_slot": image_slot,
+                            "source_image_name": img_file["name"],
+                            "embedding": vector,
+                        })
                     count += 1
             except Exception as e:
                 print(f"    ⚠ Error loading {img_file['name']}: {e}")
@@ -1174,17 +1190,26 @@ def load_all_faces(force_rebuild=False):
                             meta[key] = details.get(key)
             _activate_face_db(working_encodings, working_meta)
 
-        # If we had no usable local cache, seed working arrays from pgvector so we
-        # don't have to re-download every photo on a fresh machine.
+        # Restore individual database references before the legacy average.
+        db_samples = {}
         if not cached:
+            try:
+                db_samples = fetch_student_embedding_rows(supabase)
+            except Exception as exc:
+                print(f"Warning: individual face references unavailable ({type(exc).__name__})")
+                db_samples = {}
             for row in students_rows:
+                student_id = str(row["student_id"])
+                individual_rows = db_samples.get(student_id, [])
+                stored_fp = (individual_rows[0].get("dataset_fingerprint")
+                             if individual_rows else None)
+                individual_vectors = verified_student_embeddings(individual_rows, stored_fp)
                 vec = _parse_pg_vector(row.get("face_embedding"))
                 fp_db = row.get("face_embedding_fingerprint")
-                if vec is not None and fp_db:
+                if individual_vectors or (vec is not None and fp_db):
                     mid = row.get("middle_name") or ""
-                    details = student_details_cache.get(str(row["student_id"]), {})
-                    working_encodings.append(vec)
-                    working_meta.append({
+                    details = student_details_cache.get(student_id, {})
+                    meta = {
                         "role": "student",
                         "id": row["student_id"],
                         "stud_id": details.get("stud_id"),
@@ -1192,8 +1217,17 @@ def load_all_faces(force_rebuild=False):
                         "grade_level": details.get("grade_level"),
                         "section_name": details.get("section_name"),
                         "email": details.get("email"),
-                    })
-                    working_per_person[f"student_{row['student_id']}"] = fp_db
+                    }
+                    if individual_vectors:
+                        working_encodings.extend(individual_vectors)
+                        working_meta.extend([meta] * len(individual_vectors))
+                        working_per_person[f"student_{row['student_id']}"] = stored_fp
+                    else:
+                        working_encodings.append(vec)
+                        working_meta.append(meta)
+                        # Do not mark the legacy average as current: a Storage
+                        # rebuild should create the missing individual set.
+                        print("Warning: legacy average used pending image rebuild")
             for row in teachers_rows:
                 vec = _parse_pg_vector(row.get("face_embedding"))
                 fp_db = row.get("face_embedding_fingerprint")
@@ -1283,12 +1317,21 @@ def load_all_faces(force_rebuild=False):
             print("=" * 60)
             return
 
+        # A stale but readable NPZ may be repaired from a newer, fingerprint-
+        # matched database set without re-encoding the same Storage images.
+        if cached:
+            try:
+                db_samples = fetch_student_embedding_rows(supabase)
+            except Exception as exc:
+                print(f"Warning: individual face restore unavailable ({type(exc).__name__})")
+                db_samples = {}
+
         # ── STEP 3: Incremental sync — only process what changed ─────────────
         print("⚙ Changes detected — running incremental sync…")
         _set_engine_boot_state(face_db_phase="rebuilding")
 
         rebuild_t0 = time.perf_counter()
-        added = updated = removed = kept = 0
+        added = updated = removed = kept = sync_failures = 0
 
         # Build the set of person keys that exist remotely right now
         # Key format:  "student_<student_id>"  or  "teacher_<teacher_id>"
@@ -1395,27 +1438,57 @@ def load_all_faces(force_rebuild=False):
                     "name":        f"{row['first_name']} {mid} {row['last_name']}".strip(),
                 }
 
-            # If updating an existing person, remove their old encodings first
-            if not is_new:
-                old_indices = key_index.get(person_key, [])
-                keep = [i for i in range(len(working_meta)) if i not in set(old_indices)]
-                working_encodings = [working_encodings[i] for i in keep]
-                working_meta      = [working_meta[i]      for i in keep]
-                key_index = _build_key_index(working_meta)
+            if entry["role"] == "student":
+                current_rows = db_samples.get(str(meta["id"]), [])
+                from_db = verified_student_embeddings(current_rows, new_fp)
+                if from_db:
+                    if not is_new:
+                        old_indices = set(key_index.get(person_key, []))
+                        keep = [i for i in range(len(working_meta)) if i not in old_indices]
+                        working_encodings = [working_encodings[i] for i in keep]
+                        working_meta = [working_meta[i] for i in keep]
+                    working_encodings.extend(from_db)
+                    working_meta.extend([meta] * len(from_db))
+                    working_per_person[person_key] = new_fp
+                    key_index = _build_key_index(working_meta)
+                    if is_new:
+                        added += 1
+                    else:
+                        updated += 1
+                    continue
 
-            # Download & encode the new/updated images
+            # Build the candidate before replacing any previous valid set.
             new_encs  = []
             new_metas = []
-            n = load_encodings_from_storage(folder, meta, new_encs, new_metas)
+            samples = []
+            n = load_encodings_from_storage(
+                folder, meta, new_encs, new_metas,
+                samples if entry["role"] == "student" else None,
+            )
 
             if n > 0:
+                if entry["role"] == "student":
+                    try:
+                        replace_student_embeddings(
+                            supabase, meta["id"], folder, new_fp, samples,
+                        )
+                    except Exception as exc:
+                        sync_failures += 1
+                        print(f"Warning: student face set not persisted ({type(exc).__name__})")
+                        continue
+                if not is_new:
+                    old_indices = set(key_index.get(person_key, []))
+                    keep = [i for i in range(len(working_meta)) if i not in old_indices]
+                    working_encodings = [working_encodings[i] for i in keep]
+                    working_meta = [working_meta[i] for i in keep]
                 working_encodings.extend(new_encs)
                 working_meta.extend(new_metas)
                 working_per_person[person_key] = new_fp   # store new fingerprint
                 key_index = _build_key_index(working_meta)
 
-                avg_embedding = np.mean(np.array(new_encs, dtype=np.float32), axis=0)
-                _upsert_face_embedding(entry["role"], meta["id"], avg_embedding, new_fp)
+                if entry["role"] != "student":
+                    avg_embedding = np.mean(np.array(new_encs, dtype=np.float32), axis=0)
+                    _upsert_face_embedding(entry["role"], meta["id"], avg_embedding, new_fp)
 
                 if is_new:
                     added += 1
@@ -1424,24 +1497,20 @@ def load_all_faces(force_rebuild=False):
                     updated += 1
                     print(f"    🔄 UPDATED  {meta['name']} ({n} enc)")
             else:
-                # No encodable face found — don't store a broken fingerprint
-                working_per_person.pop(person_key, None)
-                if is_new:
-                    # Never had encodings, still doesn't — just warn
-                    print(f"    ⚠ SKIPPED (no face in storage) {meta['name']}")
-                else:
-                    # Had encodings before, now storage is empty → treat as removed
-                    removed += 1
-                    print(f"    ❌ REMOVED  {meta['name']} (files deleted from storage)")
+                # Keep the prior reference set and retry when Storage recovers.
+                sync_failures += 1
+                print(f"Warning: no usable images for {person_key}; prior references retained")
 
-        # ── STEP 4: Activate updated DB and save cache ───────────────────────
+        # Activate and save the completed or partially recovered set.
         enc_np = (np.array(working_encodings, dtype=np.float32)
                   if working_encodings
                   else np.empty((0, 128), dtype=np.float32))
 
         _activate_face_db(enc_np, working_meta)
-        _save_face_cache_to_disk(enc_np, working_meta, remote_fingerprint, working_per_person)
-        current_face_fingerprint = remote_fingerprint
+        active_fingerprint = (remote_fingerprint if not sync_failures
+                              else (cached.get("fingerprint", "") if cached else ""))
+        _save_face_cache_to_disk(enc_np, working_meta, active_fingerprint, working_per_person)
+        current_face_fingerprint = active_fingerprint
 
         with engine_boot_lock:
             d = dict(engine_boot_state.get("durations_ms") or {})
@@ -1449,8 +1518,8 @@ def load_all_faces(force_rebuild=False):
             d["total_startup"]  = round((time.perf_counter() - overall_t0) * 1000, 2)
 
         _set_engine_boot_state(
-            status="ready", face_db_phase="ready",
-            cache_status="incremental_update",
+            status="ready", face_db_phase="ready" if not sync_failures else "partial_sync",
+            cache_status="incremental_update" if not sync_failures else "partial_sync",
             data_source="remote" if (added + updated + removed) > 0 else "cache",
             durations_ms=d,
             encodings_loaded=len(working_meta),
@@ -1470,6 +1539,7 @@ def load_all_faces(force_rebuild=False):
                 "updated": int(updated),
                 "removed": int(removed),
                 "kept": int(kept),
+                "failed": int(sync_failures),
             }
             print(f"REBUILD SUMMARY: {last_rebuild_summary}")
         except Exception:
@@ -2032,7 +2102,8 @@ def recognition_worker():
                                         "labels":    new_labels,
                                         "colors":    new_colors})
 
-threading.Thread(target=recognition_worker, daemon=True).start()
+if not ISOLATED_FACE_TEST:
+    threading.Thread(target=recognition_worker, daemon=True).start()
 
 def _push(payload):
     message = json.dumps(payload)
@@ -2131,7 +2202,9 @@ except Exception:
     CLI_CAMERA_INDEX = None
 
 # Choose camera index (CLI -> ENV -> auto-detect external webcam -> fallback 0)
-_cam_index = _find_camera_index(preferred_range=(1, 4), fallback_index=0, cli_index=CLI_CAMERA_INDEX)
+_cam_index = (0 if ISOLATED_FACE_TEST else
+              _find_camera_index(preferred_range=(1, 4), fallback_index=0,
+                                 cli_index=CLI_CAMERA_INDEX))
 if _cam_index is None:
     _cam_index = 0
 camera = None
@@ -2435,7 +2508,8 @@ def shutdown():
         print(f"Error during shutdown: {e}")
         return jsonify({"success": False, "error": str(e)})
 
-threading.Thread(target=face_auto_sync_worker, daemon=True).start()
+if not ISOLATED_FACE_TEST:
+    threading.Thread(target=face_auto_sync_worker, daemon=True).start()
 
 # ─────────────────────────────────────────────
 # Scanner UI
