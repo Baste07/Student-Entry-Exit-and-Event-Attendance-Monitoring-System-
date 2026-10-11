@@ -94,8 +94,9 @@ function showGreeting(name, message, isSpoof = false, details = {}) {
         timeEl.style.display = 'none';
     }
 
-    const state = isSpoof ? 'spoof' : (details.type === 'already_recorded' ? 'warning' :
-        (details.type === 'error' || details.type === 'not_participant' ? 'error' : 'success'));
+    const feedback = EventAttendanceFeedback.forOutcome(details.type, details.attendance_status);
+    const state = isSpoof ? 'spoof' : (['already_recorded', 'time_out_unavailable', 'event_not_started'].includes(details.type) ? 'warning' :
+        (['error', 'not_participant', 'no_active_event'].includes(details.type) ? 'error' : 'success'));
     const stateContent = {
         success: { badge: details.type === 'time_out' ? 'TIME-OUT RECORDED' : 'ATTENDANCE CONFIRMED', icon: 'fa-circle-check' },
         warning: { badge: 'ALREADY RECORDED', icon: 'fa-circle-exclamation' },
@@ -103,9 +104,9 @@ function showGreeting(name, message, isSpoof = false, details = {}) {
         spoof: { badge: 'LIVENESS CHECK FAILED', icon: 'fa-shield-halved' }
     }[state];
     greetCard.className = `greet-card ${state}`;
-    greetBadge.textContent = stateContent.badge;
+    greetBadge.textContent = feedback?.badge || stateContent.badge;
     greetTitle.textContent = state === 'spoof' ? 'Face verification unsuccessful' :
-        (state === 'success' ? 'Attendance recorded' : stateContent.badge.toLowerCase());
+        (feedback?.title || (state === 'success' ? 'Attendance recorded' : stateContent.badge.toLowerCase()));
     greetAvatar.innerHTML = `<i class="fa-solid ${stateContent.icon}" aria-hidden="true"></i>`;
     greetDiagnostics.hidden = !isSpoof;
     greetScore.textContent = details.score ?? 'Not available';
@@ -675,7 +676,8 @@ function handleRecognitionEvent(d) {
         section: d.section || '',
         time: d.time || '',
         stud_id: d.stud_id || '',
-        type: d.type || 'greeting'
+        type: d.type || 'greeting',
+        attendance_status: d.attendance_status || ''
     };
 
     if (d.type === 'spoof') {
@@ -691,23 +693,26 @@ function handleRecognitionEvent(d) {
     }
 
     if (d.type === 'time_in') {
-        showGreeting(name, message, false, details);
-        showToast(`${name} timed in · ${details.event_name || 'Event'}`, 'green', 3000);
+        const feedback = EventAttendanceFeedback.forOutcome(d.type, d.attendance_status);
+        showGreeting(name, feedback.message, false, details);
+        showToast(`${feedback.title} · ${name}`, 'green', 3000);
         // Email toast will appear via polling shortly
         return;
     }
     if (d.type === 'time_out') {
-        showGreeting(name, message, false, details);
-        showToast(`${name} timed out · ${details.event_name || 'Event'}`, 'green', 3000);
+        const feedback = EventAttendanceFeedback.forOutcome(d.type);
+        showGreeting(name, feedback.message, false, details);
+        showToast(`${feedback.title} · ${name}`, 'green', 3000);
         // Email toast will appear via polling shortly
         return;
     }
-    if (d.type === 'already_recorded') {
-        showGreeting(name, d.reason || message, false, details);
-        showToast(d.reason || message, 'amber', 3000);
+    if (['already_recorded', 'time_out_unavailable', 'event_not_started'].includes(d.type)) {
+        const feedback = EventAttendanceFeedback.forOutcome(d.type);
+        showGreeting(name, d.type === 'event_not_started' ? (d.reason || feedback.message) : feedback.message, false, details);
+        showToast(feedback.title, 'amber', 3000);
         return;
     }
-    if (d.type === 'not_participant' || d.type === 'error') {
+    if (['not_participant', 'no_active_event', 'error'].includes(d.type)) {
         showGreeting(name, d.reason || message, false, details);
         showToast(d.reason || message, 'red', 4000);
         return;
