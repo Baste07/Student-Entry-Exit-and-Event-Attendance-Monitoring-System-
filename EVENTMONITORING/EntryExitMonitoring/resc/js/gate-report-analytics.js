@@ -7,7 +7,7 @@ let gateAnalyticsChart = null;
 let gateAnalyticsRequest = 0;
 let gateAnalyticsQuality = { invalid: 0, future: 0 };
 let gateAnalyticsView = null;
-let gateActiveTab = 'weekday';
+let gateActiveTab = 'overview';
 
 document.addEventListener('DOMContentLoaded', () => {
     const type = document.getElementById('reportType');
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const to = document.getElementById('reportTo').value;
         if (type.value === 'analytics' && from && to && to >= from) generateGateAnalyticsReport();
     });
-    for (const tab of ['weekday', 'time', 'trends']) {
+    for (const tab of ['overview', 'weekday', 'time', 'trends']) {
         document.getElementById(`gate${gateTabName(tab)}Tab`).addEventListener('click', () => gateSelectTab(tab));
     }
     // reports.js initializes the default Manila date range before this listener.
@@ -78,10 +78,13 @@ function gateResetDisplay() {
     gateDestroyCharts();
     if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
 }
-function gateTabName(tab) { return tab === 'weekday' ? 'Weekday' : tab === 'time' ? 'Time' : 'Trends'; }
+function gateTabName(tab) {
+    return { overview: 'Overview', weekday: 'Weekday', time: 'Time', trends: 'Trends' }[tab];
+}
 function gateSelectTab(tab) {
+    if (!['overview', 'weekday', 'time', 'trends'].includes(tab)) return;
     gateActiveTab = tab;
-    for (const name of ['weekday', 'time', 'trends']) {
+    for (const name of ['overview', 'weekday', 'time', 'trends']) {
         const selected = name === tab;
         const button = document.getElementById(`gate${gateTabName(name)}Tab`);
         button.classList.toggle('active', selected);
@@ -254,7 +257,7 @@ function gateWeekStart(day) {
 function renderGateChart() {
     gateDestroyCharts();
     const view = gateAnalyticsView;
-    if (!view) return;
+    if (!view || gateActiveTab === 'overview') return;
     if (gateActiveTab === 'weekday') {
         document.querySelector('.gate-weekday-chart').style.height = `${Math.max(280, view.weekdays.length * 48 + 70)}px`;
         gateChart('gateWeekdayChart', 'gateWeekdayEmpty', view.ranked.length > 0, {
@@ -280,7 +283,7 @@ function renderGateChart() {
             ] }, options: { responsive: true, maintainAspectRatio: false, animation: false,
                 scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true } } },
                 plugins: { tooltip: { callbacks: { label(context) { return `${context.dataset.label}: ${context.parsed.y} students`; } } } } } });
-    } else {
+    } else if (gateActiveTab === 'trends') {
         const trend = gateTrendRows(view);
         gateChart('gateTrendChart', 'gateTrendEmpty', trend.length > 0, { type: 'line',
             data: { labels: trend.map(row => row.label), datasets: [{ label: 'Sum of daily unique student arrivals',
