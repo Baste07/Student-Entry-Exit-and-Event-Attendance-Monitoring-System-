@@ -64,7 +64,7 @@ async function loadHeader() {
     if (!container) return;
 
     try {
-        const res  = await fetch(`${INCLUDES_PATH}header.html`);
+        const res  = await fetch(`${INCLUDES_PATH}header.html`, { cache: 'no-store' });
         const html = await res.text();
         container.innerHTML = html;
         window.AppDeployment?.applyNavigation(container);
