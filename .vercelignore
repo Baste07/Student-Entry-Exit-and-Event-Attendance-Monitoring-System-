@@ -5,4 +5,24 @@
 /TEST/
 /dist/
 /.student-rollover-clean-dev/
+/supabase/.temp/
+/.vercel/
+
+# LOCAL_GATE runtime data must never be part of a WEB deployment upload.
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/face_encodings_cache*
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/engine_log.txt
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/engine_log*.xml
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/registration_log.txt
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/*.log
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/*.bak*
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/*.backup*
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/hog_visuals/
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/hog_visuals_live/
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/machine_lab_config.json
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/START_ATTENDANCE.bat
+/EVENTMONITORING/TimeInAndTimeOutMonitoring/students/trigger_registration.php
 /EVENTMONITORING/TimeInAndTimeOutMonitoring/students/camera_owner.json
+
+# Ignored LOCAL_GATE notes and text files are not WEB build inputs.
+/EVENTMONITORING/**/*.md
+/EVENTMONITORING/**/*.txt
