@@ -187,6 +187,11 @@ async function prepareCheckIn(id, role, source, autoRecord = false) {
             showStatus('ID not found. Check the selected role and ID.', 'error');
             return;
         }
+        if (role === 'student' && /^student_uuid:/i.test(String(id))) {
+            // The resolved record keeps its permanent UUID for movement and recording.
+            // Show staff the readable ID after the UUID lookup has succeeded.
+            document.getElementById('personId').value = person.stud_id || '';
+        }
         const now = gateNow();
         const movement = await nextMovement(person, role, now);
         pendingPerson = { person, role, source };
@@ -312,7 +317,10 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
     updateClock();
     window.setInterval(updateClock, 1000);
 
-    document.querySelectorAll('input[name="personRole"]').forEach(input => input.addEventListener('change', () => setRole(selectedRole())));
+    document.querySelectorAll('input[name="personRole"]').forEach(input => input.addEventListener('change', () => {
+        setRole(selectedRole());
+        document.getElementById('personId').value = '';
+    }));
     document.getElementById('lookupButton').addEventListener('click', () => {
         void prepareCheckIn(document.getElementById('personId').value.trim(), selectedRole(), qrGunMode ? 'qr' : 'manual');
     });
