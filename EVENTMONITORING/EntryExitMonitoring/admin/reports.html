@@ -11,7 +11,7 @@
 
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
-    <link rel="stylesheet" href="../resc/css/reports.css?v=20261008a">
+    <link rel="stylesheet" href="../resc/css/reports.css?v=20261011b">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
     <link rel="stylesheet" href="../../shared/ui-feedback.css">
 
@@ -21,7 +21,7 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
-<body data-gate-reports-version="20261008a">
+<body data-gate-reports-version="20261011b">
 
     <div id="header-container"></div>
     <div id="sidebar-container"></div>
@@ -86,20 +86,22 @@
             <div class="report-loading" id="reportLoading" role="status" hidden>Loading gate records…</div>
             <section id="gateAnalyticsPanel" hidden>
                 <div class="gate-period" id="gatePeriod" aria-live="polite"></div>
-                <div class="gate-section-heading" id="gateOverview"><h2>Overview</h2><p>Student arrivals count each student once per date, even if they scan again.</p></div>
-                <div class="analytics-grid gate-kpis">
-                    <div class="analytics-card"><span class="analytics-label">Busiest Day</span><strong id="gateBusiestDay">—</strong><small id="gateBusiestExplanation">Load a date range to compare school days.</small></div>
-                    <div class="analytics-card"><span class="analytics-label">Average Daily Students</span><strong id="gateAverageDaily">—</strong><small id="gateAverageExplanation">Average unique arrivals on dates with recorded student entries.</small></div>
-                    <div class="analytics-card"><span class="analytics-label">Peak Arrival Time</span><strong id="gatePeakArrival">—</strong><small id="gatePeakArrivalExplanation">First student arrivals, grouped in 30-minute periods.</small></div>
-                    <div class="analytics-card"><span class="analytics-label">Peak Exit Time</span><strong id="gatePeakExit">—</strong><small id="gatePeakExitExplanation">Last student exits, grouped in 30-minute periods.</small></div>
-                </div>
                 <nav class="gate-tabs" aria-label="Entry and Exit analysis sections">
-                    <a href="#gateOverview">Overview</a>
-                    <button type="button" id="gateWeekdayTab" aria-controls="gateWeekdayPanel" aria-pressed="true" class="active">Weekday Activity</button>
+                    <button type="button" id="gateOverviewTab" aria-controls="gateOverviewPanel" aria-pressed="true" class="active">Overview</button>
+                    <button type="button" id="gateWeekdayTab" aria-controls="gateWeekdayPanel" aria-pressed="false">Weekday Activity</button>
                     <button type="button" id="gateTimeTab" aria-controls="gateTimePanel" aria-pressed="false">Time Activity</button>
                     <button type="button" id="gateTrendsTab" aria-controls="gateTrendsPanel" aria-pressed="false">Trends</button>
                 </nav>
-                <section class="panel gate-tab-panel" id="gateWeekdayPanel" role="region" aria-labelledby="gateWeekdayTab">
+                <section class="gate-tab-panel" id="gateOverviewPanel" role="region" aria-labelledby="gateOverviewTab">
+                    <div class="gate-section-heading"><h2>Overview</h2><p>Student arrivals count each student once per date, even if they scan again.</p></div>
+                    <div class="analytics-grid gate-kpis">
+                        <div class="analytics-card"><span class="analytics-label">Busiest Day</span><strong id="gateBusiestDay">—</strong><small id="gateBusiestExplanation">Load a date range to compare school days.</small></div>
+                        <div class="analytics-card"><span class="analytics-label">Average Daily Students</span><strong id="gateAverageDaily">—</strong><small id="gateAverageExplanation">Average unique arrivals on dates with recorded student entries.</small></div>
+                        <div class="analytics-card"><span class="analytics-label">Peak Arrival Time</span><strong id="gatePeakArrival">—</strong><small id="gatePeakArrivalExplanation">First student arrivals, grouped in 30-minute periods.</small></div>
+                        <div class="analytics-card"><span class="analytics-label">Peak Exit Time</span><strong id="gatePeakExit">—</strong><small id="gatePeakExitExplanation">Last student exits, grouped in 30-minute periods.</small></div>
+                    </div>
+                </section>
+                <section class="panel gate-tab-panel" id="gateWeekdayPanel" role="region" aria-labelledby="gateWeekdayTab" hidden>
                     <div class="panel-title"><i class="fa-solid fa-calendar-week"></i> Student Activity by Day of Week</div>
                     <p class="chart-description">Average unique student arrivals per observed date. Days without recorded arrivals are not assumed to be school days.</p>
                     <div class="analytics-chart gate-weekday-chart"><canvas id="gateWeekdayChart" aria-label="Average unique student arrivals by weekday" role="img"></canvas><p id="gateWeekdayEmpty" hidden>No student arrivals match these filters.</p></div>
@@ -191,9 +193,9 @@
     <script src="../../config/config.js"></script>
     <script src="../../shared/ui-feedback.js"></script>
     <script src="../includes/sidebar.js"></script>
-    <script src="../resc/js/gate-analytics.js?v=20261008a"></script>
-    <script src="../resc/js/reports.js?v=20261008a"></script>
-    <script src="../resc/js/gate-report-analytics.js?v=20261008a"></script>
+    <script src="../resc/js/gate-analytics.js?v=20261011b"></script>
+    <script src="../resc/js/reports.js?v=20261011b"></script>
+    <script src="../resc/js/gate-report-analytics.js?v=20261011b"></script>
     <script src="../../shared/logout-modal.js"></script>
     <script>
         loadHeader();

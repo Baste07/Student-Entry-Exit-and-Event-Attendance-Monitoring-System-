@@ -187,6 +187,41 @@ test('page scripts reference controls present in their matching pages', () => {
     }
 });
 
+test('Overview is a real report tab that replaces the Weekday panel when selected', () => {
+    const html = fs.readFileSync(path.join(__dirname, '../../EntryExitMonitoring/admin/reports.html'), 'utf8');
+    assert.match(html, /id="gateOverviewTab"[^>]*aria-controls="gateOverviewPanel"[^>]*aria-pressed="true"[^>]*class="active"/);
+    assert.match(html, /id="gateWeekdayPanel"[^>]*hidden/);
+    assert.doesNotMatch(html, /href="#gateOverview"/);
+
+    const elements = new Map();
+    for (const name of ['Overview', 'Weekday', 'Time', 'Trends']) {
+        const classes = new Set(name === 'Overview' ? ['active'] : []);
+        elements.set(`gate${name}Tab`, {
+            classList: { toggle(value, on) { if (on) classes.add(value); else classes.delete(value); },
+                contains(value) { return classes.has(value); } },
+            attributes: {}, setAttribute(key, value) { this.attributes[key] = value; }
+        });
+        elements.set(`gate${name}Panel`, { hidden: name !== 'Overview' });
+    }
+    const source = fs.readFileSync(path.join(__dirname, '../../EntryExitMonitoring/resc/js/gate-report-analytics.js'), 'utf8');
+    const context = { document: { addEventListener() {}, getElementById(id) { return elements.get(id); } } };
+    vm.createContext(context);
+    vm.runInContext(source, context);
+    assert.equal(vm.runInContext('gateActiveTab', context), 'overview');
+
+    vm.runInContext("gateSelectTab('weekday')", context);
+    assert.equal(elements.get('gateOverviewPanel').hidden, true);
+    assert.equal(elements.get('gateWeekdayPanel').hidden, false);
+    assert.equal(elements.get('gateWeekdayTab').attributes['aria-pressed'], 'true');
+
+    vm.runInContext("gateSelectTab('overview')", context);
+    assert.equal(elements.get('gateOverviewPanel').hidden, false);
+    assert.equal(elements.get('gateWeekdayPanel').hidden, true);
+    assert.equal(elements.get('gateOverviewTab').attributes['aria-pressed'], 'true');
+    assert.equal(elements.get('gateOverviewTab').classList.contains('active'), true);
+    assert.equal(elements.get('gateWeekdayTab').attributes['aria-pressed'], 'false');
+});
+
 test('weekday averages count one arrival per student per Manila date across months', () => {
     const days = [
         ['2026-09-28', '2026-10-05', 1], // Monday
@@ -326,6 +361,8 @@ test('changing a grade filter updates overview, weekday chart, and explanation t
     vm.runInContext('renderGateAnalytics()', context);
     assert.equal(element('gateAverageDaily').textContent, '1');
     assert.match(element('gateWeekdayExplanation').textContent, /highest observed average \(1 unique student arrivals\).*Based on 1 observed Tuesday/);
+    assert.equal(configs.length, 0, 'Overview does not render a hidden Weekday chart');
+    vm.runInContext("gateSelectTab('weekday')", context);
     assert.equal(configs.at(-1).data.datasets[0].data[1], 1);
     element('gradeFilter').value = 'Grade 2';
     vm.runInContext('renderGateAnalytics()', context);
