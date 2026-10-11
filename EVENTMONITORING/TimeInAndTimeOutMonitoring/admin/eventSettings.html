@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="../../shared/global.css">
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
-    <link rel="stylesheet" href="../resc/css/eventSettings.css">
+    <link rel="stylesheet" href="../resc/css/eventSettings.css?v=20261011">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
     <link rel="stylesheet" href="../../shared/ui-feedback.css">
 </head>
@@ -31,7 +31,7 @@
             <section class="setting-card">
                 <h2>Notifications</h2>
                 <div class="setting-row"><div><strong>System SMS Service</strong><p id="systemSmsStatus">Loading system policy...</p></div><span class="managed-pill">Managed by Super Admin</span></div>
-                <div class="setting-row"><div><label for="eventSmsEnabled"><strong>Facial Event Attendance SMS</strong></label><p id="eventSmsStatus">Loading event preference...</p></div><input type="checkbox" role="switch" id="eventSmsEnabled" disabled></div>
+                <div class="setting-row" id="eventSmsRow"><div><label for="eventSmsEnabled"><strong>Facial Event Attendance SMS</strong></label><p id="eventSmsStatus">Loading event preference...</p></div><input type="checkbox" role="switch" id="eventSmsEnabled" aria-describedby="eventSmsStatus" disabled></div>
                 <p class="setting-note">Attendance is recorded even when SMS is disabled or delivery fails. Event email delivery follows its existing behavior.</p>
             </section>
             <section class="setting-card">
@@ -48,7 +48,7 @@
     <script src="../../shared/global.js"></script>
     <script src="../../shared/settings-service.js"></script>
     <script src="../../shared/ui-feedback.js"></script>
-    <script src="../resc/js/eventSettings.js"></script>
+    <script src="../resc/js/eventSettings.js?v=20261011"></script>
     <script src="../../shared/logout-modal.js"></script>
     <script>loadHeader(); loadSidebar('event-settings');</script>
 </body>

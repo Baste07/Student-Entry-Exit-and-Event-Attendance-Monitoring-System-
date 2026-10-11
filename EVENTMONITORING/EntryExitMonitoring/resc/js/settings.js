@@ -38,8 +38,9 @@ async function loadSettings() {
         document.getElementById('antiSpoofManaged').textContent = AppSettings.enabled(systemSettings, 'anti_spoof_enabled')
             ? 'Enabled by Super Admin' : 'Disabled by Super Admin';
         document.getElementById('systemSmsManaged').textContent = AppSettings.enabled(systemSettings, 'sms_enabled')
-            ? 'Enabled by Super Admin' : 'Disabled by Super Admin';
+            ? 'System SMS Service is enabled.' : 'Disabled by Super Admin';
         updateEffectiveSms();
+        updateCooldownHelp();
         saveButton.disabled = false;
     } catch (error) {
         console.error('Gate settings unavailable:', error);
@@ -54,9 +55,13 @@ function applyToForm(settings) {
     for (const key of ['gateOpen', 'gateClose', 'lateThreshold', 'scanMethod', 'cooldown']) {
         document.getElementById(key).value = key === 'scanMethod' && settings[key] === 'both' ? 'face' : settings[key];
     }
-    for (const [id, key] of [['enforceGateHours', 'enforceGateHours'], ['autoExit', 'autoExit'], ['gateSmsEnabled', 'sms_enabled']]) {
+    for (const [id, key] of [['enforceGateHours', 'enforceGateHours'], ['autoExit', 'autoExit']]) {
         document.getElementById(id).checked = AppSettings.enabled(settings, key);
     }
+    document.getElementById('gateSmsEnabled').checked = AppSettings.enabled(
+        systemSettings && !AppSettings.enabled(systemSettings, 'sms_enabled') ? storedGateSettings : settings,
+        'sms_enabled'
+    );
     updateEffectiveSms();
 }
 
@@ -65,9 +70,19 @@ function updateEffectiveSms() {
     if (!systemSettings) return;
     const preference = document.getElementById('gateSmsEnabled').checked;
     const master = AppSettings.enabled(systemSettings, 'sms_enabled');
+    document.getElementById('gateSmsEnabled').disabled = !master;
+    document.getElementById('gateSmsRow').classList.toggle('is-unavailable', !master);
     note.textContent = !master
-        ? `Stored preference: ${preference ? 'On' : 'Off'}. Currently unavailable because Master SMS is off.`
+        ? `Stored preference: ${preference ? 'On' : 'Off'}. Unavailable because the System SMS Service is disabled by Super Admin.`
         : `Stored preference: ${preference ? 'On' : 'Off'}. Gate SMS is ${preference ? 'active' : 'paused'} after the engine's next refresh (about 15 seconds).`;
+}
+
+function updateCooldownHelp() {
+    const note = document.getElementById('cooldownHelp');
+    if (!storedGateSettings) return;
+    note.textContent = AppSettings.hasSaved('gate', 'cooldown')
+        ? `Currently configured: ${storedGateSettings.cooldown} seconds for face and QR/ID gate scans. The face engine picks up changes on its next settings refresh; reopen the QR/ID scanner to load them.`
+        : 'No cooldown saved yet: QR/ID gate scans use 10 seconds and face gate scans use 5 seconds. Saving this form applies the displayed value to both.';
 }
 
 function formValues() {
@@ -79,7 +94,9 @@ function formValues() {
         scanMethod: document.getElementById('scanMethod').value,
         autoExit: document.getElementById('autoExit').checked,
         cooldown: Number(document.getElementById('cooldown').value),
-        sms_enabled: document.getElementById('gateSmsEnabled').checked
+        sms_enabled: systemSettings && !AppSettings.enabled(systemSettings, 'sms_enabled')
+            ? AppSettings.enabled(storedGateSettings, 'sms_enabled')
+            : document.getElementById('gateSmsEnabled').checked
     };
 }
 
@@ -114,6 +131,7 @@ async function saveSettings() {
         await logSystemAudit({ action: 'UPDATE', moduleName: 'entry_exit', pageName: 'settings.html',
             targetTable: 'gate_settings', details: { old_values: previous, new_values: changes } });
         updateEffectiveSms();
+        updateCooldownHelp();
         UIFeedback.success('Gate settings were saved.', 'Settings saved');
     } catch (error) {
         console.error('Gate settings could not be saved:', error);

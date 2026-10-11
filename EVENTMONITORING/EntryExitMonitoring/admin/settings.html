@@ -11,7 +11,7 @@
 
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
-    <link rel="stylesheet" href="../resc/css/settings.css?v=20260926">
+    <link rel="stylesheet" href="../resc/css/settings.css?v=20261011">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
     <link rel="stylesheet" href="../../shared/ui-feedback.css">
 </head>
@@ -97,8 +97,9 @@
                     </div>
                     <div class="setting-row">
                         <div class="setting-info">
-                            <strong>Cooldown Period (seconds)</strong>
-                            <span>Minimum seconds between scans for the same person. Existing defaults are 10 seconds for QR/UI and 5 seconds for face until a value is saved.</span>
+                            <label for="cooldown"><strong>Cooldown Period (seconds)</strong></label>
+                            <span>How long the system waits before the same person can be scanned again. This helps prevent duplicate Entry or Exit records.</span>
+                            <span id="cooldownHelp">Loading the configured cooldown...</span>
                         </div>
                         <input type="number" id="cooldown" class="setting-input" min="1" max="300" value="10" style="width:100px;">
                     </div>
@@ -115,9 +116,9 @@
                         <div class="setting-info"><strong>System SMS Service</strong><span id="systemSmsManaged">Loading system policy...</span></div>
                         <span class="managed-badge">Managed by Super Admin</span>
                     </div>
-                    <div class="setting-row">
+                    <div class="setting-row" id="gateSmsRow">
                         <div class="setting-info"><strong>Facial Entry &amp; Exit SMS</strong><span id="gateSmsEffective">Loading gate preference...</span></div>
-                        <label class="toggle"><input type="checkbox" id="gateSmsEnabled"><span class="toggle-slider"></span></label>
+                        <label class="toggle"><input type="checkbox" id="gateSmsEnabled" aria-label="Facial Entry and Exit SMS" aria-describedby="gateSmsEffective" disabled><span class="toggle-slider"></span></label>
                     </div>
                 </div>
             </div>
@@ -141,7 +142,7 @@
     <script src="../../shared/settings-service.js"></script>
     <script src="../../shared/ui-feedback.js"></script>
     <script src="../includes/sidebar.js?v=20260927b"></script>
-    <script src="../resc/js/settings.js?v=20260927b"></script>
+    <script src="../resc/js/settings.js?v=20261011"></script>
     <script src="../../shared/logout-modal.js"></script>
     <script>
         loadHeader();

@@ -17,8 +17,6 @@ let currentMode   = 'face';
 let qrScanner     = null;
 let sseSource     = null;
 let engineOnline  = false;
-let cooldownMap   = {};
-let COOLDOWN_MS   = 10000;
 let AUTO_EXIT     = true;
 let GATE_SETTINGS = {};
 let overlayTimer  = null; // shared dismiss timer
@@ -66,7 +64,6 @@ async function loadGateSettings() {
     try {
         GATE_SETTINGS = await AppSettings.load(supabaseClient, 'gate', { refresh: true });
         if (GateScanRoute.redirectIfPreferred(GATE_SETTINGS, 'face')) return true;
-        COOLDOWN_MS = Math.min(300, Math.max(1, parseInt(GATE_SETTINGS.cooldown, 10) || 10)) * 1000;
         AUTO_EXIT   = GATE_SETTINGS.autoExit !== 'false';
     } catch (error) {
         console.warn('Gate settings could not be loaded; using defaults:', error);
@@ -312,12 +309,10 @@ function stopScanner() {
 
 /* ══════════════════════════════════════════════════
    FACE MODE — SSE from Flask :5000
-   Handles all SSE message types:
-     greeting_only → employee gate log
-     time_in / time_out → student gate log
-     spoof → spoof overlay + log to spoof_attempts
-     not_participant / error / already_recorded → info overlay
-     upcoming → info overlay (reminder)
+   Flask saves face gate logs and enforces its repeat-scan cooldown.
+   This page displays every gate_recorded confirmation, including a later Exit.
+   recognized, greeting_only, and event time_in/time_out do not write gate logs here.
+   Spoof and informational messages use their own overlays.
 ══════════════════════════════════════════════════ */
 async function setScannerMode(mode) {
     const response = await adminAal2Fetch(`${FLASK_BASE}/scanner_mode`, {
@@ -360,7 +355,6 @@ async function startFaceMode() {
             const data = JSON.parse(event.data);
             if (!data || !data.type) return;
 
-            // Scanner-wide warnings have no person ID and must bypass the cooldown.
             if (data.type === 'multiple_faces') {
                 showMultiFaceOverlay(data.message);
                 return;
@@ -374,9 +368,6 @@ async function startFaceMode() {
                 return;
             }
 
-            const cooldownKey = data.name || data.student_id || data.employee_id || 'unknown';
-            if (isInCooldown(cooldownKey)) return;
-
             switch (data.type) {
 
                 // Student gate logging is independent from event attendance.
@@ -385,7 +376,8 @@ async function startFaceMode() {
                 }
 
                 case 'gate_recorded': {
-                    setCooldown(cooldownKey);
+                    // Flask emits this only after the gate log is saved. Always show it;
+                    // the server's repeat-scan cooldown is authoritative.
                     if (data.role === 'student') {
                         showResultStudent({
                             name: data.name,
@@ -414,7 +406,6 @@ async function startFaceMode() {
 
                 // ── Spoof detected ──
                 case 'spoof': {
-                    setCooldown(cooldownKey);
                     await handleSpoofDetected(data);
                     break;
                 }
@@ -424,7 +415,6 @@ async function startFaceMode() {
                 case 'error':
                 case 'already_recorded':
                 case 'upcoming': {
-                    setCooldown(cooldownKey);
                     showInfoOverlay(data);
                     break;
                 }
@@ -1079,12 +1069,6 @@ function flashStatus(statusId, logType, isLate, name, isEmployee) {
         }
     }, 3500);
 }
-
-function isInCooldown(id) {
-    const last = cooldownMap[id];
-    return last && (Date.now() - last) < COOLDOWN_MS;
-}
-function setCooldown(id) { cooldownMap[id] = Date.now(); }
 
 function setStatus(id, cls, html) {
     const el = document.getElementById(id);

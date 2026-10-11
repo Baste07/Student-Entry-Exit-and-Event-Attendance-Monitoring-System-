@@ -20,12 +20,11 @@ async function loadEventSettings() {
         document.getElementById('lateGraceMinutes').value = Number.isInteger(grace) && grace >= 0 && grace <= 99 ? grace : 15;
         document.getElementById('eventSmsEnabled').checked = AppSettings.enabled(savedEventSettings, 'sms_enabled');
         document.getElementById('systemSmsStatus').textContent = AppSettings.enabled(systemEventSettings, 'sms_enabled')
-            ? 'Enabled by Super Admin' : 'Disabled by Super Admin';
+            ? 'System SMS Service is enabled.' : 'Disabled by Super Admin';
         document.getElementById('antiSpoofStatus').textContent = AppSettings.enabled(systemEventSettings, 'anti_spoof_enabled')
             ? 'Enabled by Super Admin' : 'Disabled by Super Admin';
         showEventSmsStatus();
         document.getElementById('lateGraceMinutes').disabled = false;
-        document.getElementById('eventSmsEnabled').disabled = false;
         document.getElementById('saveEventSettings').disabled = false;
     } catch (error) {
         console.error('Event settings could not be loaded:', error);
@@ -36,9 +35,12 @@ async function loadEventSettings() {
 function showEventSmsStatus() {
     if (!systemEventSettings) return;
     const preference = document.getElementById('eventSmsEnabled').checked;
-    document.getElementById('eventSmsStatus').textContent = AppSettings.enabled(systemEventSettings, 'sms_enabled')
+    const master = AppSettings.enabled(systemEventSettings, 'sms_enabled');
+    document.getElementById('eventSmsEnabled').disabled = !master;
+    document.getElementById('eventSmsRow').classList.toggle('is-unavailable', !master);
+    document.getElementById('eventSmsStatus').textContent = master
         ? `Stored preference: ${preference ? 'On' : 'Off'}. Event SMS is ${preference ? 'active' : 'paused'} after the engine's next refresh (about 15 seconds).`
-        : `Stored preference: ${preference ? 'On' : 'Off'}. Currently unavailable because Master SMS is off.`;
+        : `Stored preference: ${preference ? 'On' : 'Off'}. Unavailable because the System SMS Service is disabled by Super Admin.`;
 }
 
 async function saveEventSettings() {
@@ -49,7 +51,8 @@ async function saveEventSettings() {
         UIFeedback.fieldError(graceInput, 'Enter a whole number from 0 to 99 minutes.');
         return;
     }
-    const desired = { late_grace_minutes: String(grace), sms_enabled: String(document.getElementById('eventSmsEnabled').checked) };
+    const desired = { late_grace_minutes: String(grace), sms_enabled: systemEventSettings && !AppSettings.enabled(systemEventSettings, 'sms_enabled')
+        ? savedEventSettings.sms_enabled : String(document.getElementById('eventSmsEnabled').checked) };
     const changes = Object.fromEntries(Object.entries(desired).filter(([key, value]) => value !== savedEventSettings[key]));
     if (!Object.keys(changes).length) return UIFeedback.toast({ type: 'info', message: 'No changes to save.' });
     eventSettingsSaving = true;

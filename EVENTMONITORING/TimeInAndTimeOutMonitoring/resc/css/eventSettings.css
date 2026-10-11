@@ -9,6 +9,7 @@
 .setting-row { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 17px 0; border-top: 1px solid #e2edf7; }
 .setting-row strong { font-size: 16px; }
 .setting-row input[type=checkbox] { width: 44px; height: 24px; accent-color: #145985; cursor: pointer; flex: none; }
+.setting-row.is-unavailable input[type=checkbox] { accent-color: #9ba7b3; opacity: .55; cursor: not-allowed; }
 .number-control { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .number-control input { width: 80px; padding: 8px; border: 1px solid #bdd9ee; border-radius: 7px; font: inherit; }
 .managed-pill { background: #e9f3fb; color: #145985; padding: 7px 12px; border-radius: 20px; font-weight: 700; white-space: nowrap; }

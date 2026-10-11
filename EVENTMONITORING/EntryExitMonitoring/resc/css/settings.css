@@ -104,6 +104,10 @@ hr {
 }
 .toggle input:checked + .toggle-slider { background: var(--blue-dark); }
 .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+.toggle input:disabled + .toggle-slider,
+.toggle input:checked:disabled + .toggle-slider { background: #b6bec7; cursor: not-allowed; box-shadow: none; }
+.setting-row.is-unavailable .toggle { opacity: .65; }
+.toggle input:focus-visible + .toggle-slider { outline: 2px solid var(--blue-mid); outline-offset: 3px; }
 .managed-badge { color: var(--blue-dark); background: #edf6ff; border: 1px solid var(--border); border-radius: 999px; padding: 7px 11px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 
 /* Save row */

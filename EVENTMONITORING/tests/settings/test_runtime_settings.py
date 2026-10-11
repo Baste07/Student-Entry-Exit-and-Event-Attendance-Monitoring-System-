@@ -102,6 +102,9 @@ class SettingsTests(unittest.TestCase):
         self.assertTrue(self.settings.gate_is_late("07:30"))
         self.set("gate_settings", cooldown=12)
         self.assertEqual(self.settings.gate_cooldown_seconds(), 12)
+        for seconds in (5, 10):
+            self.set("gate_settings", cooldown=seconds)
+            self.assertEqual(self.settings.gate_cooldown_seconds(), seconds)
         self.set("event_settings", late_grace_minutes=20)
         self.assertEqual(self.settings.event_grace_minutes(), 20)
         self.set("event_settings", late_grace_minutes=300)
