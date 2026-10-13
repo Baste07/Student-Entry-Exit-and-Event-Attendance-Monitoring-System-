@@ -70,6 +70,8 @@ hr {
     margin-left: auto;
 }
 .btn-add:hover { background: var(--blue-mid); transform: translateY(-1px); }
+.export-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.export-actions .btn-add { margin-left: 0; }
 
 .controls-card {
     background: var(--white); border-radius: var(--radius-lg);
