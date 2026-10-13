@@ -17,6 +17,7 @@ load_dotenv(env_path, override=True)
 # 4. Standard Imports (Cleaned up, no duplicates)
 
 import io, signal, warnings, datetime, queue, threading, json, time, hashlib
+from zoneinfo import ZoneInfo
 import urllib.request          # ← ADD THIS
 import numpy as np
 import cv2
@@ -562,7 +563,10 @@ def _log_sms_status(student_id, attendance_type, notification_type, success, mes
 def _attendance_timestamp_label(timestamp_iso):
     try:
         parsed = datetime.datetime.fromisoformat(str(timestamp_iso).replace("Z", "+00:00"))
-        return parsed.strftime("%I:%M %p on %B %d, %Y").replace(" 0", " ")
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=datetime.timezone.utc)
+        manila_time = parsed.astimezone(ZoneInfo("Asia/Manila"))
+        return manila_time.strftime("%I:%M %p on %B %d, %Y").replace(" 0", " ")
     except Exception:
         return str(timestamp_iso)
 
@@ -1691,10 +1695,61 @@ def _record_spoof_attempt(meta, reason, score=None):
         print(f"⚠ Failed to record spoof attempt: {exc}")
 
 
+def _select_relevant_event(events, now_utc, open_attendance_event_ids=()):
+    """Select by the event schedule in Manila, not a possibly stale status row.
+
+    A completed event is relevant for Time Out only on its end date. An open
+    same-day Time In takes precedence over upcoming events. Historical events
+    never mask an upcoming event or produce a new attendance write.
+    """
+    local_now = now_utc.astimezone(datetime.timezone(datetime.timedelta(hours=8)))
+    today = local_now.date().isoformat()
+    clock = local_now.time().replace(tzinfo=None)
+    ongoing, upcoming, completed_today = [], [], []
+
+    for event in events:
+        if event.get("status") == "cancelled":
+            continue
+        start_date = str(event.get("event_date") or "")[:10]
+        end_date = str(event.get("end_date") or start_date)[:10]
+        if not start_date or end_date < start_date:
+            continue
+        try:
+            start_time = datetime.time.fromisoformat(str(event.get("time_start"))).replace(tzinfo=None) if event.get("time_start") else None
+            end_time = datetime.time.fromisoformat(str(event.get("time_end"))).replace(tzinfo=None) if event.get("time_end") else None
+        except ValueError:
+            continue
+
+        if start_date > today or (start_date == today and start_time and clock < start_time):
+            upcoming.append(event)
+        elif end_date < today:
+            continue
+        elif end_date == today and end_time and clock >= end_time:
+            completed_today.append(event)
+        else:
+            ongoing.append(event)
+
+    ongoing.sort(key=lambda e: (str(e.get("event_date") or ""), str(e.get("time_start") or "")), reverse=True)
+    upcoming.sort(key=lambda e: (str(e.get("event_date") or ""), str(e.get("time_start") or "")))
+    completed_today.sort(key=lambda e: (str(e.get("end_date") or e.get("event_date") or ""), str(e.get("time_end") or "")), reverse=True)
+    if ongoing:
+        return "ongoing", ongoing[0]
+    open_ids = set(open_attendance_event_ids)
+    for event in completed_today:
+        if event.get("event_id") in open_ids:
+            return "completed", event
+    if upcoming:
+        return "upcoming", upcoming[0]
+    if completed_today:
+        return "completed", completed_today[0]
+    return "none", None
+
+
 def _record_event_attendance(student_id, meta):
     """
     Auto-detect event from the student's participation list.
-    Priority: ongoing → completed → upcoming.
+    Priority: scheduled ongoing → pending same-day Time Out → next upcoming
+    → completed today → no event.
     """
     try:
         # 1. Find every event this student is registered for
@@ -1727,16 +1782,37 @@ def _record_event_attendance(student_id, meta):
             _push({
                 "message": "NO ACTIVE EVENT",
                 "name": meta["name"],
-                "type": "error",
-                "reason": "No active or completed event found."
+                "type": "no_active_event",
+                "reason": "You are not registered for an active or upcoming event."
             })
             return
 
         now = datetime.datetime.now(datetime.timezone.utc)
-        now_local = datetime.datetime.now()
-        ongoing   = [e for e in events if e.get("status") == "ongoing"]
-        completed = [e for e in events if e.get("status") == "completed"]
-        upcoming  = [e for e in events if e.get("status") == "upcoming"]
+        now_local = now.astimezone(datetime.timezone(datetime.timedelta(hours=8))).replace(tzinfo=None)
+        selection, selected_event = _select_relevant_event(events, now)
+        if selection == "upcoming":
+            # A just-ended event with an open Time In still needs its Time Out.
+            # Only same-day completed events can win this exception; old events
+            # remain excluded by _select_relevant_event.
+            attendance_res = supabase.table("event_attendance")\
+                .select("event_id, time_in, time_out")\
+                .eq("student_id", student_id)\
+                .in_("event_id", event_ids)\
+                .execute()
+            open_ids = {row["event_id"] for row in (attendance_res.data or [])
+                        if row.get("time_in") and not row.get("time_out")}
+            selection, selected_event = _select_relevant_event(events, now, open_ids)
+        if selection == "none":
+            _push({
+                "message": "NO ACTIVE EVENT",
+                "name": meta["name"],
+                "type": "no_active_event",
+                "reason": "You are not registered for an active or upcoming event."
+            })
+            return
+        ongoing = [selected_event] if selection == "ongoing" else []
+        completed = [selected_event] if selection == "completed" else []
+        upcoming = [selected_event] if selection == "upcoming" else []
 
         # ═══════════════════════════════════════════════════
         # PRIORITY 1: ONGOING → time_in
@@ -1792,20 +1868,20 @@ def _record_event_attendance(student_id, meta):
                 })
                 return
 
-            elif row and not row.get("time_out"):
+            elif row and row.get("time_in") and not row.get("time_out"):
                 _push({
-                    "message": "ALREADY TIMED IN",
+                    "message": "TIME OUT UNAVAILABLE",
                     "name": meta["name"],
-                    "type": "already_recorded",
+                    "type": "time_out_unavailable",
                     "grade": meta.get("grade_level", ""),
                     "section": meta.get("section_name", ""),
                     "stud_id": meta.get("stud_id", ""),
                     "event_name": ev.get("event_name", ""),
-                    "reason": "You have already timed in for this event."
+                    "reason": "Time Out is not yet available for this event."
                 })
                 return
 
-            else:
+            elif row and row.get("time_in") and row.get("time_out"):
                 _push({
                     "message": "ATTENDANCE COMPLETE",
                     "name": meta["name"],
@@ -1818,10 +1894,19 @@ def _record_event_attendance(student_id, meta):
                 })
                 return
 
+            _push({
+                "message": "NO TIME IN FOUND",
+                "name": meta["name"],
+                "type": "error",
+                "reason": "No valid Time In exists for this event."
+            })
+            return
+
         # ═══════════════════════════════════════════════════
-        # PRIORITY 2: COMPLETED → time_out (if missing)
+        # PRIORITY 3: COMPLETED TODAY → time_out (if missing)
         # ═══════════════════════════════════════════════════
         if completed:
+            completed_attendance = None
             for ev in completed:
                 ev_id = ev["event_id"]
                 att_res = supabase.table("event_attendance")\
@@ -1874,6 +1959,22 @@ def _record_event_attendance(student_id, meta):
                     })
                     return
 
+                if row and row.get("time_in") and row.get("time_out") and completed_attendance is None:
+                    completed_attendance = ev
+
+            if completed_attendance is not None:
+                _push({
+                    "message": "ATTENDANCE COMPLETE",
+                    "name": meta["name"],
+                    "type": "already_recorded",
+                    "grade": meta.get("grade_level", ""),
+                    "section": meta.get("section_name", ""),
+                    "stud_id": meta.get("stud_id", ""),
+                    "event_name": completed_attendance.get("event_name", ""),
+                    "reason": "Time-in and time-out already recorded."
+                })
+                return
+
             _push({
                 "message": "NO TIME IN FOUND",
                 "name": meta["name"],
@@ -1883,16 +1984,19 @@ def _record_event_attendance(student_id, meta):
             return
 
         # ═══════════════════════════════════════════════════
-        # PRIORITY 3: UPCOMING
+        # PRIORITY 2: UPCOMING (read-only)
         # ═══════════════════════════════════════════════════
         if upcoming:
             ev = upcoming[0]
+            schedule = " ".join(str(ev.get(key) or "") for key in ("event_date", "time_start")).strip()
             _push({
-                "message": "EVENT NOT STARTED",
+                "message": "EVENT NOT STARTED YET",
                 "name": meta["name"],
-                "type": "errfaor",
+                "type": "event_not_started",
                 "event_name": ev.get("event_name", ""),
-                "reason": f"Event '{ev.get('event_name')}' hasn't started yet."
+                "event_date": str(ev.get("event_date") or ""),
+                "event_time_start": str(ev.get("time_start") or ""),
+                "reason": f"Your next registered event has not started yet. Scheduled for {schedule}." if schedule else "Your next registered event has not started yet."
             })
             return
 

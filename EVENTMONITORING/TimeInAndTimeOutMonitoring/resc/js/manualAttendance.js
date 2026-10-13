@@ -7,7 +7,7 @@
 let EVENT_LATE_GRACE_MINUTES = 15;
 
 const ERR_ACTIONS = new Set([
-    'NOT_REGISTERED', 'NO_ACTIVE_EVENT', 'EVENT_NOT_STARTED', 'ALREADY_TIMED_IN',
+    'NOT_REGISTERED', 'NO_ACTIVE_EVENT', 'EVENT_NOT_STARTED', 'TIME_OUT_UNAVAILABLE',
     'ATTENDANCE_COMPLETE', 'NO_TIME_IN_FOUND', 'TEACHER_GREETING'
 ]);
 
@@ -553,6 +553,49 @@ function getSelectedRole() {
 // ══════════════════════════════════════════════════════════════
 // STUDENT EVENT STATUS
 // ══════════════════════════════════════════════════════════════
+function selectRelevantEvent(events, now = new Date(), openAttendanceEventIds = []) {
+    // Match the Events page's Asia/Manila schedule convention. Stored status is
+    // refreshed only while that management page is open and can become stale.
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+    }).formatToParts(now).map(part => [part.type, part.value]));
+    const today = `${parts.year}-${parts.month}-${parts.day}`;
+    const clock = `${parts.hour}:${parts.minute}:${parts.second}`;
+    const ongoing = [], upcoming = [], completedToday = [];
+    const eventClock = value => {
+        if (!value) return null;
+        const text = String(value);
+        return /^\d{2}:\d{2}(?::\d{2})?$/.test(text) ? (text.length === 5 ? `${text}:00` : text) : null;
+    };
+
+    for (const event of events) {
+        if (event.status === 'cancelled') continue;
+        const startDate = String(event.event_date || '').slice(0, 10);
+        const endDate = String(event.end_date || startDate).slice(0, 10);
+        const startTime = eventClock(event.time_start);
+        const endTime = eventClock(event.time_end);
+        if (!startDate || endDate < startDate || (event.time_start && !startTime) || (event.time_end && !endTime)) continue;
+
+        if (startDate > today || (startDate === today && startTime && clock < startTime)) upcoming.push(event);
+        else if (endDate < today) continue;
+        else if (endDate === today && endTime && clock >= endTime) completedToday.push(event);
+        else ongoing.push(event);
+    }
+
+    const key = (event, dateField, timeField) => `${event[dateField] || event.event_date || ''} ${eventClock(event[timeField]) || ''}`;
+    ongoing.sort((a, b) => key(b, 'event_date', 'time_start').localeCompare(key(a, 'event_date', 'time_start')));
+    upcoming.sort((a, b) => key(a, 'event_date', 'time_start').localeCompare(key(b, 'event_date', 'time_start')));
+    completedToday.sort((a, b) => key(b, 'end_date', 'time_end').localeCompare(key(a, 'end_date', 'time_end')));
+    if (ongoing.length) return { state: 'ongoing', event: ongoing[0] };
+    const openIds = new Set(openAttendanceEventIds);
+    const pendingTimeOut = completedToday.find(event => openIds.has(event.event_id));
+    if (pendingTimeOut) return { state: 'completed', event: pendingTimeOut };
+    if (upcoming.length) return { state: 'upcoming', event: upcoming[0] };
+    if (completedToday.length) return { state: 'completed', event: completedToday[0] };
+    return { state: 'none', event: null };
+}
+
 async function getStudentEventStatus(student) {
     const eventSettings = await AppSettings.load(supabaseClient, 'event', { missingTableDefaults: true });
     const grace = Number(eventSettings.late_grace_minutes);
@@ -567,28 +610,43 @@ async function getStudentEventStatus(student) {
         .eq('student_id', sid);
 
     if (!participants || !participants.length) {
-        return { success: true, action: 'NOT_REGISTERED', message: 'You are not registered for any event.' };
+        return { success: true, action: 'NOT_REGISTERED', message: EventAttendanceFeedback.forOutcome('NOT_REGISTERED').message };
     }
 
     const eventIds = participants.map(p => p.event_id);
 
-    // 2. Pull those events: ongoing, completed, upcoming
+    // 2. Pull registered events; classify by schedule, not stale stored status.
     const { data: events } = await supabaseClient
         .from('events')
-        .select('event_id, event_name, status, event_date, time_start, time_end, location, description')
+        .select('event_id, event_name, status, event_date, end_date, time_start, time_end, location, description')
         .in('event_id', eventIds)
         .in('status', ['ongoing', 'completed', 'upcoming'])
         .order('event_date', { ascending: false })
         .order('time_start', { ascending: false });
 
     if (!events || !events.length) {
-        return { success: true, action: 'NO_ACTIVE_EVENT', message: 'No active or completed event found.' };
+        return { success: true, action: 'NO_ACTIVE_EVENT', message: 'You are not registered for an active or upcoming event.' };
     }
 
     const now = new Date();
-    const ongoing   = events.filter(e => e.status === 'ongoing');
-    const completed = events.filter(e => e.status === 'completed');
-    const upcoming  = events.filter(e => e.status === 'upcoming');
+    let { state, event: selectedEvent } = selectRelevantEvent(events, now);
+    if (state === 'upcoming') {
+        // A completed event from today may still have a valid pending Time Out.
+        const { data: attendanceRows, error: attendanceError } = await supabaseClient
+            .from('event_attendance')
+            .select('event_id, time_in, time_out')
+            .eq('student_id', sid)
+            .in('event_id', eventIds);
+        if (attendanceError) throw attendanceError;
+        const openIds = (attendanceRows || []).filter(row => row.time_in && !row.time_out).map(row => row.event_id);
+        ({ state, event: selectedEvent } = selectRelevantEvent(events, now, openIds));
+    }
+    const ongoing = state === 'ongoing' ? [selectedEvent] : [];
+    const completed = state === 'completed' ? [selectedEvent] : [];
+    const upcoming = state === 'upcoming' ? [selectedEvent] : [];
+    if (state === 'none') {
+        return { success: true, action: 'NO_ACTIVE_EVENT', message: 'You are not registered for an active or upcoming event.' };
+    }
 
     // PRIORITY 1: ONGOING → time_in
     if (ongoing.length > 0) {
@@ -623,25 +681,28 @@ async function getStudentEventStatus(student) {
         } else if (row.time_in && !row.time_out) {
             return {
                 success: true,
-                action: 'ALREADY_TIMED_IN',
+                action: 'TIME_OUT_UNAVAILABLE',
                 event_id: evId,
                 _event: ev,           
                 event_name: ev.event_name,
-                message: 'You have already timed in for this event.'
+                message: EventAttendanceFeedback.forOutcome('TIME_OUT_UNAVAILABLE').message
             };
-        } else {
+        } else if (row.time_in && row.time_out) {
             return {
                 success: true,
                 action: 'ATTENDANCE_COMPLETE',
                 event_id: evId,
                 event_name: ev.event_name,
-                message: 'Time-in and time-out already recorded.'
+                message: EventAttendanceFeedback.forOutcome('ATTENDANCE_COMPLETE').message
             };
         }
+        return { success: true, action: 'NO_TIME_IN_FOUND', message: 'No valid Time In exists for this event.' };
     }
 
-    // PRIORITY 2: COMPLETED → time_out (if missing)
+    // PRIORITY 2: PENDING TIME OUT FOR AN EVENT COMPLETED TODAY; otherwise
+    // completed today is considered only after the next upcoming event.
     if (completed.length > 0) {
+        let completedAttendance = null;
         for (const ev of completed) {
             const evId = ev.event_id;
             const { data: attRows } = await supabaseClient
@@ -666,6 +727,16 @@ async function getStudentEventStatus(student) {
                     message: 'Ready to record TIME OUT.'
                 };
             }
+            if (row && row.time_in && row.time_out && !completedAttendance) completedAttendance = ev;
+        }
+        if (completedAttendance) {
+            return {
+                success: true,
+                action: 'ATTENDANCE_COMPLETE',
+                event_id: completedAttendance.event_id,
+                event_name: completedAttendance.event_name,
+                message: EventAttendanceFeedback.forOutcome('ATTENDANCE_COMPLETE').message
+            };
         }
         return {
             success: true,
@@ -674,7 +745,7 @@ async function getStudentEventStatus(student) {
         };
     }
 
-    // PRIORITY 3: UPCOMING
+    // PRIORITY 3: UPCOMING (read-only)
     if (upcoming.length > 0) {
         const ev = upcoming[0];
         return {
@@ -684,7 +755,7 @@ async function getStudentEventStatus(student) {
             event_name: ev.event_name,
             event_date: ev.event_date,
             event_time_start: format12HourTime(ev.time_start),
-            message: `Event '${ev.event_name}' hasn't started yet.`
+            message: 'Your next registered event has not started yet.'
         };
     }
 
@@ -762,12 +833,14 @@ async function doConfirm() {
            res = await confirmStudentEvent(d);
         }
 
-        showToast(res.message || 'Done', res.success ? 's' : 'e');
+        showToast(res.title ? `${res.title} — ${res.message}` : (res.message || 'Done'), res.success ? 's' : 'e');
 
         if (res.success) {
             const isStudentAction = d.role === 'student' && ['IN', 'OUT'].includes(d.action);
             
             if (isStudentAction) {
+                const resultClass = res.attendance_status === 'late' ? 'mw' : 'ms';
+                setMsg(resultClass, d.action === 'OUT' ? 'fa-right-from-bracket' : 'fa-check', `${res.title}. ${res.message}`);
                 setTimeout(() => {
                     resetFormForNextStudent();
                 }, 2000);
@@ -846,7 +919,7 @@ async function confirmStudentEvent(payload) {
     let attendanceId = payload.attendance_id;
     const studentId = person.student_id;
 
-    if (['NOT_REGISTERED', 'NO_ACTIVE_EVENT', 'EVENT_NOT_STARTED', 'ALREADY_TIMED_IN', 'ATTENDANCE_COMPLETE', 'NO_TIME_IN_FOUND', 'TEACHER_GREETING'].includes(action)) {
+    if (['NOT_REGISTERED', 'NO_ACTIVE_EVENT', 'EVENT_NOT_STARTED', 'TIME_OUT_UNAVAILABLE', 'ATTENDANCE_COMPLETE', 'NO_TIME_IN_FOUND', 'TEACHER_GREETING'].includes(action)) {
         return { success: true, message: 'No action needed.' };
     }
 
@@ -870,7 +943,8 @@ async function confirmStudentEvent(payload) {
             lateMinutes: isLate ? (lateMinutes || 0) : 0,
         });
 
-        return { success: true, message: `Time IN recorded ✅ — ${isLate ? `⚠ LATE by ${lateMinutes || 0} min` : 'On Time'}` };
+        const feedback = EventAttendanceFeedback.forOutcome('IN', isLate ? 'late' : 'on-time');
+        return { success: true, title: feedback.title, message: feedback.message, attendance_status: isLate ? 'late' : 'on-time' };
     }
 
     if (action === 'OUT') {
@@ -911,7 +985,8 @@ async function confirmStudentEvent(payload) {
             durationMinutes,
         });
 
-        return { success: true, message: 'Time OUT recorded ✅' };
+        const feedback = EventAttendanceFeedback.forOutcome('OUT');
+        return { success: true, title: feedback.title, message: feedback.message };
     }
 
     return { success: false, message: 'Attendance state is not ready for this action.' };
@@ -974,7 +1049,11 @@ function renderResult(data, autoConfirm = false) {
         `<div class="ii"><div class="il">${l}</div><div class="iv">${v}</div></div>`).join('');
 
     const { mc, ic } = msgCls(action, data);
-    setMsg(mc, ic, data.message);
+    const feedback = EventAttendanceFeedback.forOutcome(action);
+    const displayMessage = feedback && ERR_ACTIONS.has(action)
+        ? `${feedback.title}. ${feedback.message}`
+        : data.message;
+    setMsg(mc, ic, displayMessage);
 
     const cb = document.getElementById('btn-confirm');
     cb.disabled = false; cb.style.opacity = '1';
@@ -1019,7 +1098,7 @@ function msgCls(action) {
     if (action === 'OUT') return { mc: 'ms', ic: 'fa-right-from-bracket' };
     if (action === 'TEACHER_GREETING') return { mc: 'mi', ic: 'fa-hand' };
     if (action === 'ATTENDANCE_COMPLETE') return { mc: 'mi', ic: 'fa-check-double' };
-    if (['EVENT_NOT_STARTED', 'ALREADY_TIMED_IN', 'NO_TIME_IN_FOUND'].includes(action)) return { mc: 'mw', ic: 'fa-hourglass-half' };
+    if (['EVENT_NOT_STARTED', 'TIME_OUT_UNAVAILABLE', 'NO_TIME_IN_FOUND'].includes(action)) return { mc: 'mw', ic: 'fa-hourglass-half' };
     return { mc: 'me', ic: 'fa-circle-xmark' };
 }
 

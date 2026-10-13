@@ -1,0 +1,110 @@
+[
+  {
+    "name": "historical plus active",
+    "events": [
+      {"event_id":"old","event_date":"2026-10-01","time_start":"08:00:00","time_end":"10:00:00","status":"completed"},
+      {"event_id":"active","event_date":"2026-10-11","time_start":"08:00:00","time_end":"10:00:00","status":"ongoing"}
+    ],
+    "state": "ongoing", "event_id": "active"
+  },
+  {
+    "name": "historical plus upcoming today",
+    "events": [
+      {"event_id":"old","event_date":"2026-10-01","time_start":"08:00:00","time_end":"10:00:00","status":"completed"},
+      {"event_id":"future","event_date":"2026-10-11","time_start":"13:00:00","time_end":"15:00:00","status":"upcoming"}
+    ],
+    "state": "upcoming", "event_id": "future"
+  },
+  {
+    "name": "nearest future beats old and later future",
+    "events": [
+      {"event_id":"later","event_date":"2026-10-13","time_start":"08:00:00","time_end":"10:00:00","status":"upcoming"},
+      {"event_id":"old","event_date":"2026-10-01","time_start":"08:00:00","time_end":"10:00:00","status":"completed"},
+      {"event_id":"next","event_date":"2026-10-12","time_start":"08:00:00","time_end":"10:00:00","status":"upcoming"}
+    ],
+    "state": "upcoming", "event_id": "next"
+  },
+  {
+    "name": "historical events only",
+    "events": [
+      {"event_id":"old1","event_date":"2026-10-01","time_start":"08:00:00","time_end":"10:00:00","status":"completed"},
+      {"event_id":"old2","event_date":"2026-10-05","time_start":"08:00:00","time_end":"10:00:00","status":"completed"}
+    ],
+    "state": "none", "event_id": null
+  },
+  {
+    "name": "completed today remains relevant without active or future event",
+    "events": [
+      {"event_id":"old","event_date":"2026-10-01","time_start":"08:00:00","time_end":"10:00:00","status":"completed"},
+      {"event_id":"today","event_date":"2026-10-11","time_start":"08:00:00","time_end":"08:30:00","status":"completed"}
+    ],
+    "state": "completed", "event_id": "today"
+  },
+  {
+    "name": "upcoming beats completed today",
+    "events": [
+      {"event_id":"today","event_date":"2026-10-11","time_start":"08:00:00","time_end":"08:30:00","status":"completed"},
+      {"event_id":"future","event_date":"2026-10-11","time_start":"13:00:00","time_end":"15:00:00","status":"upcoming"}
+    ],
+    "state": "upcoming", "event_id": "future"
+  },
+  {
+    "name": "stored status can lag behind active schedule",
+    "events": [
+      {"event_id":"active","event_date":"2026-10-11","time_start":"08:00:00","time_end":"10:00:00","status":"upcoming"}
+    ],
+    "state": "ongoing", "event_id": "active"
+  },
+  {
+    "name": "multi-day event remains active",
+    "events": [
+      {"event_id":"multiday","event_date":"2026-10-10","end_date":"2026-10-12","time_start":"08:00:00","time_end":"10:00:00","status":"ongoing"}
+    ],
+    "state": "ongoing", "event_id": "multiday"
+  },
+  {
+    "name": "cancelled event is never selected",
+    "events": [
+      {"event_id":"cancelled","event_date":"2026-10-11","time_start":"08:00:00","time_end":"10:00:00","status":"cancelled"}
+    ],
+    "state": "none", "event_id": null
+  },
+  {
+    "name": "event starting at current Manila minute is active",
+    "events": [
+      {"event_id":"starts-now","event_date":"2026-10-11","time_start":"09:00:00","time_end":"10:00:00","status":"upcoming"}
+    ],
+    "state": "ongoing", "event_id": "starts-now"
+  },
+  {
+    "name": "event ending at current Manila minute is completed today",
+    "events": [
+      {"event_id":"ends-now","event_date":"2026-10-11","time_start":"08:00:00","time_end":"09:00:00","status":"ongoing"}
+    ],
+    "state": "completed", "event_id": "ends-now"
+  },
+  {
+    "name": "pending same-day Time Out precedes upcoming event",
+    "events": [
+      {"event_id":"ended","event_date":"2026-10-11","time_start":"07:00:00","time_end":"08:30:00","status":"completed"},
+      {"event_id":"future","event_date":"2026-10-11","time_start":"13:00:00","time_end":"15:00:00","status":"upcoming"}
+    ],
+    "open_event_ids": ["ended"], "state": "completed", "event_id": "ended"
+  },
+  {
+    "name": "closed same-day attendance leaves upcoming event next",
+    "events": [
+      {"event_id":"ended","event_date":"2026-10-11","time_start":"07:00:00","time_end":"08:30:00","status":"completed"},
+      {"event_id":"future","event_date":"2026-10-11","time_start":"13:00:00","time_end":"15:00:00","status":"upcoming"}
+    ],
+    "open_event_ids": [], "state": "upcoming", "event_id": "future"
+  },
+  {
+    "name": "historical open attendance cannot override upcoming",
+    "events": [
+      {"event_id":"old","event_date":"2026-10-01","time_start":"07:00:00","time_end":"08:30:00","status":"completed"},
+      {"event_id":"future","event_date":"2026-10-11","time_start":"13:00:00","time_end":"15:00:00","status":"upcoming"}
+    ],
+    "open_event_ids": ["old"], "state": "upcoming", "event_id": "future"
+  }
+]

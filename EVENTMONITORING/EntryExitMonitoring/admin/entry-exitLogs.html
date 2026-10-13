@@ -14,6 +14,8 @@
     <link rel="stylesheet" href="../resc/css/entry-exitLogs.css">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
     <link rel="stylesheet" href="../../shared/ui-feedback.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
@@ -33,9 +35,14 @@
                     <span class="stat-badge entry"><i class="fa-solid fa-door-open"></i> <span id="badgeEntries">0</span> Entries</span>
                     <span class="stat-badge exit"><i class="fa-solid fa-right-from-bracket"></i> <span id="badgeExits">0</span> Exits</span>
                 </div>
-                <button class="btn-add" onclick="exportCSV()">
-                    <i class="fa-solid fa-file-csv"></i> Export CSV
-                </button>
+                <div class="export-actions">
+                    <button type="button" class="btn-add" onclick="exportCSV()">
+                        <i class="fa-solid fa-file-csv"></i> Export CSV
+                    </button>
+                    <button type="button" class="btn-add" onclick="exportPDF()">
+                        <i class="fa-solid fa-file-pdf"></i> Export PDF
+                    </button>
+                </div>
             </div>
             <hr>
 
