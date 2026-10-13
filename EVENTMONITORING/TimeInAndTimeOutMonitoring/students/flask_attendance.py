@@ -17,6 +17,7 @@ load_dotenv(env_path, override=True)
 # 4. Standard Imports (Cleaned up, no duplicates)
 
 import io, signal, warnings, datetime, queue, threading, json, time, hashlib
+from zoneinfo import ZoneInfo
 import urllib.request          # ← ADD THIS
 import numpy as np
 import cv2
@@ -562,7 +563,10 @@ def _log_sms_status(student_id, attendance_type, notification_type, success, mes
 def _attendance_timestamp_label(timestamp_iso):
     try:
         parsed = datetime.datetime.fromisoformat(str(timestamp_iso).replace("Z", "+00:00"))
-        return parsed.strftime("%I:%M %p on %B %d, %Y").replace(" 0", " ")
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=datetime.timezone.utc)
+        manila_time = parsed.astimezone(ZoneInfo("Asia/Manila"))
+        return manila_time.strftime("%I:%M %p on %B %d, %Y").replace(" 0", " ")
     except Exception:
         return str(timestamp_iso)
 
