@@ -120,6 +120,7 @@ admin/create-admin.php
 admin/delete-admin.php
 admin/send-student-qr-email.php
 admin/spoof-attempts.html
+admin/spoof-attempts.js
 admin/student-import.css
 admin/student-import.html
 admin/student-import.js
