@@ -25,6 +25,7 @@ let qrCameraFallbackTimer = null;
 let qrKeyboardActivitySeen = false;
 let qrGunModeActive = false;
 let qrGunSubmitTimer = null;
+let qrCameraSession = 0;
 
 let nativeDetectorStop = null;
 
@@ -85,6 +86,7 @@ function useQrGunMode() {
 }
 
 async function stopScanner() {
+    qrCameraSession++;
     if (nativeDetectorStop) {
         nativeDetectorStop();
         nativeDetectorStop = null;
@@ -95,14 +97,6 @@ async function stopScanner() {
     html5QrCode = null;
     try { await instance.stop();  } catch (_) {}
     try { await instance.clear(); } catch (_) {}
-}
-
-async function ensureCameraPermission() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('MEDIA_DEVICES_UNSUPPORTED');
-    }
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    stream.getTracks().forEach(track => track.stop());
 }
 
 function getQrScannerConfig() {
@@ -152,23 +146,33 @@ function buildDeviceCameraConfig(deviceId) {
     };
 }
 
-async function tryStartScanner(cameraConfig, qrConfig, onDecode) {
+async function tryStartScanner(cameraConfig, qrConfig, onDecode, session) {
     const instance = new Html5Qrcode('qr-reader');
     try {
         await instance.start(cameraConfig, qrConfig, onDecode);
+        if (session !== qrCameraSession || qrGunModeActive) {
+            try { await instance.stop(); } catch (_) {}
+            try { await instance.clear(); } catch (_) {}
+            return false;
+        }
         html5QrCode = instance;
         return true;
-    } catch (_) {
+    } catch (error) {
         try { await instance.clear(); } catch (__) {}
+        if (/NotAllowed|Permission|SecurityError/i.test(`${error?.name || ''} ${error?.message || ''}`)) {
+            throw new Error('CAMERA_PERMISSION_DENIED');
+        }
         return false;
     }
 }
 
-async function tryStartDeviceCamera(deviceId, qrConfig, onDecode) {
+async function tryStartDeviceCamera(deviceId, qrConfig, onDecode, session) {
     if (!deviceId) return false;
-    if (await tryStartScanner(buildDeviceCameraConfig(deviceId), qrConfig, onDecode)) return true;
-    if (await tryStartScanner({ deviceId: { exact: deviceId } }, qrConfig, onDecode)) return true;
-    if (await tryStartScanner(String(deviceId), qrConfig, onDecode)) return true;
+    if (await tryStartScanner(buildDeviceCameraConfig(deviceId), qrConfig, onDecode, session)) return true;
+    if (session !== qrCameraSession) return false;
+    if (await tryStartScanner({ deviceId: { exact: deviceId } }, qrConfig, onDecode, session)) return true;
+    if (session !== qrCameraSession) return false;
+    if (await tryStartScanner(String(deviceId), qrConfig, onDecode, session)) return true;
     return false;
 }
 
@@ -181,82 +185,32 @@ function setPreferredQrCameraId(cameraId) {
     localStorage.setItem('manual_attendance_qr_camera_id', String(cameraId));
 }
 
-function isLaptopCameraLabel(label) {
-    return /integrated|internal|built-in|builtin|facetime|face time|laptop|front camera/i.test(String(label || ''));
-}
-
-function isExternalCameraCandidate(camera) {
-    const label = String(camera?.label || '').toLowerCase();
-    if (!label) return true;
-    if (isLaptopCameraLabel(label)) return false;
-    return true;
-}
-
-async function startScannerWithFallback(onDecode) {
+async function startScannerWithFallback(onDecode, session) {
     const qrConfig = getQrScannerConfig();
     showToast('Scanning for webcam...', 's');
-
-    try {
-        await ensureCameraPermission();
-    } catch (permErr) {
-        console.warn('Camera permission pre-check failed:', permErr);
-    }
-
-    const devices = await Html5Qrcode.getCameras();
-
-    if (devices && devices.length) {
-        const labeledDevices = devices.map((cam, index) => {
-            const label = String(cam.label || '').toLowerCase();
-            const preferredExternal = /usb|webcam|logitech|hd pro|c920|c922|c930|brio|external|document/i.test(label);
-            const preferredLaptop   = isLaptopCameraLabel(label);
-            return { ...cam, originalIndex: index, preferredExternal, preferredLaptop };
-        });
-
-        const hasMultipleCameras  = labeledDevices.length > 1;
-        const nonLaptopCandidates = labeledDevices.filter(isExternalCameraCandidate);
-
-        if (hasMultipleCameras && !nonLaptopCandidates.length) {
-            showToast('No external webcam found. Click Scan QR to start local camera.', 's');
-            return;
-        }
-
-        const preferredCameraId = getPreferredQrCameraId();
-        if (preferredCameraId) {
-            const rememberedCamera    = labeledDevices.find(cam => String(cam.id) === String(preferredCameraId));
-            const rememberedIsAllowed = rememberedCamera && (!hasMultipleCameras || !rememberedCamera.preferredLaptop);
-            if (rememberedIsAllowed) {
-                if (await tryStartDeviceCamera(rememberedCamera.id, qrConfig, onDecode)) return;
-            } else if (rememberedCamera?.preferredLaptop) {
-                localStorage.removeItem('manual_attendance_qr_camera_id');
-            }
-        }
-
-        const keywordExternal   = nonLaptopCandidates.filter(cam => cam.preferredExternal);
-        const otherNonLaptop    = nonLaptopCandidates.filter(cam => !cam.preferredExternal);
-        const unknownCandidates = labeledDevices.filter(cam => !cam.preferredLaptop && !nonLaptopCandidates.includes(cam));
-        const laptopCandidates  = labeledDevices.filter(cam => cam.preferredLaptop);
-
-        const nonPrimaryNonLaptop = otherNonLaptop.filter(cam => cam.originalIndex !== 0);
-        const primaryNonLaptop    = otherNonLaptop.filter(cam => cam.originalIndex === 0);
-
-        const orderedDevices = hasMultipleCameras
-            ? [...keywordExternal, ...nonPrimaryNonLaptop, ...primaryNonLaptop, ...unknownCandidates, ...laptopCandidates]
-            : labeledDevices;
-
-        for (const cam of orderedDevices) {
-            if (await tryStartDeviceCamera(cam.id, qrConfig, onDecode)) {
+    const devices = await PreferredCamera.listVideoInputs();
+    if (devices.length) {
+        // A remembered camera can lead only within its own class, never ahead of an external one.
+        const remembered = devices.find(cam => cam.id === getPreferredQrCameraId());
+        const ordered = remembered && remembered.type === devices[0].type
+            ? [remembered, ...devices.filter(cam => cam !== remembered)] : devices;
+        for (const cam of ordered) {
+            if (session !== qrCameraSession) throw new Error('CAMERA_CANCELLED');
+            if (await tryStartDeviceCamera(cam.id, qrConfig, onDecode, session)) {
                 setPreferredQrCameraId(cam.id);
+                console.info(`[Event QR] ${cam.type} camera selected`);
                 return;
             }
         }
-
-        showToast('No webcam matched. Falling back to local camera.', 's');
+        throw new Error('CAMERA_START_FAILED');
     }
 
-    if (await tryStartScanner(buildCameraConfig('user'),        qrConfig, onDecode)) return;
-    if (await tryStartScanner(buildCameraConfig('environment'), qrConfig, onDecode)) return;
-
-    throw new Error(devices && devices.length ? 'CAMERA_START_FAILED' : 'NO_CAMERA_FOUND');
+    // enumerateDevices is unavailable, but getUserMedia succeeded: preserve browser fallback.
+    if (session !== qrCameraSession) throw new Error('CAMERA_CANCELLED');
+    if (await tryStartScanner(buildCameraConfig('environment'), qrConfig, onDecode, session)) return;
+    if (session !== qrCameraSession) throw new Error('CAMERA_CANCELLED');
+    if (await tryStartScanner(buildCameraConfig('user'), qrConfig, onDecode, session)) return;
+    throw new Error('CAMERA_START_FAILED');
 }
 
 async function tryNativeBarcodeDetector(videoEl, onDetect) {
@@ -305,6 +259,8 @@ function toggleQRScanner() {
 
 async function openQRScanner() {
     if (isScanning) return;
+    qrGunModeActive = false;
+    const session = ++qrCameraSession;
 
     clearQrCameraFallbackTimer();
 
@@ -317,27 +273,42 @@ async function openQRScanner() {
     qrDecodeLocked = false;
 
     const onDecode = (decodedText) => {
-        if (qrDecodeLocked) return;
+        if (session !== qrCameraSession || qrDecodeLocked) return;
         qrDecodeLocked = true;
         if (nativeDetectorStop) { nativeDetectorStop(); nativeDetectorStop = null; }
         processQrResult(decodedText);
     };
 
     try {
-        await startScannerWithFallback(onDecode);
+        await startScannerWithFallback(onDecode, session);
+        if (session !== qrCameraSession) return;
 
         const videoEl = qrContainer.querySelector('video');
         if (videoEl) {
-            nativeDetectorStop = await tryNativeBarcodeDetector(videoEl, onDecode);
+            const activeScanner = html5QrCode;
+            videoEl.srcObject?.getVideoTracks?.().forEach(track => track.addEventListener('ended', () => {
+                if (session !== qrCameraSession || html5QrCode !== activeScanner) return;
+                void stopScanner().then(() => {
+                    resetScannerUi();
+                    showToast('Camera Unavailable: The camera disconnected. Reconnect it and click Scan QR to retry.', 'e');
+                });
+            }, { once: true }));
+            const stopDetector = await tryNativeBarcodeDetector(videoEl, onDecode);
+            if (session !== qrCameraSession) {
+                if (stopDetector) stopDetector();
+                return;
+            }
+            nativeDetectorStop = stopDetector;
         }
     } catch (err) {
+        if (session !== qrCameraSession || err?.message === 'CAMERA_CANCELLED') return;
         resetScannerUi();
         const msg = String(err?.message || '').toUpperCase();
-        if (msg.includes('MEDIA_DEVICES_UNSUPPORTED')) { showToast('Camera is not supported by this browser/device.', 'e'); return; }
-        if (msg.includes('NO_CAMERA_FOUND'))            { showToast('No camera found on this device.', 'e');               return; }
+        if (msg.includes('CAMERA_UNSUPPORTED')) { showToast('Camera is not supported by this browser/device.', 'e'); return; }
+        if (msg.includes('NO_CAMERA_FOUND')) { showToast('Camera Required: Connect an external webcam or enable the built-in camera, then try again.', 'e'); return; }
         if (msg.includes('NOTALLOWED') || msg.includes('PERMISSION')) { showToast('Camera permission blocked. Allow camera access in browser settings.', 'e'); return; }
         if (msg.includes('NOTREADABLE') || msg.includes('TRACKSTARTERROR')) { showToast('Camera is busy. Close other apps/tabs using the camera and try again.', 'e'); return; }
-        showToast('Unable to start camera. Check browser camera icon/site permissions then try again.', 'e');
+        showToast('Camera Unavailable: Check that a webcam is connected and not in use, then try again.', 'e');
     }
 }
 

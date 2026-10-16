@@ -55,6 +55,7 @@ const greetThreshold = document.getElementById('greetThreshold');
 let isBooting = false; 
 let isEngineOnline = false;
 let isFaceDbReady = false;
+let attendanceCameraUnavailable = false;
 let currentFaceDbPhase = 'offline';
 let _prevFaceDbPhase = currentFaceDbPhase;
 let _prevRebuildSummaryTs = null;
@@ -192,6 +193,10 @@ function renderStripStatus() {
         stripStatus.textContent = phaseLabel(currentFaceDbPhase);
         return;
     }
+    if (attendanceCameraUnavailable) {
+        stripStatus.textContent = 'Camera Required';
+        return;
+    }
     stripStatus.innerHTML = '<div class="pulse"></div>Ready';
 }
 
@@ -200,7 +205,7 @@ function renderTileStates() {
 
     if (isLive) {
         sessionState.textContent = 'Live';
-        if (streamState) streamState.textContent = 'Camera Live';
+        if (streamState) streamState.textContent = attendanceCameraUnavailable ? 'Camera Required' : 'Camera Live';
     } else if (!isEngineOnline) {
         sessionState.textContent = 'Engine Off';
         if (streamState) streamState.textContent = 'Waiting Engine';
@@ -384,6 +389,11 @@ setInterval(async () => {
 
             const status = await fetchEngineStatus();
             if (status) {
+                const unavailable = !!status.camera_owned_by_this_engine && status.camera?.available === false;
+                if (unavailable && !attendanceCameraUnavailable) {
+                    setOutput('error', 'fa-solid fa-camera', 'Camera Required: Connect or enable a webcam, then retry.');
+                }
+                attendanceCameraUnavailable = unavailable;
                 isFaceDbReady = !!status.face_db_ready && status.face_db_phase === 'ready';
                 const newPhase = status.face_db_phase || (isFaceDbReady ? 'ready' : 'starting');
 
