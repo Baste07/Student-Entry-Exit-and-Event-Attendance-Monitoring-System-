@@ -225,6 +225,7 @@
 
             <!-- Grade/Section Targeting -->
             <div id="gradeSectionTarget">
+                <div id="targetSchoolYearHint" class="target-summary">Loading school year...</div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Target Grade Levels <span class="required">*</span></label>
@@ -246,24 +247,10 @@
                         <span class="field-error" id="error-targetGradeLevel"></span>
                     </div>
                     <div class="form-group">
-                        <label>Target Sections <span style="font-weight:400;color:#888">(optional)</span></label>
-                        <div class="multi-select" id="sectionMultiSelect">
-                            <div class="multi-select-trigger" onclick="toggleDropdown('sectionDropdown')">
-                                <span id="sectionTriggerText">-- All Sections --</span>
-                                <i class="fa-solid fa-chevron-down"></i>
-                            </div>
-                            <div class="multi-select-dropdown" id="sectionDropdown">
-                                <div class="multi-select-option" onclick="toggleAllSections()">
-                                    <i class="fa-solid fa-square" id="sectionAllIcon"></i>
-                                    <span><strong>Select All Sections</strong></span>
-                                </div>
-                                <div class="multi-select-divider"></div>
-                                <div id="sectionOptionsList">
-                                    <div class="multi-select-hint">Select grade(s) first</div>
-                                </div>
-                            </div>
-                        </div>
-                        <input type="hidden" id="targetSection">
+                        <label>Sections by Grade</label>
+                        <div id="gradeSectionSummary" class="target-summary">Select grades first</div>
+                        <div id="gradeSectionGroups" class="grade-section-groups" aria-label="Sections by selected grade"></div>
+                        <div id="participantPreview" class="target-preview" aria-live="polite">Select grades to preview eligible students.</div>
                     </div>
                 </div>
             </div>
@@ -378,6 +365,7 @@
 
     <!-- Page logic -->
     <script src="../../shared/ui-feedback.js"></script>
+    <script src="../../shared/event-targets.js"></script>
     <script src="../resc/js/events.js"></script>
     <script src="../../shared/logout-modal.js"></script>
 

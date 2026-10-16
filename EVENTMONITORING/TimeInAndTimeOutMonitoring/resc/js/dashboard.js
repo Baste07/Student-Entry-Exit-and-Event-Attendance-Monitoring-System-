@@ -139,6 +139,7 @@ async function fetchAndSyncEvents() {
         if (error) throw error;
 
         const events = data || [];
+        await EventTargets.attach(supabaseClient, events);
         await syncEventStatuses(events);
         return events;
     } catch (error) {
@@ -474,8 +475,7 @@ function displayEvents(events) {
                         <div class="schedule-item">
                             <div class="schedule-subject">Target Audience</div>
                             <div class="schedule-detail">
-                                ${event.target_grade_level ? `Grade Level: ${escapeHtml(event.target_grade_level)}` : 'All grade levels'}
-                                ${event.target_section ? ` · Section: ${escapeHtml(event.target_section)}` : ''}
+                                ${escapeHtml(EventTargets.summary(event))}
                             </div>
                         </div>
                         ${event.end_date && event.end_date !== event.event_date ? `

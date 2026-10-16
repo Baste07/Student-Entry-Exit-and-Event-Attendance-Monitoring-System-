@@ -10,8 +10,13 @@ const todayISO = new Date().toLocaleDateString('en-CA');
 
 // Multi-select globals
 let selectedGrades = new Set();
-let selectedSections = new Set();
+// A null value means All Sections; otherwise the Set holds section UUIDs.
+let gradeSectionTargets = new Map();
 let allSectionsData = [];
+let applicableSchoolYear = null;
+let editingTargetKind = 'new';
+let initialLegacyTarget = '';
+let previewSequence = 0;
 
 // Student modal globals
 let modalSelectedStudentIds = new Set();
@@ -136,21 +141,26 @@ async function updateEventStatusesLocal() {
 // DATA LOADING
 // ══════════════════════════════════════════════════════════
 
-async function loadGradeLevels() {
+async function loadGradeLevels(schoolYearId = null) {
     try {
-   const { data, error } = await supabaseClient
-    .from('sections')
-    .select('section_id, grade_level, section_name')
-    .order('grade_level');
-
+        const yearResult = await supabaseClient.from('school_years')
+            .select('id, name, is_active')
+            .eq(schoolYearId ? 'id' : 'is_active', schoolYearId || true)
+            .limit(1);
+        if (yearResult.error) throw yearResult.error;
+        applicableSchoolYear = yearResult.data?.[0] || null;
+        if (!applicableSchoolYear) throw new Error('No applicable school year was found.');
+        document.getElementById('targetSchoolYearHint').textContent =
+            `Target school year: ${applicableSchoolYear.name || 'Current school year'}`;
+        const { data, error } = await supabaseClient.from('sections')
+            .select('section_id, grade_level, section_name, school_year_id')
+            .eq('school_year_id', applicableSchoolYear.id)
+            .order('grade_level');
         if (error) throw error;
-
         allSectionsData = data || [];
         const grades = ['Kinder', ...Array.from({ length: 10 }, (_, i) => `Grade ${i + 1}`)];
-
         renderGradeOptions(grades);
-        renderSectionOptions([]);
-
+        renderGradeSectionGroups();
         const modalFilter = document.getElementById('modalFilterGrade');
         if (modalFilter) {
             modalFilter.innerHTML = '<option value="">All Grades</option>';
@@ -159,9 +169,12 @@ async function loadGradeLevels() {
 
     } catch (err) {
         console.error('loadGradeLevels error:', err);
-        const fallback = ['Grade 11', 'Grade 12'];
-        renderGradeOptions(fallback);
-        renderSectionOptions([]);
+        applicableSchoolYear = null;
+        allSectionsData = [];
+        document.getElementById('targetSchoolYearHint').textContent = 'School year unavailable';
+        renderGradeOptions(['Kinder', ...Array.from({ length: 10 }, (_, i) => `Grade ${i + 1}`)]);
+        renderGradeSectionGroups();
+        document.getElementById('participantPreview').textContent = 'School year or sections could not be loaded; saving is unavailable.';
     }
 }
 async function loadEvents() {
@@ -175,6 +188,7 @@ async function loadEvents() {
         if (error) throw error;
 
         allEvents = data || [];
+        await EventTargets.attach(supabaseClient, allEvents);
 
         // REMOVE this block — don't overwrite the DB status locally
         // allEvents.forEach(ev => {
@@ -254,7 +268,7 @@ function renderTable(rows) {
             <td>${timeLabel}</td>
             <td><span class="badge" style="background:${typeColor}20;color:${typeColor}">${escHtml(ev.event_type || '—')}</span></td>
             <td><span class="secondary-cell">${escHtml(ev.location || '—')}</span></td>
-            <td><span class="badge info">${escHtml(ev.target_grade_level || 'All')}${ev.target_section ? ' – ' + escHtml(ev.target_section) : ''}</span></td>
+            <td><span class="badge info">${escHtml(EventTargets.summary(ev))}</span></td>
             <td><span class="badge" style="background:${sc.bg};color:${sc.text}">${escHtml(status)}</span></td>
             <td>
                 <div style="display:flex;gap:8px">
@@ -318,6 +332,19 @@ document.getElementById('eventForm').addEventListener('submit', async function (
         showSingleValidationError('selectedStudents', 'Please select at least one student participant');
         return;
     }
+    if (isEdit && editingTargetKind === 'normalized' && participantMode !== 'grade') {
+        UIFeedback.error('Changing a normalized Event to Individual mode requires a separate conversion review.');
+        return;
+    }
+    if (isEdit && editingTargetKind === 'legacy-grade' &&
+        (participantMode !== 'grade' || [...selectedGrades].sort().join(',') !== initialLegacyTarget)) {
+        UIFeedback.error('Legacy Event targeting cannot be converted here. Review its existing roster and section names first.');
+        return;
+    }
+    if (isEdit && editingTargetKind === 'individual' && participantMode !== 'individual') {
+        UIFeedback.error('Changing an Individual Event to grade targeting requires a separate conversion review.');
+        return;
+    }
 
     const btn = this.querySelector('.btn-submit');
     const orig = btn.innerHTML;
@@ -348,70 +375,56 @@ document.getElementById('eventForm').addEventListener('submit', async function (
             location: location || null,
             status: initialStatus,
             description: description || null,
-            target_grade_level: participantMode === 'grade' ? Array.from(selectedGrades).join(',') : null,
-            target_section: participantMode === 'grade' ? (Array.from(selectedSections).join(',') || null) : null,
         };
 
-        let savedEventId = eventId;
-        let saveErr;
-
-        if (isEdit) {
+        if (participantMode === 'grade' && editingTargetKind !== 'legacy-grade') {
+            if (!applicableSchoolYear) throw new Error('Select an applicable school year before saving.');
+            const { data, error } = await supabaseClient.rpc('save_grade_targeted_event', {
+                p_event: payload,
+                p_school_year_id: applicableSchoolYear.id,
+                p_targets: getNormalizedRules(),
+                p_event_id: isEdit ? eventId : null,
+            });
+            if (error) throw error;
+            if (!data) throw new Error('The Event save did not return an Event ID.');
+        } else if (isEdit && editingTargetKind === 'legacy-grade') {
+            // Metadata-only edit: keep legacy targets and the existing roster intact.
             const { error } = await supabaseClient.from('events').update(payload).eq('event_id', eventId);
-            saveErr = error;
-            savedEventId = eventId;
+            if (error) throw error;
         } else {
-            const { data, error } = await supabaseClient.from('events').insert(payload).select('event_id');
-            saveErr = error;
-            savedEventId = data && data[0] ? data[0].event_id : null;
+            // Preserve the committed Individual Event write sequence until its
+            // separate deletion-integrity work is reviewed and released.
+            const individualPayload = { ...payload, target_grade_level: null, target_section: null };
+            let savedEventId = eventId;
+            let saveErr;
+
+            if (isEdit) {
+                const { error } = await supabaseClient.from('events').update(individualPayload).eq('event_id', eventId);
+                saveErr = error;
+                savedEventId = eventId;
+            } else {
+                const { data, error } = await supabaseClient.from('events').insert(individualPayload).select('event_id');
+                saveErr = error;
+                savedEventId = data && data[0] ? data[0].event_id : null;
+            }
+
+            if (saveErr) throw saveErr;
+            if (savedEventId) {
+                if (isEdit) {
+                    await supabaseClient.from('event_participants').delete().eq('event_id', savedEventId);
+                }
+                const studentIdsToInsert = new Set(selectedStudentIds);
+                if (studentIdsToInsert.size > 0) {
+                    const participants = Array.from(studentIdsToInsert).map(studentId => ({
+                        event_id: savedEventId,
+                        student_id: studentId,
+                        added_by: null,
+                    }));
+                    const { error: pError } = await supabaseClient.from('event_participants').insert(participants);
+                    if (pError) throw pError;
+                }
+            }
         }
-
-        if (saveErr) throw saveErr;
-
-       if (savedEventId) {
-    // ── 1. Always wipe old links on edit so we can re-sync cleanly ──
-    if (isEdit) {
-        await supabaseClient.from('event_participants').delete().eq('event_id', savedEventId);
-    }
-
-    let studentIdsToInsert = new Set();
-
-    // ── 2. Individual mode: use the hand-picked set ──
-    if (participantMode === 'individual') {
-        studentIdsToInsert = new Set(selectedStudentIds);
-    }
-    // ── 3. Grade/Section mode: query all matching active students ──
-    else if (participantMode === 'grade') {
-        const sectionIds = allSectionsData
-            .filter(s => selectedSections.has(s.section_name))
-            .map(s => s.section_id)
-            .filter(Boolean);
-        if (selectedSections.size === 0 || sectionIds.length > 0) {
-            let query = supabaseClient.from('students')
-                .select('student_id')
-                .in('current_grade_level', Array.from(selectedGrades))
-                .eq('status', 'active');
-            if (selectedSections.size > 0) query = query.in('section_id', sectionIds);
-            const { data: matchedStudents, error: studentErr } = await query;
-            if (studentErr) throw studentErr;
-            matchedStudents?.forEach(s => studentIdsToInsert.add(s.student_id));
-        }
-    }
-
-    // ── 4. Bulk insert the participants ──
-    if (studentIdsToInsert.size > 0) {
-        const participants = Array.from(studentIdsToInsert).map(studentId => ({
-            event_id: savedEventId,
-            student_id: studentId,
-            added_by: null   // ← swap to currentUserId if you track the creator
-        }));
-
-        const { error: pError } = await supabaseClient
-            .from('event_participants')
-            .insert(participants);
-
-        if (pError) throw pError;
-    }
-}
 
         showToast(isEdit ? 'Event updated successfully!' : 'Event added successfully!');
         btn.disabled = false;
@@ -458,10 +471,13 @@ function openAddModal() {
     document.getElementById('eventId').value = '';
 
     selectedGrades.clear();
-    selectedSections.clear();
+    gradeSectionTargets.clear();
+    document.getElementById('gradeSectionGroups').style.display = '';
+    applicableSchoolYear = null;
+    editingTargetKind = 'new';
     const grades = ['Kinder', ...Array.from({ length: 10 }, (_, i) => `Grade ${i + 1}`)];
     renderGradeOptions(grades);
-    renderSectionOptions([]);
+    renderGradeSectionGroups();
     
       // Clear live validation
     document.getElementById('liveValidationBox').style.display = 'none';
@@ -475,6 +491,9 @@ function openAddModal() {
     document.getElementById('eventEndDate').removeAttribute('required');
     document.getElementById('endDateRow').style.display = 'none';
     document.getElementById('participantMode').value = 'grade';
+    document.getElementById('participantMode').disabled = false;
+    document.getElementById('gradeMultiSelect').removeAttribute('inert');
+    document.getElementById('gradeSectionGroups').style.display = '';
     document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-plus"></i> Add Event';
     document.getElementById('submitBtnText').textContent = 'Add Event';
 
@@ -492,6 +511,11 @@ function openAddModal() {
 async function editEvent(id) {
     const ev = allEvents.find(x => x.event_id === id);
     if (!ev) return;
+    document.getElementById('gradeSectionGroups').style.display = '';
+    if (ev.targetSummaryUnavailable || !Array.isArray(ev.normalizedTargets)) {
+        UIFeedback.error('Event targeting could not be verified. Refresh after the approved migration is installed.');
+        return;
+    }
 
     document.getElementById('eventId').value = ev.event_id;
     document.getElementById('eventName').value = ev.event_name || '';
@@ -507,52 +531,38 @@ async function editEvent(id) {
     document.getElementById('eventEndDate').value = hasEndDate ? ev.end_date : '';
     toggleEndDate();
 
-    await loadGradeLevels();
-
     selectedGrades.clear();
-    if (ev.target_grade_level) {
-        ev.target_grade_level.split(',').forEach(g => {
-            const trimmed = g.trim();
-            if (trimmed) selectedGrades.add(trimmed);
-        });
-    }
-    const grades = ['Kinder', ...Array.from({ length: 10 }, (_, i) => `Grade ${i + 1}`)];
-    renderGradeOptions(grades);
-    document.querySelectorAll('#gradeOptionsList .multi-select-option').forEach(opt => {
-        if (selectedGrades.has(opt.dataset.value)) {
-            opt.classList.add('selected');
-            opt.querySelector('i').className = 'fa-solid fa-check-square';
+    gradeSectionTargets.clear();
+    editingTargetKind = ev.normalizedTargets.length ? 'normalized'
+        : ev.target_grade_level ? 'legacy-grade' : 'individual';
+    await loadGradeLevels(ev.normalizedTargets[0]?.school_year_id || null);
+    if (editingTargetKind === 'normalized') {
+        for (const target of ev.normalizedTargets) {
+            selectedGrades.add(target.grade_level);
+            gradeSectionTargets.set(target.grade_level, target.all_sections ? null
+                : new Set((target.event_grade_target_sections || []).map(link => link.section_id)));
         }
-    });
-    updateGradeTrigger();
-    updateSectionOptions();
-
-    selectedSections.clear();
-    if (ev.target_section) {
-        ev.target_section.split(',').forEach(s => {
-            const trimmed = s.trim();
-            if (trimmed) selectedSections.add(trimmed);
-        });
+    } else if (editingTargetKind === 'legacy-grade') {
+        ev.target_grade_level.split(',').map(g => g.trim()).filter(Boolean)
+            .forEach(g => selectedGrades.add(g));
+        initialLegacyTarget = [...selectedGrades].sort().join(',');
+        document.getElementById('gradeSectionGroups').style.display = 'none';
+        document.getElementById('participantPreview').textContent =
+            `Legacy targeting: ${EventTargets.legacySummary(ev)}. Its roster is preserved; changing targeting requires a separate review.`;
     }
-    document.querySelectorAll('#sectionOptionsList .multi-select-option').forEach(opt => {
-        if (selectedSections.has(opt.dataset.value)) {
-            opt.classList.add('selected');
-            opt.querySelector('i').className = 'fa-solid fa-check-square';
-        }
-    });
-    updateSectionTrigger();
-    updateHiddenInput('targetGradeLevel', selectedGrades);
-    updateHiddenInput('targetSection', selectedSections);
-
+    renderGradeOptions(['Kinder', ...Array.from({ length: 10 }, (_, i) => `Grade ${i + 1}`)]);
+    renderGradeSectionGroups();
     await loadEventParticipants(ev.event_id);
-    if (currentEventParticipants.length > 0) {
-        document.getElementById('participantMode').value = 'individual';
+    if (editingTargetKind === 'individual') {
         selectedStudentIds = new Set(currentEventParticipants.map(p => p.student_id));
         await preloadStudentNames(Array.from(selectedStudentIds));
     } else {
-        document.getElementById('participantMode').value = 'grade';
         selectedStudentIds.clear();
     }
+    document.getElementById('participantMode').value = editingTargetKind === 'individual' ? 'individual' : 'grade';
+    document.getElementById('participantMode').disabled = true;
+    if (editingTargetKind === 'legacy-grade') document.getElementById('gradeMultiSelect').setAttribute('inert', '');
+    else document.getElementById('gradeMultiSelect').removeAttribute('inert');
     toggleParticipantMode();
 
     document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-edit"></i> Edit Event';
@@ -581,7 +591,8 @@ function renderGradeOptions(grades) {
     const container = document.getElementById('gradeOptionsList');
     if (!container) return;
     container.innerHTML = grades.map(g => `
-        <div class="multi-select-option" data-value="${escHtml(g)}" onclick="toggleGrade('${escHtml(g)}', this)">
+        <div class="multi-select-option ${selectedGrades.has(g) ? 'selected' : ''}"
+             data-value="${escHtml(g)}" onclick="toggleGrade('${g}')">
             <i class="fa-solid ${selectedGrades.has(g) ? 'fa-check-square' : 'fa-square'}"></i>
             <span>${escHtml(g)}</span>
         </div>
@@ -589,33 +600,15 @@ function renderGradeOptions(grades) {
     updateGradeTrigger();
 }
 
-function renderSectionOptions(sections) {
-    const container = document.getElementById('sectionOptionsList');
-    if (!container) return;
-    if (sections.length === 0) {
-        container.innerHTML = '<div class="multi-select-hint">Select grade(s) first to see sections</div>';
-        return;
-    }
-    container.innerHTML = sections.map(s => `
-        <div class="multi-select-option" data-value="${escHtml(s)}" onclick="toggleSection('${escHtml(s)}', this)">
-            <i class="fa-solid ${selectedSections.has(s) ? 'fa-check-square' : 'fa-square'}"></i>
-            <span>${escHtml(s)}</span>
-        </div>
-    `).join('');
-    updateSectionTrigger();
-}
-
 function toggleDropdown(dropdownId) {
     const dropdown = document.getElementById(dropdownId);
     if (!dropdown) return;
     const isOpen = dropdown.classList.contains('open');
-
     document.querySelectorAll('.multi-select-dropdown').forEach(d => d.classList.remove('open'));
     document.querySelectorAll('.multi-select-trigger').forEach(t => t.classList.remove('active'));
-
     if (!isOpen) {
         dropdown.classList.add('open');
-        if (dropdown.previousElementSibling) dropdown.previousElementSibling.classList.add('active');
+        dropdown.previousElementSibling?.classList.add('active');
     }
 }
 
@@ -626,134 +619,130 @@ document.addEventListener('click', function (e) {
     }
 });
 
-function toggleGrade(grade, el) {
+function toggleGrade(grade) {
     if (selectedGrades.has(grade)) {
         selectedGrades.delete(grade);
-        el.classList.remove('selected');
-        el.querySelector('i').className = 'fa-solid fa-square';
+        gradeSectionTargets.delete(grade);
     } else {
         selectedGrades.add(grade);
-        el.classList.add('selected');
-        el.querySelector('i').className = 'fa-solid fa-check-square';
+        gradeSectionTargets.set(grade, null); // Newly selected grades use All Sections.
     }
-    updateGradeTrigger();
-    updateSectionOptions();
-    updateHiddenInput('targetGradeLevel', selectedGrades);
+    renderGradeOptions(['Kinder', ...Array.from({ length: 10 }, (_, i) => `Grade ${i + 1}`)]);
+    renderGradeSectionGroups();
 }
 
 function toggleAllGrades() {
-    const options = document.querySelectorAll('#gradeOptionsList .multi-select-option');
-    const allSelected = selectedGrades.size === options.length && options.length > 0;
-
-    if (allSelected) {
+    const grades = ['Kinder', ...Array.from({ length: 10 }, (_, i) => `Grade ${i + 1}`)];
+    if (selectedGrades.size === grades.length) {
         selectedGrades.clear();
-        options.forEach(opt => {
-            opt.classList.remove('selected');
-            opt.querySelector('i').className = 'fa-solid fa-square';
-        });
+        gradeSectionTargets.clear();
     } else {
-        options.forEach(opt => {
-            const grade = opt.dataset.value;
+        grades.forEach(grade => {
             selectedGrades.add(grade);
-            opt.classList.add('selected');
-            opt.querySelector('i').className = 'fa-solid fa-check-square';
+            gradeSectionTargets.set(grade, null);
         });
     }
-    updateGradeTrigger();
-    updateSectionOptions();
-    updateHiddenInput('targetGradeLevel', selectedGrades);
+    renderGradeOptions(grades);
+    renderGradeSectionGroups();
 }
 
 function updateGradeTrigger() {
     const trigger = document.getElementById('gradeTriggerText');
     if (!trigger) return;
     const count = selectedGrades.size;
-    if (count === 0) {
-        trigger.textContent = '-- Select Grades --';
-    } else if (count === 1) {
-        trigger.textContent = Array.from(selectedGrades)[0];
-    } else {
-        trigger.innerHTML = `${count} grades selected <span class="count-badge">${count}</span>`;
-    }
+    trigger.textContent = count === 0 ? '-- Select Grades --'
+        : count === 1 ? [...selectedGrades][0] : `${count} grades selected`;
     const icon = document.getElementById('gradeAllIcon');
-    if (icon) icon.className = count > 0 ? 'fa-solid fa-check-square' : 'fa-solid fa-square';
+    if (icon) icon.className = count === 11 ? 'fa-solid fa-check-square' : 'fa-solid fa-square';
+    document.getElementById('targetGradeLevel').value = [...selectedGrades].join(',');
 }
 
-function toggleSection(section, el) {
-    if (selectedSections.has(section)) {
-        selectedSections.delete(section);
-        el.classList.remove('selected');
-        el.querySelector('i').className = 'fa-solid fa-square';
-    } else {
-        selectedSections.add(section);
-        el.classList.add('selected');
-        el.querySelector('i').className = 'fa-solid fa-check-square';
-    }
-    updateSectionTrigger();
-    updateHiddenInput('targetSection', selectedSections);
+function setAllSectionsForGrade(grade) {
+    if (!selectedGrades.has(grade)) return;
+    gradeSectionTargets.set(grade, null);
+    renderGradeSectionGroups();
 }
 
-function toggleAllSections() {
-    const options = document.querySelectorAll('#sectionOptionsList .multi-select-option');
-    const allSelected = selectedSections.size === options.length && options.length > 0;
-
-    if (allSelected) {
-        selectedSections.clear();
-        options.forEach(opt => {
-            opt.classList.remove('selected');
-            opt.querySelector('i').className = 'fa-solid fa-square';
-        });
-    } else {
-        options.forEach(opt => {
-            const section = opt.dataset.value;
-            selectedSections.add(section);
-            opt.classList.add('selected');
-            opt.querySelector('i').className = 'fa-solid fa-check-square';
-        });
-    }
-    updateSectionTrigger();
-    updateHiddenInput('targetSection', selectedSections);
+function toggleGradeSection(grade, sectionId, checked) {
+    const section = allSectionsData.find(s => s.section_id === sectionId);
+    if (!selectedGrades.has(grade) || !applicableSchoolYear ||
+        section?.grade_level !== grade || section?.school_year_id !== applicableSchoolYear.id) return;
+    const ids = new Set(gradeSectionTargets.get(grade) || []);
+    if (checked) ids.add(sectionId);
+    else ids.delete(sectionId);
+    gradeSectionTargets.set(grade, ids.size ? ids : null);
+    renderGradeSectionGroups();
 }
 
-function updateSectionTrigger() {
-    const trigger = document.getElementById('sectionTriggerText');
-    if (!trigger) return;
-    const count = selectedSections.size;
-    if (count === 0) {
-        trigger.textContent = '-- All Sections --';
-    } else if (count === 1) {
-        trigger.textContent = Array.from(selectedSections)[0];
-    } else {
-        trigger.innerHTML = `${count} sections selected <span class="count-badge">${count}</span>`;
-    }
-    const icon = document.getElementById('sectionAllIcon');
-    if (icon) icon.className = count > 0 ? 'fa-solid fa-check-square' : 'fa-solid fa-square';
+function renderGradeSectionGroups() {
+    const container = document.getElementById('gradeSectionGroups');
+    if (!container) return;
+    const openGrades = new Set([...container.querySelectorAll('details[open]')].map(el => el.dataset.grade));
+    container.innerHTML = [...selectedGrades].map(grade => {
+        const sections = allSectionsData.filter(section =>
+            section.grade_level === grade && section.school_year_id === applicableSchoolYear?.id);
+        const chosen = gradeSectionTargets.get(grade);
+        const label = chosen === null || chosen === undefined ? 'All Sections' :
+            `${chosen.size} specific section${chosen.size === 1 ? '' : 's'}`;
+        return `<details class="grade-section-group" data-grade="${escHtml(grade)}" ${openGrades.has(grade) ? 'open' : ''}>
+            <summary>${escHtml(grade)} <span>${label}</span></summary>
+            <div class="grade-section-options">
+                <label><input type="radio" name="sections-${escHtml(grade)}"
+                    ${chosen == null ? 'checked' : ''} onchange="setAllSectionsForGrade('${grade}')"> All Sections</label>
+                ${sections.map(section => `<label><input type="checkbox"
+                    ${chosen?.has(section.section_id) ? 'checked' : ''}
+                    onchange="toggleGradeSection('${grade}', '${section.section_id}', this.checked)">
+                    ${escHtml(section.section_name)}</label>`).join('') ||
+                    '<span class="multi-select-hint">No sections in this school year</span>'}
+            </div>
+        </details>`;
+    }).join('');
+    const customized = [...gradeSectionTargets.values()].filter(value => value instanceof Set).length;
+    document.getElementById('gradeSectionSummary').textContent = selectedGrades.size
+        ? `${selectedGrades.size} grade${selectedGrades.size === 1 ? '' : 's'} selected; ${customized} customized`
+        : 'Select grades first';
+    updateGradeTrigger();
+    refreshParticipantPreview();
 }
 
-function updateSectionOptions() {
-    const availableSections = [...new Set(
-        allSectionsData
-            .map(s => s.section_name)
-            .filter(Boolean)
-    )].sort();
-
-    renderSectionOptions(availableSections);
-
-    selectedSections.forEach(sec => {
-        if (!availableSections.includes(sec)) selectedSections.delete(sec);
+function getNormalizedRules() {
+    if (!applicableSchoolYear || !selectedGrades.size) throw new Error('Select an applicable school year and at least one grade.');
+    return [...selectedGrades].map(grade => {
+        const selected = gradeSectionTargets.get(grade);
+        const sectionIds = selected == null ? [] : [...selected];
+        if (selected !== null && selected !== undefined && !sectionIds.length) throw new Error(`${grade} needs a section or All Sections.`);
+        for (const id of sectionIds) {
+            if (!allSectionsData.some(section => section.section_id === id &&
+                section.grade_level === grade && section.school_year_id === applicableSchoolYear.id)) {
+                throw new Error(`A selected section does not belong to ${grade} in this school year.`);
+            }
+        }
+        return { grade_level: grade, all_sections: selected == null, section_ids: sectionIds };
     });
-    updateSectionTrigger();
-    updateHiddenInput('targetSection', selectedSections);
 }
 
-function updateHiddenInput(id, set) {
-    const input = document.getElementById(id);
-    if (input) input.value = Array.from(set).join(',');
+async function refreshParticipantPreview() {
+    const el = document.getElementById('participantPreview');
+    if (!el || editingTargetKind === 'legacy-grade') return;
+    const sequence = ++previewSequence;
+    if (!applicableSchoolYear || !selectedGrades.size) {
+        el.textContent = 'Select grades to preview eligible students.';
+        return;
+    }
+    el.textContent = 'Checking eligible students...';
+    try {
+        const { data, error } = await supabaseClient.rpc('preview_event_grade_participants', {
+            p_school_year_id: applicableSchoolYear.id, p_targets: getNormalizedRules(),
+            p_event_id: editingTargetKind === 'normalized' ? document.getElementById('eventId').value || null : null,
+        });
+        if (error) throw error;
+        if (sequence === previewSequence) {
+            el.textContent = `${new Set((data || []).map(row => row.student_id)).size} currently eligible student(s). No participant records are written by preview.`;
+        }
+    } catch (error) {
+        if (sequence === previewSequence) el.textContent = `Preview unavailable: ${error.message || error}`;
+    }
 }
-
-// ══════════════════════════════════════════════════════════
-// PARTICIPANT MODE
-// ══════════════════════════════════════════════════════════
 
 function toggleParticipantMode() {
     const mode = document.getElementById('participantMode').value;
