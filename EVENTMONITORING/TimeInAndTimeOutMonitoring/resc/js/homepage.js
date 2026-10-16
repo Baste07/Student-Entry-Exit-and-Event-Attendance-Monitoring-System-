@@ -120,7 +120,11 @@ async function fetchOngoingEvents() {
             .order('time_start', { ascending: true });
 
         if (error) { console.error('fetchOngoingEvents:', error); return []; }
-        return data || [];
+        const events = data || [];
+        if (typeof location !== 'undefined' && location.pathname.includes('/admin/')) {
+            await EventTargets.attach(supabaseClient, events);
+        }
+        return events;
     } catch (err) {
         console.error('fetchOngoingEvents error:', err);
         return [];
@@ -154,7 +158,11 @@ async function fetchAllEvents() {
             .limit(10);
 
         if (error) { console.error('fetchAllEvents:', error); return []; }
-        return data || [];
+        const events = data || [];
+        if (typeof location !== 'undefined' && location.pathname.includes('/admin/')) {
+            await EventTargets.attach(supabaseClient, events);
+        }
+        return events;
     } catch (err) {
         console.error('fetchAllEvents error:', err);
         return [];
@@ -165,6 +173,13 @@ const typeColors = {
     assembly: '#176aa4', meeting: '#06b6d4', sports: '#f59e0b',
     ceremony: '#ec4899', exam: '#ef4444', holiday: '#22c55e', other: '#6b7280',
 };
+
+function safeTargetSummary(event) {
+    if (!event.targetSummaryUnavailable && !event.normalizedTargets?.length && !event.target_grade_level) return '';
+    return EventTargets.summary(event).replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+}
 
 // ── Ongoing event with live attendance count ──
 function renderOngoingEventCard(ev, presentCount) {
@@ -186,6 +201,7 @@ function renderOngoingEventCard(ev, presentCount) {
                 <span><i class="fa-solid fa-clock"></i> ${timeLabel}</span>
                 ${ev.location ? `<span style="margin-left:12px;"><i class="fa-solid fa-location-dot"></i> ${ev.location}</span>` : ''}
             </div>
+            ${safeTargetSummary(ev) ? `<div class="event-desc">Target: ${safeTargetSummary(ev)}</div>` : ''}
             <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:#f0fdf4; border-radius:8px;">
                 <span style="color:#166534; font-size:14px; font-weight:600;">
                     <i class="fa-solid fa-users"></i> Attendance
@@ -221,6 +237,7 @@ function renderEvent(ev) {
                 ${ev.location ? `<span><i class="fa-solid fa-location-dot"></i> ${ev.location}</span>` : ''}
             </div>
             ${ev.description ? `<div class="event-desc">${ev.description}</div>` : ''}
+            ${safeTargetSummary(ev) ? `<div class="event-desc">Target: ${safeTargetSummary(ev)}</div>` : ''}
         </div>`;
 }
 

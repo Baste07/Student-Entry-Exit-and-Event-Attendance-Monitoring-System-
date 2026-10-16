@@ -165,6 +165,7 @@ portal/portal.js
 shared/admin-credential-check.js
 shared/admin-inactivity.js
 shared/admin-mfa.js
+shared/event-targets.js
 shared/global.css
 shared/global.js
 shared/logout-modal.css

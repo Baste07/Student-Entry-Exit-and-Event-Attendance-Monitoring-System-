@@ -33,6 +33,7 @@ async function init() {
         if (error) throw error;
 
         allEventsList = data || [];
+        await EventTargets.attach(supabaseClient, allEventsList);
 
         renderEventOptions();
     } catch (err) {
@@ -108,9 +109,7 @@ async function loadAttendanceForEvent(eventId) {
 
     // Show target hint
     if (hint) {
-        hint.textContent = currentEvent && currentEvent.target_grade_level
-            ? `Target: ${currentEvent.target_grade_level}${currentEvent.target_section ? ' – ' + currentEvent.target_section : ' (all sections)'}`
-            : 'Target: All students';
+        hint.textContent = `Target: ${EventTargets.summary(currentEvent)}`;
     }
 
     setTableLoading(true);
@@ -381,9 +380,7 @@ function exportPdf() {
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const eventTarget = currentEvent?.target_grade_level
-        ? `Target: ${currentEvent.target_grade_level}${currentEvent.target_section ? ` - ${currentEvent.target_section}` : ' (all sections)'}`
-        : 'Target: All students';
+    const eventTarget = `Target: ${EventTargets.summary(currentEvent)}`;
 
     doc.setFontSize(16);
     doc.setTextColor(11, 78, 120);
