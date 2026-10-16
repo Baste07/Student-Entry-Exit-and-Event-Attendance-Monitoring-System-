@@ -2223,112 +2223,108 @@ def _push(payload):
 # ─────────────────────────────────────────────
 # Camera + frame generator
 # ─────────────────────────────────────────────
-def _find_camera_index(preferred_range=(1, 4), fallback_index=0, cli_index=None):
-    """Try to find a working camera. Prefer external webcams (indices in preferred_range).
-    Preference order:
-      1) CLI `--camera-index` if provided
-      2) ENV `CAMERA_INDEX` if provided
-      3) auto-detect external indices in preferred_range
-      4) fallback_index
-    Returns an index (int) or None if nothing works.
+def _camera_candidates(preferred_range=(1, 4), fallback_index=0, cli_index=None,
+                       skip_index=None, use_overrides=True):
+    """Order explicit overrides, likely external indexes, then the local default.
+
+    OpenCV indexes do not prove USB identity; each candidate must pass a frame read.
     """
-    # 1) CLI override (highest priority)
-    if cli_index is not None:
+    candidates = []
+    for value in ((cli_index, os.getenv("CAMERA_INDEX")) if use_overrides else ()):
         try:
-            idx = int(cli_index)
-            cap = cv2.VideoCapture(idx)
-            ok, _ = cap.read()
-            cap.release()
-            if ok:
-                print(f"✓ Using camera index from CLI --camera-index={idx}")
-                return idx
-            else:
-                print(f"⚠ CLI camera index {idx} not usable, falling back to env/auto-detect")
-        except Exception:
-            pass
+            if value is not None and str(value).strip():
+                index = int(value)
+                if index != fallback_index:
+                    candidates.append(index)
+        except (TypeError, ValueError):
+            print("Invalid camera index override; using automatic selection")
+    candidates.extend(range(preferred_range[0], preferred_range[1] + 1))
+    candidates.append(fallback_index)
+    return list(dict.fromkeys(idx for idx in candidates if idx >= 0 and idx != skip_index))
 
-    # 2) Env override
-    env_val = os.getenv("CAMERA_INDEX")
-    if env_val:
-        try:
-            idx = int(env_val)
-            cap = cv2.VideoCapture(idx)
-            ok, _ = cap.read()
-            cap.release()
-            if ok:
-                print(f"✓ Using camera index from CAMERA_INDEX={idx}")
-                return idx
-            else:
-                print(f"⚠ CAMERA_INDEX={idx} not usable, falling back to auto-detect")
-        except Exception:
-            pass
 
-    # Try preferred external indices first
-    start, end = preferred_range
-    for idx in range(start, end + 1):
+def _open_attendance_camera(index):
+    if os.name == "nt" and hasattr(cv2, "CAP_DSHOW"):
+        return cv2.VideoCapture(index, cv2.CAP_DSHOW)
+    return cv2.VideoCapture(index)
+
+
+def _find_camera_index(preferred_range=(1, 4), fallback_index=0, cli_index=None,
+                       skip_index=None, use_overrides=True):
+    """Return a validated camera capture and index, or (None, None)."""
+    for index in _camera_candidates(preferred_range, fallback_index, cli_index,
+                                    skip_index, use_overrides):
+        capture = None
+        usable = False
         try:
-            cap = cv2.VideoCapture(idx)
-            if not cap or not cap.isOpened():
-                if cap:
-                    cap.release()
+            capture = _open_attendance_camera(index)
+            if capture is None or not capture.isOpened():
                 continue
-            ok, _ = cap.read()
-            cap.release()
-            if ok:
-                print(f"✓ Detected camera at index {idx} (external)")
-                return idx
+            ok, frame = capture.read()
+            if ok and frame is not None:
+                usable = True
+                kind = "likely external" if index != fallback_index else "local/default"
+                print(f"Camera index {index} selected ({kind}; OpenCV index is not physical identity)")
+                return capture, index
         except Exception:
-            continue
-
-    # Fallback to internal camera (usually 0)
-    try:
-        cap = cv2.VideoCapture(fallback_index)
-        ok, _ = cap.read()
-        cap.release()
-        if ok:
-            print(f"✓ Using fallback camera index {fallback_index}")
-            return fallback_index
-    except Exception:
-        pass
-
-    print("⚠ No working camera found")
-    return None
+            pass
+        finally:
+            if capture is not None and not usable:
+                try:
+                    capture.release()
+                except Exception:
+                    pass
+    print("Camera Required: No usable external or built-in camera was detected")
+    return None, None
 
 
 # Parse CLI args (optional) to allow forcing camera index
 try:
     import argparse
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument('--camera-index', type=int, help='Force camera index (overrides CAMERA_INDEX env)')
+    parser.add_argument('--camera-index', type=int,
+                        help='Prefer this non-default camera index before automatic candidates')
     args, _unknown = parser.parse_known_args()
     CLI_CAMERA_INDEX = args.camera_index
 except Exception:
     CLI_CAMERA_INDEX = None
 
-# Choose camera index (CLI -> ENV -> auto-detect external webcam -> fallback 0)
-_cam_index = (0 if ISOLATED_FACE_TEST else
-              _find_camera_index(preferred_range=(1, 4), fallback_index=0,
-                                 cli_index=CLI_CAMERA_INDEX))
-if _cam_index is None:
-    _cam_index = 0
+# Camera selection occurs when the attendance engine owns and opens the device.
+_cam_index = None
 camera = None
 camera_runtime_lock = threading.Lock()
-
-
-def _open_attendance_camera():
-    if os.name == "nt" and hasattr(cv2, "CAP_DSHOW"):
-        return cv2.VideoCapture(_cam_index, cv2.CAP_DSHOW)
-    return cv2.VideoCapture(_cam_index)
+camera_retry_at = 0.0
+camera_failed_index = None
+camera_failed_until = 0.0
+camera_status = {"available": None, "index": None, "type": None, "message": "Camera not started"}
 
 
 def _ensure_attendance_camera_open():
-    global camera
+    global camera, _cam_index, camera_retry_at, camera_status
     if not _has_camera_owner():
         return False
     with camera_runtime_lock:
         if camera is not None and camera.isOpened():
             return True
-        cam = _open_attendance_camera()
+        if time.monotonic() < camera_retry_at:
+            return False
+        if camera is not None:
+            try:
+                camera.release()
+            except Exception:
+                pass
+            camera = None
+        skip = camera_failed_index if time.monotonic() < camera_failed_until else None
+        candidates = (0, 0) if ISOLATED_FACE_TEST else (1, 4)
+        cam, index = _find_camera_index(preferred_range=candidates,
+                                        fallback_index=0, cli_index=CLI_CAMERA_INDEX,
+                                        skip_index=skip,
+                                        use_overrides=not ISOLATED_FACE_TEST)
+        if cam is None:
+            camera_retry_at = time.monotonic() + 2.0
+            camera_status = {"available": False, "index": None, "type": None,
+                             "message": "Camera Required: No usable camera detected"}
+            return False
         try:
             cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -2336,34 +2332,38 @@ def _ensure_attendance_camera_open():
             cam.set(cv2.CAP_PROP_FPS, 30)
         except Exception:
             pass
-        if cam is None or not cam.isOpened():
-            try:
-                if cam is not None:
-                    cam.release()
-            except Exception:
-                pass
-            return False
         camera = cam
+        _cam_index = index
+        camera_retry_at = 0.0
+        camera_status = {"available": True, "index": index,
+                         "type": "likely external" if index != 0 else "local/default",
+                         "message": "Camera ready"}
         return True
 
 
-def _release_attendance_camera():
-    global camera, latest_frame
+def _release_attendance_camera(failed=False):
+    global camera, latest_frame, _cam_index, camera_failed_index, camera_failed_until, camera_status
     with camera_runtime_lock:
+        if failed and _cam_index is not None:
+            camera_failed_index = _cam_index
+            camera_failed_until = time.monotonic() + 5.0
         try:
-            if camera is not None and camera.isOpened():
+            if camera is not None:
                 camera.release()
         except Exception:
             pass
         camera = None
+        _cam_index = None
+        camera_status = {"available": False if failed else None, "index": None,
+                         "type": None, "message": "Camera Unavailable" if failed else "Camera released"}
     with frame_lock:
         latest_frame = None
 
 
-def _camera_wait_frame(message):
+def _camera_wait_frame(message, title="Camera is assigned to another engine"):
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
     cv2.rectangle(frame, (0, 0), (640, 480), (16, 20, 28), -1)
-    cv2.putText(frame, "Camera is assigned to another engine", (42, 215),
+    cv2.putText(frame, title, (42, 215),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.62, (210, 220, 235), 2)
     cv2.putText(frame, message, (42, 248),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.56, (120, 190, 255), 2)
@@ -2383,14 +2383,17 @@ def generate_frames():
             continue
 
         if not _ensure_attendance_camera_open():
-            yield _camera_wait_frame("Unable to open camera. Check camera permissions/hardware.")
+            yield _camera_wait_frame("Connect or enable a webcam, then retry.", "Camera Required")
             time.sleep(0.12)
             continue
 
-        ok, frame = camera.read()
+        try:
+            ok, frame = camera.read()
+        except Exception:
+            ok, frame = False, None
         if not ok:
-            _release_attendance_camera()
-            yield _camera_wait_frame("Camera read failed. Retrying...")
+            _release_attendance_camera(failed=True)
+            yield _camera_wait_frame("Camera disconnected. Trying another device.", "Camera Unavailable")
             time.sleep(0.1)
             continue
         with frame_lock:
@@ -2455,6 +2458,8 @@ def engine_status():
     payload["engine_online"] = True
     payload["camera_owner"] = owner_state.get("owner")
     payload["camera_owned_by_this_engine"] = owner_state.get("owner") == ENGINE_CAMERA_OWNER
+    with camera_runtime_lock:
+        payload["camera"] = dict(camera_status)
     payload["anti_spoof"] = {
         "enabled": runtime_settings.anti_spoof_enabled(ANTI_SPOOF_ENABLED),
         "available": anti_spoof_state.get("available"),

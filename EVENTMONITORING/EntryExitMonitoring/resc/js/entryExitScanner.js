@@ -104,6 +104,7 @@ async function checkEngineStatus() {
 function setEngineStatus(online, status = null) {
     engineOnline = online;
     isFaceDbReady = !!status?.face_db_ready && status?.face_db_phase === 'ready';
+    const cameraRequired = online && status?.camera_owned_by_this_engine && status?.camera?.available === false;
     const pill        = document.getElementById('enginePill');
     const engineState = document.getElementById('engineState');
     const stripStatus = document.getElementById('stripStatus');
@@ -114,9 +115,13 @@ function setEngineStatus(online, status = null) {
         if (startEngineButton) startEngineButton.style.display = 'none';
         if (stopEngineButton) stopEngineButton.style.display = 'inline-flex';
         pill.className = 'engine-pill online';
-        pill.innerHTML = '<i class="fa-solid fa-circle"></i> Face Engine Online';
+        pill.innerHTML = cameraRequired
+            ? '<i class="fa-solid fa-triangle-exclamation"></i> Camera Required'
+            : '<i class="fa-solid fa-circle"></i> Face Engine Online';
         if (engineState) engineState.textContent = 'Online';
-        if (stripStatus) stripStatus.innerHTML   = '<span class="pulse"></span> Online';
+        if (stripStatus) stripStatus.innerHTML = cameraRequired ? 'Camera Required' : '<span class="pulse"></span> Online';
+        if (cameraRequired && currentMode === 'face') setStatus('faceStatus', 'error',
+            '<i class="fa-solid fa-camera"></i> Camera Required: Connect or enable a webcam, then retry.');
     } else {
         if (startEngineButton) startEngineButton.style.display = 'inline-flex';
         if (stopEngineButton) stopEngineButton.style.display = 'none';
