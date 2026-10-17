@@ -37,7 +37,7 @@ export async function buildEmployeeQrMail(employee: EmployeeRecord): Promise<QrM
   const payload = `employee_uuid:${employee.employee_id.toLowerCase()}`;
   const png = await QRCode.toBuffer(payload, { type: 'png', width: 512, margin: 0, errorCorrectionLevel: 'M' });
   const name = [employee.first_name, employee.middle_name, employee.last_name].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-  const displayId = employee.emp_no;
+  const displayId = String(employee.emp_no ?? '').trim();
   const faculty = employee.faculty || 'N/A';
   const safeId = displayId.replace(/[^a-zA-Z0-9_-]/g, '-');
   const pngName = `qr-${safeId}.png`;
