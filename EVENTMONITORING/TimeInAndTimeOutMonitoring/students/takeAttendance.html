@@ -37,160 +37,6 @@
     box-shadow: 0 4px 14px rgba(192,57,43,.35);
 }
 
-/* ── Credential Modal ── */
-.cred-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(10, 20, 15, 0.72);
-    z-index: 9999;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(6px);
-}
-.cred-overlay.on { display: flex; }
-
-.cred-box {
-    background: #ffffff;
-    border-radius: 18px;
-    padding: 36px 32px 30px;
-    width: 92%;
-    max-width: 400px;
-    box-shadow: 0 24px 60px rgba(0,0,0,.25);
-    animation: credPop .28s cubic-bezier(.34,1.56,.64,1);
-    border: 1.5px solid #d4e6d9;
-}
-
-@keyframes credPop {
-    from { opacity: 0; transform: scale(.88) translateY(16px); }
-    to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.cred-icon {
-    width: 52px; height: 52px;
-    background: #edf7ff;
-    border: 1.5px solid #0b4e78;
-    border-radius: 14px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px; margin-bottom: 14px;
-    color: #0b4e78;
-}
-
-.cred-box h3 {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 18px; font-weight: 700;
-    color: #0f2419; margin-bottom: 4px;
-}
-
-.cred-box p {
-    font-size: 13.5px; color: #0b4e78;
-    margin-bottom: 22px; line-height: 1.5;
-}
-
-.cred-fg { margin-bottom: 14px; }
-
-.cred-fg label {
-    display: block;
-    font-size: 12.5px; font-weight: 700;
-    color: #0b4e78; margin-bottom: 6px;
-    text-transform: uppercase; letter-spacing: .7px;
-    font-family: 'DM Sans', sans-serif;
-}
-
-.cred-fg input {
-    width: 100%;
-    padding: 11px 14px;
-    border: 1.5px solid #d4e6d9;
-    border-radius: 10px;
-    font-size: 14px;
-    font-family: 'DM Sans', sans-serif;
-    color: #0f2419;
-    background: #f5f8f5;
-    outline: none;
-    transition: border-color .18s, box-shadow .18s;
-    box-sizing: border-box;
-}
-
-.cred-fg input:focus {
-    border-color: #80c7f5;
-    background: #fff;
-    box-shadow: 0 0 0 3px rgba(64,145,108,.12);
-}
-
-.cred-error {
-    display: none;
-    align-items: center;
-    gap: 8px;
-    background: #fef2f2;
-    border: 1px solid #80c7f5;
-    color: #0b4e78;
-    padding: 10px 13px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 14px;
-    font-family: 'DM Sans', sans-serif;
-}
-.cred-error.on { display: flex; }
-
-.cred-btns {
-    display: flex;
-    gap: 10px;
-    margin-top: 6px;
-}
-
-.cred-btn-submit {
-    flex: 1;
-    padding: 12px;
-    background: #0b4e78;
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px; font-weight: 700;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 7px;
-    transition: all .18s;
-    box-shadow: 0 4px 12px rgba(26,71,49,.22);
-}
-.cred-btn-submit:hover:not(:disabled) {
-    background: #0b4e78;
-    transform: translateY(-1px);
-}
-.cred-btn-submit:disabled { opacity: .55; cursor: not-allowed; }
-
-.cred-btn-cancel {
-    padding: 12px 18px;
-    background: transparent;
-    color: #80c7f5;
-    border: 1.5px solid #80c7f5;
-    border-radius: 10px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 14px; font-weight: 600;
-    cursor: pointer;
-    transition: all .15s;
-}
-.cred-btn-cancel:hover {
-    border-color: #2f8fce;
-    color: #2f8fce;
-    background: #f5f8f5;
-}
-
-.cred-divider {
-    border: none;
-    border-top: 1px solid #e8f0eb;
-    margin: 20px 0 16px;
-}
-
-.cred-note {
-    text-align: center;
-    font-size: 12px;
-    color: #9ca3af;
-    font-family: 'DM Sans', sans-serif;
-}
-
-.cred-note i { color: #0b4e78; margin-right: 4px; }
-
 /* ── Greeting Overlay ── */
 .greet-overlay {
     display: none;
@@ -420,7 +266,7 @@
         <i class="fa-solid fa-triangle-exclamation" style="color:#d97706"></i>
         Facial recognition unavailable?
     </p>
-    <button class="btn-manual" onclick="openCredModal()">
+    <button class="btn-manual" id="manualAttendanceButton" type="button">
         <i class="fa-solid fa-pencil"></i> Switch to Manual Attendance
     </button>
 
@@ -500,149 +346,18 @@
     </div>
 </div>
 
-<!-- ══ CREDENTIAL MODAL ══ -->
-<div class="cred-overlay" id="credOverlay" onclick="if(event.target===this)closeCredModal()">
-    <div class="cred-box">
-        <div class="cred-bar"></div>
-
-        <div class="cred-icon">
-            <i class="fa-solid fa-lock"></i>
-        </div>
-
-        <h3>Admin / Teacher Access</h3>
-        <p>Enter your credentials to unlock Manual Attendance mode. This action is logged for security.</p>
-
-        <div class="cred-error" id="credError">
-            <i class="fa-solid fa-circle-xmark"></i>
-            <span id="credErrorMsg">Invalid credentials. Please try again.</span>
-        </div>
-
-        <div class="cred-fg">
-            <label><i class="fa-solid fa-envelope" style="color:#0b4e78;margin-right:5px"></i> Email Address</label>
-            <input type="email" id="credEmail" placeholder="Enter your email" autocomplete="off">
-        </div>
-
-        <div class="cred-fg">
-            <label><i class="fa-solid fa-lock" style="color:#0b4e78;margin-right:5px"></i> Password</label>
-            <input type="password" id="credPassword" placeholder="Enter your password"
-                   onkeydown="if(event.key==='Enter')submitCredentials()">
-        </div>
-
-        <hr class="cred-divider">
-
-        <div class="cred-btns">
-            <button class="cred-btn-cancel" onclick="closeCredModal()">
-                <i class="fa-solid fa-xmark"></i> Cancel
-            </button>
-            <button class="cred-btn-submit" id="credSubmitBtn" onclick="submitCredentials()">
-                <i class="fa-solid fa-arrow-right-to-bracket"></i> Verify & Open
-            </button>
-        </div>
-
-        <p class="cred-note" style="margin-top:14px">
-            <i class="fa-solid fa-shield-halved"></i>
-            Only admins and teachers can access manual mode
-        </p>
-    </div>
-</div>
-
-<!-- Supabase (needed for credential check) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../../config/.env.js"></script>
 <script src="../../config/config.js"></script>
-<script src="../../shared/admin-credential-check.js"></script>
-
 <script src="../../shared/ui-feedback.js"></script>
 <script src="../resc/js/eventAttendanceFeedback.js?v=20261011b"></script>
 <script src="../resc/js/takeAttendance.js?v=20261011b"></script>
 
 <script>
-// ══════════════════════════════════════════════════
-// CREDENTIAL MODAL LOGIC
-// ══════════════════════════════════════════════════
-
-function openCredModal() {
-    document.getElementById('credOverlay').classList.add('on');
-    document.getElementById('credEmail').value    = '';
-    document.getElementById('credPassword').value = '';
-    document.getElementById('credError').classList.remove('on');
-    document.getElementById('credSubmitBtn').disabled = false;
-    document.getElementById('credSubmitBtn').innerHTML =
-        '<i class="fa-solid fa-arrow-right-to-bracket"></i> Verify & Open';
-    setTimeout(() => document.getElementById('credEmail').focus(), 100);
-}
-
-function closeCredModal() {
-    document.getElementById('credOverlay').classList.remove('on');
-}
-
-async function submitCredentials() {
-    const email    = document.getElementById('credEmail').value.trim();
-    const password = document.getElementById('credPassword').value;
-    const errBox   = document.getElementById('credError');
-    const btn      = document.getElementById('credSubmitBtn');
-
-    errBox.classList.remove('on');
-
-    if (!email || !password) {
-        document.getElementById('credErrorMsg').textContent = 'Please enter both email and password.';
-        errBox.classList.add('on');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
-
-    try {
-        // Admin passwords are checked by Supabase Auth, not the profile table.
-        const adminData = await verifyAdminCredentials(email, password);
-
-        if (adminData) {
-            sessionStorage.setItem('manual_access_granted', 'true');
-            sessionStorage.setItem('manual_access_role', adminData.admin_level || 'admin');
-            closeCredModal();
-            window.location.href = 'manualAttendance.html';
-            return;
-        }
-
-        // Check teachers table
-        const { data: teacherData } = await supabaseClient
-            .from('teachers')
-            .select('teacher_id, email, first_name, last_name')
-            .eq('email', email)
-            .eq('password', password)
-            .eq('status', 'active')
-            .maybeSingle();
-
-        if (teacherData) {
-            sessionStorage.setItem('manual_access_granted', 'true');
-            sessionStorage.setItem('manual_access_role', 'teacher');
-            closeCredModal();
-            window.location.href = 'manualAttendance.html';
-            return;
-        }
-
-        // ❌ Neither matched
-        document.getElementById('credErrorMsg').textContent =
-            'Invalid email or password. Please try again.';
-        errBox.classList.add('on');
-        document.getElementById('credPassword').value = '';
-        document.getElementById('credPassword').focus();
-
-    } catch (err) {
-        console.error('Credential check error:', err);
-        document.getElementById('credErrorMsg').textContent =
-            'Connection error. Please try again.';
-        errBox.classList.add('on');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Verify & Open';
-    }
-}
-
-// Close modal on Escape key
-document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeCredModal();
+document.getElementById('manualAttendanceButton').addEventListener('click', () => {
+    const target = new URL('manualAttendance.html', window.location.href);
+    sessionStorage.setItem('allowed_admin_route', target.pathname);
+    window.location.assign(target.href);
 });
 </script>
 

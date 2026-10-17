@@ -19,7 +19,6 @@ const QR_DEBUG_MODE = new URLSearchParams(window.location.search).get('qrdebug')
 let lastDecodedId = '';
 let lastDecodedAt = 0;
 const QR_DUPLICATE_COOLDOWN_MS = 50;
-const MANUAL_ACCESS_ROLE = sessionStorage.getItem('manual_access_role') || '';
 let resumeScannerAfterSuccess = false;
 let qrCameraFallbackTimer = null;
 let qrKeyboardActivitySeen = false;
