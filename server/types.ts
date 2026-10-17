@@ -41,6 +41,18 @@ export interface StudentRecord {
   sections: { section_name: string | null } | null;
 }
 
+export interface EmployeeRecord {
+  employee_id: string;
+  emp_no: string;
+  first_name: string | null;
+  middle_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  faculty: string | null;
+  role: string | null;
+  status: string | null;
+}
+
 export interface AuditRecord {
   user_id: string;
   action: string;
@@ -70,6 +82,7 @@ export interface AdminGateway {
   deleteProfile(id: string): Promise<void>;
   insertAudit(record: AuditRecord): Promise<void>;
   getStudent(id: string): Promise<StudentRecord | null>;
+  getEmployee(id: string): Promise<EmployeeRecord | null>;
 }
 
 export class BackendError extends Error {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { AdminGateway, AdminProfile, AuditRecord, AuthAccount, Factor, StudentRecord } from '../../server/types.js';
+import type { AdminGateway, AdminProfile, AuditRecord, AuthAccount, EmployeeRecord, Factor, StudentRecord } from '../../server/types.js';
 import { createAdmin } from '../../server/create-admin.js';
 import { updateAdminPassword } from '../../server/update-admin-password.js';
 import { validAdminPassword } from '../../server/admin-password-policy.js';
@@ -9,6 +9,7 @@ import { adminMfaFactors } from '../../server/admin-mfa-factors.js';
 import { updateAdminEmail } from '../../server/update-admin-email.js';
 import { sendStudentQrEmail } from '../../server/send-student-qr-email.js';
 import type { QrMail } from '../../server/mail.js';
+import QRCode from 'qrcode';
 
 const IDS = {
   normal: '11111111-1111-4111-8111-111111111111',
@@ -37,6 +38,9 @@ class Fixture implements AdminGateway {
   student: StudentRecord = { student_id: IDS.student, stud_id: '2-0001', first_name: 'Test', middle_name: null,
     last_name: 'Student', birth_date: '2015-01-01', gender: 'Female', email: 'student@example.invalid',
     current_grade_level: 'Grade 2', sections: { section_name: 'Section A' } };
+  employee: EmployeeRecord = { employee_id: '88888888-8888-4888-8888-888888888888', emp_no: 'EMP-001',
+    first_name: 'Test', middle_name: null, last_name: 'Employee', email: 'employee@example.invalid',
+    faculty: 'Science', role: 'teacher', status: 'active' };
   async getUserFromToken(token: string) {
     if (!issuedTokens.has(token)) return null;
     return this.users.get(issuedTokens.get(token)!) || null;
@@ -61,6 +65,7 @@ class Fixture implements AdminGateway {
   async deleteProfile(id: string) { this.profiles.delete(id); }
   async insertAudit(row: AuditRecord) { this.audits.push(row); }
   async getStudent(id: string) { return id === IDS.student ? this.student : null; }
+  async getEmployee(id: string) { return id === this.employee.employee_id ? this.employee : null; }
 }
 
 const issuedTokens = new Map<string, string>();
@@ -85,6 +90,7 @@ const deleteBody = { adminId: IDS.target };
 const mfaBody = { action: 'status', adminId: IDS.target };
 const emailBody = { adminId: IDS.target, email: 'changed@example.invalid', confirmEmail: true };
 const qrBody = { studentUuid: IDS.student, email: 'student@example.invalid', qrPayload: `student_uuid:${IDS.student}` };
+const employeeQrBody = { employeeUuid: '88888888-8888-4888-8888-888888888888' };
 
 process.env.ADMIN_EMAIL_CHANGE_ENABLED = '1';
 process.env.ADMIN_EMAIL_CHANGE_PROJECT_REF = 'ehyqvyglirirktfmdezq';
@@ -109,6 +115,24 @@ test('QR endpoint allows active AAL2 Admin but denies all AAL1 and suspended cal
   assert.equal(await status(handler, qrBody, token(IDS.suspended)), 403);
   assert.equal(await status(handler, qrBody, token(IDS.normal)), 200);
   assert.equal(await status(handler, qrBody, token(IDS.super)), 200);
+});
+
+test('Employee QR endpoint uses the stored recipient and immutable UUID payload', async () => {
+  const sent: QrMail[] = [];
+  const handler: Handler = (req, gateway) => sendStudentQrEmail(req, gateway, async mail => { sent.push(mail); });
+  assert.equal(await status(handler, employeeQrBody, token(IDS.normal)), 200);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, 'employee@example.invalid');
+  const expectedPng = await QRCode.toBuffer('employee_uuid:88888888-8888-4888-8888-888888888888',
+    { type: 'png', width: 512, margin: 0, errorCorrectionLevel: 'M' });
+  assert.deepEqual(sent[0].attachments[1].content, expectedPng);
+  assert.doesNotMatch(sent[0].html, /employee@example\.invalid/);
+});
+
+test('Employee QR endpoint rejects invalid and unknown UUIDs', async () => {
+  const handler: Handler = (req, gateway) => sendStudentQrEmail(req, gateway, async () => {});
+  assert.equal(await status(handler, { employeeUuid: 'not-a-uuid' }, token(IDS.normal)), 422);
+  assert.equal(await status(handler, { employeeUuid: '99999999-9999-4999-8999-999999999999' }, token(IDS.normal)), 404);
 });
 
 test('a locked AAL2 Admin cannot use privileged APIs even with a valid Auth token', async () => {
