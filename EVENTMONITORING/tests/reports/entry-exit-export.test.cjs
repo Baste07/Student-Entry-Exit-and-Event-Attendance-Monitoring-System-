@@ -72,6 +72,7 @@ function page(rows = logs) {
     return {
         context, events, element,
         filter(id, value) { element(id).value = value; vm.runInContext('applyFilters()', context); },
+        tableHtml() { return element('logsTableBody').innerHTML; },
         rows() { return JSON.parse(vm.runInContext('JSON.stringify(getFilteredExportRows())', context)); },
         async csv() {
             vm.runInContext('exportCSV()', context);
@@ -81,6 +82,20 @@ function page(rows = logs) {
         pdf() { vm.runInContext('exportPDF()', context); return events.pdfs.at(-1); }
     };
 }
+
+test('Employee and student rows use the correct Grade and Section / Role columns', () => {
+    const p = page();
+    const html = p.tableHtml();
+    const employeeRow = html.split('<tr>').find(row => row.includes('Reyes, Maria'));
+    const studentRow = html.split('<tr>').find(row => row.includes('Larga, John'));
+
+    assert.match(employeeRow, /<td>—<\/td><td><span class="log-role-badge emp">[\s\S]*Registrar/);
+    assert.doesNotMatch(employeeRow, /<td colspan="2">/);
+    assert.match(studentRow, /<td>Grade 1<\/td><td>MABAIT<\/td>/);
+
+    const employeeExportRow = p.rows().find(row => row[0] === 'EMP-07');
+    assert.deepEqual(employeeExportRow.slice(2, 4), ['—', 'Registrar']);
+});
 
 test('CSV and PDF consume the same filtered rows, not just the visible page', async () => {
     const p = page([...logs, ...Array.from({ length: 30 }, (_, i) => ({

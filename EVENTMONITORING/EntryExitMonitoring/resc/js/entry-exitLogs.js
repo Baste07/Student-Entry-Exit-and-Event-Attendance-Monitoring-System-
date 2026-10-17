@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadLogs() {
     const tbody = document.getElementById('logsTableBody');
-    tbody.innerHTML = `<tr><td colspan="9" class="loading-cell"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="loading-cell"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>`;
 
     try {
         const { data, error } = await supabaseClient
@@ -43,7 +43,7 @@ async function loadLogs() {
         applyFilters();
     } catch (e) {
         console.error('[entryExitLogs] load error:', e);
-        tbody.innerHTML = `<tr><td colspan="9" class="loading-cell">Failed to load logs. Please try again.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="loading-cell">Failed to load logs. Please try again.</td></tr>`;
         UIFeedback.error('Entry and exit logs could not be loaded. Please try again.', 'Load failed');
     }
 }
@@ -116,7 +116,7 @@ function renderPage() {
     const slice  = filteredLogs.slice(start, start + PAGE_SIZE);
 
     if (!slice.length) {
-        tbody.innerHTML = `<tr><td colspan="9" class="loading-cell">No logs found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="loading-cell">No logs found.</td></tr>`;
         renderPagination();
         return;
     }
@@ -131,11 +131,11 @@ function renderPage() {
             ? escHtml(`${e.last_name || '—'}, ${e.first_name || ''}`)
             : escHtml(`${s.last_name || '—'}, ${s.first_name || ''}`);
 
-        // For students show grade/section; for employees show "Employee"
+        // Employees have no grade; their faculty/role belongs in Section / Role.
         const section = s.sections || {};
         const employeeRole = e.faculty || e.role || 'Employee';
         const roleCellHtml = isEmployee
-            ? `<td colspan="2"><span class="log-role-badge emp"><i class="fa-solid fa-user-tie"></i> ${escHtml(employeeRole)}</span></td>`
+            ? `<td>—</td><td><span class="log-role-badge emp"><i class="fa-solid fa-user-tie"></i> ${escHtml(employeeRole)}</span></td>`
             : `<td>${escHtml(s.current_grade_level || '—')}</td><td>${escHtml(section.section_name || '—')}</td>`;
 
         const typeBadge = l.log_type === 'entry'
