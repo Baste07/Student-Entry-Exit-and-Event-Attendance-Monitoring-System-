@@ -244,6 +244,10 @@ async function prepareCheckIn(id, role, source, autoRecord = false) {
             // Show staff the readable ID after the UUID lookup has succeeded.
             document.getElementById('personId').value = person.stud_id || '';
         }
+        if (role === 'employee' && /^employee_uuid:/i.test(String(id))) {
+            // Keep the permanent UUID internal while showing staff the readable employee number.
+            document.getElementById('personId').value = person.emp_no || '';
+        }
         const now = gateNow();
         const movement = await nextMovement(person, role, now);
         pendingPerson = { person, role, source };
