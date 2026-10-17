@@ -41,10 +41,22 @@ export async function sendStudentQrEmail(
   if (body.email && trimmed(body.email).toLowerCase() !== storedEmail.toLowerCase()) {
     return json(409, { success: false, message: `${employeeId ? 'Employee' : 'Student'} email changed. Refresh the record before sending.` });
   }
+  let mailStage = 'mail_build';
   try {
     const mail = employee ? await buildEmployeeQrMail(employee) : await buildQrMail(student!);
+    mailStage = 'sendMail';
     await sender(mail);
-  } catch {
+  } catch (error) {
+    const failure = error && typeof error === 'object' ? error as {
+      name?: unknown; code?: unknown; command?: unknown; responseCode?: unknown;
+    } : {};
+    console.error('[qr-mail] sanitized failure', {
+      stage: mailStage,
+      errorName: typeof failure.name === 'string' ? failure.name : 'UnknownError',
+      errorCode: typeof failure.code === 'string' ? failure.code : undefined,
+      smtpCommand: typeof failure.command === 'string' ? failure.command : undefined,
+      smtpResponseCode: typeof failure.responseCode === 'number' ? failure.responseCode : undefined
+    });
     return json(500, { success: false, message: 'Failed to send email. Check SMTP configuration.' });
   }
   return json(200, { success: true, message: `${employeeId ? 'Employee' : 'Student'} QR email sent successfully with PNG attachment.` });
