@@ -9,6 +9,30 @@
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="../resc/css/manualAttendance.css">
+<script>
+    (function enforceManualAttendanceNavigation() {
+        const userStr = sessionStorage.getItem('user');
+        const allowedRoute = sessionStorage.getItem('allowed_admin_route');
+        let user = null;
+
+        try {
+            user = userStr ? JSON.parse(userStr) : null;
+        } catch (error) {
+            sessionStorage.removeItem('user');
+        }
+
+        sessionStorage.removeItem('allowed_admin_route');
+
+        if (!user || user.userType !== 'admin') {
+            window.location.replace('../../auth/login.html');
+            return;
+        }
+
+        if (allowedRoute !== window.location.pathname) {
+            window.location.replace('../../portal/portal.html');
+        }
+    })();
+</script>
 </head>
 <body>
 
@@ -158,17 +182,6 @@
     <span id="toast-msg"></span>
 </div>
 
-<script>
-    // ── Access Guard ──
-    (function() {
-        const granted = sessionStorage.getItem('manual_access_granted');
-        if (!granted) {
-            window.location.replace('takeAttendance.html');
-        } else {
-            sessionStorage.removeItem('manual_access_granted');
-        }
-    })();
-</script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../../config/.env.js"></script>
