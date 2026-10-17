@@ -110,6 +110,17 @@ class SettingsTests(unittest.TestCase):
         self.set("event_settings", late_grace_minutes=300)
         self.assertEqual(self.settings.event_grace_minutes(), 15)
 
+    def test_event_attendance_cooldown_uses_current_snapshot_and_safe_default(self):
+        self.assertEqual(self.settings.event_attendance_cooldown_seconds(), 5)
+        for seconds in (1, 5, 20, 300):
+            self.set("event_settings", attendance_cooldown_seconds=seconds)
+            self.assertEqual(self.settings.event_attendance_cooldown_seconds(), seconds)
+        for invalid in ("", "0", "-1", "301", "1.5", "NaN", "0005"):
+            self.set("event_settings", attendance_cooldown_seconds=invalid)
+            self.assertEqual(self.settings.event_attendance_cooldown_seconds(), 5)
+        self.set("event_settings", attendance_cooldown_seconds=12)
+        self.assertEqual(self.settings.event_attendance_cooldown_seconds(), 12)
+
 
 if __name__ == "__main__":
     unittest.main()

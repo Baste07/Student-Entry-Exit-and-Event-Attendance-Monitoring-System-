@@ -8,8 +8,9 @@ let EVENT_LATE_GRACE_MINUTES = 15;
 
 const ERR_ACTIONS = new Set([
     'NOT_REGISTERED', 'NO_ACTIVE_EVENT', 'EVENT_NOT_STARTED', 'TIME_OUT_UNAVAILABLE',
-    'ATTENDANCE_COMPLETE', 'NO_TIME_IN_FOUND', 'TEACHER_GREETING'
+    'ATTENDANCE_COMPLETE', 'NO_TIME_IN_FOUND', 'TEACHER_GREETING', 'COOLDOWN_ACTIVE'
 ]);
+const recentEventAttendance = new Map();
 
 let payload = null;
 let html5QrCode = null;
@@ -18,6 +19,7 @@ let qrDecodeLocked = false;
 const QR_DEBUG_MODE = new URLSearchParams(window.location.search).get('qrdebug') === '1';
 let lastDecodedId = '';
 let lastDecodedAt = 0;
+let lastCooldownFeedbackKey = '';
 const QR_DUPLICATE_COOLDOWN_MS = 50;
 let resumeScannerAfterSuccess = false;
 let qrCameraFallbackTimer = null;
@@ -429,8 +431,6 @@ async function processQrResult(rawText) {
     lastDecodedId = finalId;
     lastDecodedAt = nowMs;
 
-    playScanBeep();
-
     const studentRadio = document.querySelector('input[name="role_select"][value="student"]');
     const teacherRadio = document.querySelector('input[name="role_select"][value="teacher"]');
 
@@ -448,9 +448,11 @@ async function processQrResult(rawText) {
     }
 
     document.getElementById('id_input').value = finalId;
-    showToast(`ID Detected: ${finalId}`, 's');
-
-    lookupById(finalId, true);
+    const result = await lookupById(finalId, true, true);
+    if (result?.action !== 'COOLDOWN_ACTIVE') {
+        playScanBeep();
+        showToast(`ID Detected: ${finalId}`, 's');
+    }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -472,7 +474,7 @@ async function doLookup(autoConfirm = false) {
     }
 }
 
-async function lookupById(id, autoConfirm = false) {
+async function lookupById(id, autoConfirm = false, fromQr = false) {
     const panel = document.getElementById('result-panel');
     panel.classList.remove('show');
     panel.style.display = 'none';
@@ -491,8 +493,22 @@ async function lookupById(id, autoConfirm = false) {
 
             if (student) {
                 const result = await getStudentEventStatus(student);
-                renderResult({ role: 'student', person: student, ...result }, autoConfirm);
-                return;
+                if (fromQr && result.action === 'COOLDOWN_ACTIVE') {
+                    const key = `${result.event_id}:${student.student_id}`;
+                    if (lastCooldownFeedbackKey !== key) {
+                        renderResult({ role: 'student', person: student, ...result }, false);
+                        lastCooldownFeedbackKey = key;
+                    }
+                    // Release the QR camera for another participant without
+                    // repeatedly beeping or toasting for a held QR code.
+                    setTimeout(() => {
+                        if (document.getElementById('id_input').value === id) resetFormForNextStudent();
+                    }, 600);
+                } else {
+                    lastCooldownFeedbackKey = '';
+                    renderResult({ role: 'student', person: student, ...result }, autoConfirm);
+                }
+                return result;
             }
         } else {
             const { data: teacher } = await supabaseClient
@@ -566,11 +582,46 @@ function selectRelevantEvent(events, now = new Date(), openAttendanceEventIds = 
     return { state: 'none', event: null };
 }
 
+function eventCooldownSeconds(settings) {
+    const value = settings?.attendance_cooldown_seconds;
+    return AppSettings.validEventAttendanceCooldownSeconds(value) ? Number(value) : 5;
+}
+
+function eventCooldownRemaining(row, eventId, studentId, seconds, now = new Date()) {
+    const key = `${eventId}:${studentId}`;
+    const recent = recentEventAttendance.get(key);
+    const recentAge = recent === undefined ? Infinity : now.getTime() - recent;
+    if (recentAge >= 300000) recentEventAttendance.delete(key);
+    const localRemaining = recentAge >= 0 ? seconds * 1000 - recentAge : 0;
+    const stored = row?.time_out || row?.time_in;
+    const storedAt = stored ? Date.parse(stored) : NaN;
+    const storedAge = now.getTime() - storedAt;
+    const storedRemaining = Number.isFinite(storedAge) && storedAge >= 0 ? seconds * 1000 - storedAge : 0;
+    return Math.max(0, localRemaining, storedRemaining);
+}
+
+function markEventAttendanceSuccess(eventId, studentId) {
+    recentEventAttendance.set(`${eventId}:${studentId}`, Date.now());
+    if (recentEventAttendance.size > 4096) {
+        const cutoff = Date.now() - 300000;
+        for (const [key, savedAt] of recentEventAttendance) {
+            if (savedAt <= cutoff) recentEventAttendance.delete(key);
+        }
+    }
+}
+
+function eventCooldownResult(event) {
+    return { success: true, action: 'COOLDOWN_ACTIVE', event_id: event.event_id,
+        event_name: event.event_name,
+        message: EventAttendanceFeedback.forOutcome('COOLDOWN_ACTIVE').message };
+}
+
 async function getStudentEventStatus(student) {
-    const eventSettings = await AppSettings.load(supabaseClient, 'event', { missingTableDefaults: true });
+    const eventSettings = await AppSettings.load(supabaseClient, 'event', { refresh: true, missingTableDefaults: true });
     const grace = Number(eventSettings.late_grace_minutes);
     if (!Number.isInteger(grace) || grace < 0 || grace > 99) throw new Error('Invalid event grace setting');
     EVENT_LATE_GRACE_MINUTES = grace;
+    const cooldownSeconds = eventCooldownSeconds(eventSettings);
     const sid = student.student_id;
 
     // 1. Find events this student is registered for
@@ -632,6 +683,7 @@ async function getStudentEventStatus(student) {
             .eq('student_id', sid);
 
         const row = attRows && attRows.length > 0 ? attRows[0] : null;
+        if (eventCooldownRemaining(row, evId, sid, cooldownSeconds, now) > 0) return eventCooldownResult(ev);
 
         if (!row) {
             return {
@@ -682,6 +734,7 @@ async function getStudentEventStatus(student) {
                 .eq('student_id', sid);
 
             const row = attRows && attRows.length > 0 ? attRows[0] : null;
+            if (eventCooldownRemaining(row, evId, sid, cooldownSeconds, now) > 0) return eventCooldownResult(ev);
 
             if (row && row.time_in && !row.time_out) {
                 return {
@@ -889,7 +942,7 @@ async function confirmStudentEvent(payload) {
     let attendanceId = payload.attendance_id;
     const studentId = person.student_id;
 
-    if (['NOT_REGISTERED', 'NO_ACTIVE_EVENT', 'EVENT_NOT_STARTED', 'TIME_OUT_UNAVAILABLE', 'ATTENDANCE_COMPLETE', 'NO_TIME_IN_FOUND', 'TEACHER_GREETING'].includes(action)) {
+    if (['NOT_REGISTERED', 'NO_ACTIVE_EVENT', 'EVENT_NOT_STARTED', 'TIME_OUT_UNAVAILABLE', 'ATTENDANCE_COMPLETE', 'NO_TIME_IN_FOUND', 'TEACHER_GREETING', 'COOLDOWN_ACTIVE'].includes(action)) {
         return { success: true, message: 'No action needed.' };
     }
 
@@ -898,6 +951,11 @@ async function confirmStudentEvent(payload) {
     }
 
     const { nowStore } = getManualAttendanceClock();
+    const eventSettings = await AppSettings.load(supabaseClient, 'event', { refresh: true, missingTableDefaults: true });
+    if (eventCooldownRemaining(null, eventId, studentId, eventCooldownSeconds(eventSettings)) > 0) {
+        const feedback = EventAttendanceFeedback.forOutcome('COOLDOWN_ACTIVE');
+        return { success: false, title: feedback.title, message: feedback.message };
+    }
 
     if (action === 'IN') {
         const { error } = await supabaseClient.from('event_attendance').insert({
@@ -908,6 +966,7 @@ async function confirmStudentEvent(payload) {
             created_at: nowStore
         });
         if (error) return { success: false, message: error.message || 'Unable to save TIME IN.' };
+        markEventAttendanceSuccess(eventId, studentId);
 
         sendManualAttendanceEmail('IN', effectiveEventRow, person, nowStore, {
             lateMinutes: isLate ? (lateMinutes || 0) : 0,
@@ -949,6 +1008,7 @@ async function confirmStudentEvent(payload) {
             .update({ time_out: nowStore, updated_at: nowStore })
             .eq('attendance_id', attendanceId);
         if (error) return { success: false, message: error.message || 'Unable to save TIME OUT.' };
+        markEventAttendanceSuccess(eventId, studentId);
 
         sendManualAttendanceEmail('OUT', effectiveEventRow, person, nowStore, {
             timeInRecorded,
@@ -1024,6 +1084,10 @@ function renderResult(data, autoConfirm = false) {
         ? `${feedback.title}. ${feedback.message}`
         : data.message;
     setMsg(mc, ic, displayMessage);
+    if (action === 'COOLDOWN_ACTIVE') {
+        UIFeedback.toast({ type: 'warning', title: 'Attendance Cooldown Active',
+            message: EventAttendanceFeedback.forOutcome(action).message });
+    }
 
     const cb = document.getElementById('btn-confirm');
     cb.disabled = false; cb.style.opacity = '1';
