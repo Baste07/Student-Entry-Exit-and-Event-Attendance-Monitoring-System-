@@ -24,6 +24,11 @@
         if (type === 'no_active_event' || type === 'NO_ACTIVE_EVENT') {
             return { title: 'No Active Event', message: 'You are not registered for an active or upcoming event.', badge: 'NO ACTIVE EVENT' };
         }
+        if (type === 'COOLDOWN_ACTIVE') {
+            return { title: 'Attendance Cooldown Active',
+                message: 'Please wait a few seconds before scanning this participant again.',
+                badge: 'PLEASE WAIT' };
+        }
         return null;
     }
 

@@ -75,6 +75,7 @@ from local_admin_auth import require_admin_aal2, local_service_or_admin
 from supabase import create_client, Client
 from sms_notifications import generate_attendance_sms, resolve_guardian_phone, send_sms
 from runtime_settings import RuntimeSettings
+from event_attendance_cooldown import RecentEventAttendance
 from student_face_embedding_store import (
     checked_vector, fetch_student_embedding_rows, replace_student_embeddings,
     verified_student_embeddings,
@@ -142,6 +143,7 @@ attendee_clients = set()
 attendee_clients_lock = threading.Lock()
 recently_seen  = {}
 COOLDOWN_SECS  = 5
+recent_event_attendance = RecentEventAttendance()
 scanner_mode_lock = threading.Lock()
 scanner_mode = "event_attendance"
 
@@ -1745,6 +1747,32 @@ def _select_relevant_event(events, now_utc, open_attendance_event_ids=()):
     return "none", None
 
 
+def _recognition_debounce_seconds(mode):
+    if mode == "entry_exit":
+        return runtime_settings.gate_cooldown_seconds()
+    # A short frame-level debounce remains separate from successful Event writes,
+    # but must not make a configured 1–4 second Event cooldown ineffective.
+    return min(COOLDOWN_SECS, runtime_settings.event_attendance_cooldown_seconds())
+
+
+def _event_attendance_cooldown_remaining(row, now, seconds):
+    """Use the persisted action timestamp so Face, QR, and Manual scans agree."""
+    if not row:
+        return 0.0
+    for value in (row.get("time_out"), row.get("time_in")):
+        if not value:
+            continue
+        try:
+            recorded = value if isinstance(value, datetime.datetime) else datetime.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if recorded.tzinfo is None:
+                recorded = recorded.replace(tzinfo=datetime.timezone.utc)
+            elapsed = (now - recorded.astimezone(datetime.timezone.utc)).total_seconds()
+            return max(0.0, seconds - elapsed) if elapsed >= 0 else 0.0
+        except (TypeError, ValueError, OverflowError):
+            continue
+    return 0.0
+
+
 def _record_event_attendance(student_id, meta):
     """
     Auto-detect event from the student's participation list.
@@ -1810,6 +1838,10 @@ def _record_event_attendance(student_id, meta):
                 "reason": "You are not registered for an active or upcoming event."
             })
             return
+        if selected_event and recent_event_attendance.remaining(
+                selected_event["event_id"], "student", student_id,
+                runtime_settings.event_attendance_cooldown_seconds()) > 0:
+            return
         ongoing = [selected_event] if selection == "ongoing" else []
         completed = [selected_event] if selection == "completed" else []
         upcoming = [selected_event] if selection == "upcoming" else []
@@ -1830,6 +1862,10 @@ def _record_event_attendance(student_id, meta):
                 .execute()
             row = att_res.data[0] if att_res.data else None
 
+            if _event_attendance_cooldown_remaining(
+                    row, now, runtime_settings.event_attendance_cooldown_seconds()) > 0:
+                return
+
             if not row:
                 attendance_insert = supabase.table("event_attendance").insert({
                     "event_id": ev_id,
@@ -1837,6 +1873,9 @@ def _record_event_attendance(student_id, meta):
                     "time_in": now.isoformat(),
                     "remarks": attendance_remarks,
                 }).execute()
+                if getattr(attendance_insert, "error", None):
+                    raise RuntimeError("Event Time In was not saved")
+                recent_event_attendance.mark_success(ev_id, "student", student_id)
 
                     # ── SEND TIME-IN EMAIL ──
                 meta["late_minutes"] = late_minutes
@@ -1916,10 +1955,17 @@ def _record_event_attendance(student_id, meta):
                     .execute()
                 row = att_res.data[0] if att_res.data else None
 
+                if _event_attendance_cooldown_remaining(
+                        row, now, runtime_settings.event_attendance_cooldown_seconds()) > 0:
+                    return
+
                 if row and row.get("time_in") and not row.get("time_out"):
-                    supabase.table("event_attendance").update({
+                    attendance_update = supabase.table("event_attendance").update({
                         "time_out": now.isoformat(),
                     }).eq("attendance_id", row["attendance_id"]).execute()
+                    if getattr(attendance_update, "error", None):
+                        raise RuntimeError("Event Time Out was not saved")
+                    recent_event_attendance.mark_success(ev_id, "student", student_id)
 
                        # ── SEND TIME-OUT EMAIL ──
                     time_in_iso = row.get("time_in", "")
@@ -2149,7 +2195,7 @@ def recognition_worker():
                 label = meta["name"]
                 color = (0, 255, 0) if meta["role"] == "student" else (0, 255, 255)
                 print(f"[MATCH]   -> ACCEPTED: recognized as {meta['name']} (role={meta['role']})")
-                mode_cooldown = runtime_settings.gate_cooldown_seconds() if _get_scanner_mode() == "entry_exit" else COOLDOWN_SECS
+                mode_cooldown = _recognition_debounce_seconds(_get_scanner_mode())
                 if not last or (datetime.datetime.now() - last).total_seconds() >= mode_cooldown:
                     # ── ANALYTICS: MiniFASNet anti-spoof liveness check ──
                     t_spoof0 = time.time()

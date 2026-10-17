@@ -59,7 +59,8 @@ function qrStatus({ status = 'ongoing', attendance = null, attendanceRows = null
         event_date: '2026-10-11', time_start: '08:00:00',
         time_end: status === 'completed' ? '08:30:00' : '10:00:00' }];
     const rows = {
-        event_participants: registered ? events.map(event => ({ student_id: 'student', event_id: event.event_id })) : [],
+        event_participants: registered ? events.flatMap(event => ['student', 'student-b'].map(student_id =>
+            ({ student_id, event_id: event.event_id }))) : [],
         events, event_attendance: attendanceRows || (attendance ? [attendance] : [])
     };
     let writes = 0;
@@ -85,16 +86,24 @@ function qrStatus({ status = 'ongoing', attendance = null, attendanceRows = null
         },
         Intl,
         supabaseClient: client,
-        AppSettings: { async load() { return { late_grace_minutes: '15' }; } },
+        AppSettings: { async load() { return { late_grace_minutes: '15', attendance_cooldown_seconds: '5' }; },
+            validEventAttendanceCooldownSeconds: value => /^[1-9]$/.test(String(value)) },
         EventAttendanceFeedback: feedback,
         eventLateMinutes: () => late,
         format12HourTime: value => value,
         EVENT_LATE_GRACE_MINUTES: 15,
     });
+    vm.runInContext('const recentEventAttendance = new Map();', context);
     vm.runInContext(sourceFunction(qrSource, 'selectRelevantEvent'), context);
+    for (const name of ['eventCooldownSeconds', 'eventCooldownRemaining', 'eventCooldownResult', 'markEventAttendanceSuccess']) {
+        vm.runInContext(sourceFunction(qrSource, name), context);
+    }
     vm.runInContext(sourceFunction(qrSource, 'getStudentEventStatus', true), context);
-    return { status: () => context.getStudentEventStatus({ student_id: 'student' }),
+    return { status: (studentId = 'student') => context.getStudentEventStatus({ student_id: studentId }),
         select: (value, openIds = []) => context.selectRelevantEvent(value, new Date('2026-10-11T01:00:00Z'), openIds),
+        remaining: (row, eventId, studentId, seconds, now) =>
+            context.eventCooldownRemaining(row, eventId, studentId, seconds, now),
+        mark: (eventId, studentId) => context.markEventAttendanceSuccess(eventId, studentId),
         writes: () => writes };
 }
 
@@ -169,6 +178,7 @@ function qrResultCard(result) {
         setAv() {}, setName() {}, setMsg(_cls, _icon, text) { shown = text; },
         msgCls: action => action === 'TIME_OUT_UNAVAILABLE' ? { mc: 'mw', ic: 'fa-hourglass-half' } : { mc: 'mi', ic: 'fa-check' },
         showPanel() {}, actBtn() {}, payload: null,
+        UIFeedback: { toast() {} },
     });
     vm.runInContext(sourceFunction(qrSource, 'renderResult'), context);
     context.renderResult({ success: true, role: 'student', person: { stud_id: '1-0001' },
@@ -176,16 +186,23 @@ function qrResultCard(result) {
     return shown;
 }
 
-async function qrConfirm(action, isLate = false) {
+async function qrConfirm(action, isLate = false, options = {}) {
     const writes = [];
+    const emails = [];
+    let failWrite = Boolean(options.failWrite);
+    const cooldownSeconds = options.cooldownSeconds || 20;
     const context = vm.createContext({
         EventAttendanceFeedback: feedback,
+        AppSettings: { async load() { return { attendance_cooldown_seconds: String(cooldownSeconds) }; },
+            validEventAttendanceCooldownSeconds: value => Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 300 },
         supabaseClient: {
             from(table) {
                 assert.equal(table, 'event_attendance');
                 return {
-                    async insert(row) { writes.push(['insert', row]); return { error: null }; },
-                    update(row) { return { async eq() { writes.push(['update', row]); return { error: null }; } }; },
+                    async insert(row) { if (failWrite) return { error: { message: 'write failed' } };
+                        writes.push(['insert', row]); return { error: null }; },
+                    update(row) { return { async eq() { if (failWrite) return { error: { message: 'write failed' } };
+                        writes.push(['update', row]); return { error: null }; } }; },
                     select() { return { eq() { return { async single() {
                         return { data: { time_in: '2026-10-11T08:00:00Z' } };
                     } }; } }; },
@@ -193,18 +210,109 @@ async function qrConfirm(action, isLate = false) {
             },
         },
         getManualAttendanceClock: () => ({ nowStore: '2026-10-11T10:00:00Z' }),
-        sendManualAttendanceEmail() {},
+        sendManualAttendanceEmail: action => emails.push(action),
         Date,
     });
+    vm.runInContext('const recentEventAttendance = new Map();', context);
+    for (const name of ['eventCooldownSeconds', 'eventCooldownRemaining', 'markEventAttendanceSuccess']) {
+        vm.runInContext(sourceFunction(qrSource, name), context);
+    }
     vm.runInContext(sourceFunction(qrSource, 'confirmStudentEvent', true), context);
-    const result = await context.confirmStudentEvent({
+    const payload = {
         action, event_id: 'event', attendance_id: 'attendance',
         person: { student_id: 'student', first_name: 'Test' },
         _event: { event_id: 'event', event_name: 'School Program' },
         is_late: isLate, late_minutes: isLate ? 20 : 0,
-    });
-    return { result, writes };
+    };
+    const result = await context.confirmStudentEvent(payload);
+    return { result, writes, emails, repeat: () => context.confirmStudentEvent(payload),
+        setFail: value => { failWrite = value; } };
 }
+
+test('Event QR and Manual status suppress a fresh successful row, per person and event', async () => {
+    const row = { attendance_id: 'attendance', event_id: 'event', student_id: 'student',
+        time_in: '2026-10-11T01:00:00Z', time_out: null };
+    const qr = qrStatus({ attendance: row });
+    assert.equal((await qr.status()).action, 'COOLDOWN_ACTIVE');
+    assert.equal((await qr.status('student-b')).action, 'IN');
+    assert.equal(qr.writes(), 0);
+    qr.mark('event', 'student');
+    assert.ok(qr.remaining(null, 'event', 'student', 5, new Date()) > 0);
+    assert.equal(qr.remaining(null, 'other-event', 'student', 5, new Date()), 0);
+    assert.equal(qr.remaining(null, 'event', 'student-b', 5, new Date()), 0);
+    assert.equal(qr.remaining(row, 'event', 'student', 5, new Date('2026-10-11T01:00:05Z')), 0);
+    assert.match(feedback.forOutcome('COOLDOWN_ACTIVE').title, /Cooldown/);
+});
+
+test('Event QR and Manual writes start cooldown only after successful Time In or Time Out', async () => {
+    for (const action of ['IN', 'OUT']) {
+        const flow = await qrConfirm(action);
+        assert.equal(flow.result.success, true);
+        const repeat = await flow.repeat();
+        assert.equal(repeat.success, false);
+        assert.match(repeat.title, /Cooldown/);
+        assert.equal(flow.writes.length, 1);
+        assert.deepEqual(flow.emails, [action]);
+    }
+    const failed = await qrConfirm('IN', false, { failWrite: true });
+    assert.equal(failed.result.success, false);
+    assert.equal(failed.writes.length, 0);
+    assert.deepEqual(failed.emails, []);
+    failed.setFail(false);
+    const retry = await failed.repeat();
+    assert.equal(retry.success, true);
+    assert.equal(failed.writes.length, 1);
+    assert.deepEqual(failed.emails, ['IN']);
+});
+
+test('Event QR cooldown gives one notice, suppresses repeat beeps, and releases camera for another student', async () => {
+    const qrId = 'student_uuid:00000000-0000-4000-8000-000000000001';
+    const input = { value: qrId };
+    const panel = { classList: { remove() {} }, style: {} };
+    const timers = [];
+    const rendered = [];
+    let beeps = 0;
+    let resets = 0;
+    let lookups = 0;
+    const context = vm.createContext({
+        document: {
+            getElementById: id => id === 'id_input' ? input : panel,
+            querySelector: () => ({ checked: true }),
+        },
+        supabaseClient: { from: () => ({ select() { return this; }, eq() { return this; },
+            async maybeSingle() { return { data: { student_id: 'student', stud_id: '1-0001' } }; } }) },
+        getSelectedRole: () => 'student',
+        getStudentEventStatus: async () => ({ action: 'COOLDOWN_ACTIVE', event_id: 'event' }),
+        renderResult: result => rendered.push(result.action),
+        resetFormForNextStudent: () => { resets++; input.value = ''; },
+        setTimeout: callback => { timers.push(callback); return timers.length; },
+        extractIdFromQr: value => value,
+        setQrDebug() {}, isValidDetectedId: () => true,
+        playScanBeep: () => { beeps++; }, showToast() {},
+        lookupById: async () => { lookups++; return { action: 'COOLDOWN_ACTIVE' }; },
+        lastDecodedId: '', lastDecodedAt: 0, QR_DUPLICATE_COOLDOWN_MS: 50,
+        Date,
+    });
+    vm.runInContext('let payload = null; let lastCooldownFeedbackKey = "";', context);
+    vm.runInContext(sourceFunction(qrSource, 'lookupById', true), context);
+    const first = await context.lookupById(qrId, true, true);
+    assert.equal(first.action, 'COOLDOWN_ACTIVE');
+    assert.deepEqual(rendered, ['COOLDOWN_ACTIVE']);
+    assert.equal(timers.length, 1);
+    timers.shift()();
+    assert.equal(resets, 1);
+    input.value = qrId;
+    await context.lookupById(qrId, true, true);
+    assert.deepEqual(rendered, ['COOLDOWN_ACTIVE']);
+    timers.shift()();
+    assert.equal(resets, 2);
+
+    context.lookupById = async () => { lookups++; return { action: 'COOLDOWN_ACTIVE' }; };
+    vm.runInContext(sourceFunction(qrSource, 'processQrResult', true), context);
+    await context.processQrResult(qrId);
+    assert.equal(lookups, 1);
+    assert.equal(beeps, 0);
+});
 
 async function qrConfirmedCard(action, result) {
     const elements = new Map();

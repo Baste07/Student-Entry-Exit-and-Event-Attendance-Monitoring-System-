@@ -18,6 +18,9 @@ async function loadEventSettings() {
         ]);
         const grace = Number(savedEventSettings.late_grace_minutes);
         document.getElementById('lateGraceMinutes').value = Number.isInteger(grace) && grace >= 0 && grace <= 99 ? grace : 15;
+        const cooldown = savedEventSettings.attendance_cooldown_seconds;
+        document.getElementById('attendanceCooldownSeconds').value = AppSettings.validEventAttendanceCooldownSeconds(cooldown)
+            ? cooldown : '5';
         document.getElementById('eventSmsEnabled').checked = AppSettings.enabled(savedEventSettings, 'sms_enabled');
         document.getElementById('systemSmsStatus').textContent = AppSettings.enabled(systemEventSettings, 'sms_enabled')
             ? 'System SMS Service is enabled.' : 'Disabled by Super Admin';
@@ -25,6 +28,7 @@ async function loadEventSettings() {
             ? 'Enabled by Super Admin' : 'Disabled by Super Admin';
         showEventSmsStatus();
         document.getElementById('lateGraceMinutes').disabled = false;
+        document.getElementById('attendanceCooldownSeconds').disabled = false;
         document.getElementById('saveEventSettings').disabled = false;
     } catch (error) {
         console.error('Event settings could not be loaded:', error);
@@ -51,7 +55,14 @@ async function saveEventSettings() {
         UIFeedback.fieldError(graceInput, 'Enter a whole number from 0 to 99 minutes.');
         return;
     }
-    const desired = { late_grace_minutes: String(grace), sms_enabled: systemEventSettings && !AppSettings.enabled(systemEventSettings, 'sms_enabled')
+    const cooldownInput = document.getElementById('attendanceCooldownSeconds');
+    const cooldown = cooldownInput.value.trim();
+    if (!AppSettings.validEventAttendanceCooldownSeconds(cooldown)) {
+        UIFeedback.fieldError(cooldownInput, 'Enter a whole number from 1 to 300 seconds.');
+        return;
+    }
+    const desired = { late_grace_minutes: String(grace), attendance_cooldown_seconds: cooldown,
+        sms_enabled: systemEventSettings && !AppSettings.enabled(systemEventSettings, 'sms_enabled')
         ? savedEventSettings.sms_enabled : String(document.getElementById('eventSmsEnabled').checked) };
     const changes = Object.fromEntries(Object.entries(desired).filter(([key, value]) => value !== savedEventSettings[key]));
     if (!Object.keys(changes).length) return UIFeedback.toast({ type: 'info', message: 'No changes to save.' });

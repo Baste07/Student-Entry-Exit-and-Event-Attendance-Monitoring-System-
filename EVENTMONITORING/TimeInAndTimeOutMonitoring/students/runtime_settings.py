@@ -14,7 +14,8 @@ DEFAULTS = {
     "gate": {"sms_enabled": "true", "gateOpen": "06:00", "gateClose": "18:00",
              "lateThreshold": "07:30", "autoExit": "true", "cooldown": "10",
              "enforceGateHours": "false"},
-    "event": {"sms_enabled": "true", "late_grace_minutes": "15"},
+    "event": {"sms_enabled": "true", "late_grace_minutes": "15",
+              "attendance_cooldown_seconds": "5"},
 }
 TABLES = {"system": "system_settings", "gate": "gate_settings", "event": "event_settings"}
 
@@ -108,6 +109,10 @@ class RuntimeSettings:
             return value if 0 <= value <= 99 else 15
         except (TypeError, ValueError):
             return 15
+
+    def event_attendance_cooldown_seconds(self):
+        text = str(self.value("event", "attendance_cooldown_seconds", "5"))
+        return int(text) if re.fullmatch(r"([1-9]|[1-9][0-9]|[12][0-9][0-9]|300)", text) else 5
 
     def gate_cooldown_seconds(self):
         with self.lock:

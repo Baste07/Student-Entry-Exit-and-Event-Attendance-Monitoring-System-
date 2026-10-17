@@ -10,7 +10,7 @@
             enforceGateHours: 'false', scanMethod: 'face', autoExit: 'true',
             cooldown: '10', sms_enabled: 'true'
         },
-        event: { sms_enabled: 'true', late_grace_minutes: '15' }
+        event: { sms_enabled: 'true', late_grace_minutes: '15', attendance_cooldown_seconds: '5' }
     };
     const cache = {};
     const savedKeys = {};
@@ -47,6 +47,8 @@
                 !validAdminTimeoutMinutes(value)) throw new Error('Inactivity timeout must be at least 3 whole minutes.');
             if (scope === 'system' && key === 'admin_login_max_attempts' &&
                 !validAdminLoginMaxAttempts(value)) throw new Error('Maximum failed logins must be a whole number from 3 to 6.');
+            if (scope === 'event' && key === 'attendance_cooldown_seconds' &&
+                !validEventAttendanceCooldownSeconds(value)) throw new Error('Event attendance cooldown must be a whole number from 1 to 300 seconds.');
             return { key, value: String(value) };
         });
         if (!rows.length) return;
@@ -67,10 +69,14 @@
         return /^([3-9]|[1-9][0-9]+)$/.test(text) && Number.isSafeInteger(Number(text));
     }
     function validAdminLoginMaxAttempts(value) { return /^[3-6]$/.test(String(value ?? '')); }
+    function validEventAttendanceCooldownSeconds(value) {
+        return /^([1-9]|[1-9][0-9]|[12][0-9][0-9]|300)$/.test(String(value ?? ''));
+    }
     function effectiveSms(system, module) { return enabled(system, 'sms_enabled') && enabled(module, 'sms_enabled'); }
     function hasSaved(scope, key) { return !!savedKeys[scope]?.has(key); }
     const api = { defaults, load, save, enabled, effectiveSms, hasSaved,
-        validAdminTimeoutMinutes, validAdminLoginMaxAttempts };
+        validAdminTimeoutMinutes, validAdminLoginMaxAttempts,
+        validEventAttendanceCooldownSeconds };
     root.AppSettings = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
