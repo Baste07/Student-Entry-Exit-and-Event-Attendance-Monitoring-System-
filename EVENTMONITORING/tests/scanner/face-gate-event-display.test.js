@@ -81,10 +81,11 @@ test('QR/ID uses the saved cooldown for both Entry and Exit without hiding accep
         };
         const context = vm.createContext({
             document: { getElementById: element, addEventListener() {} },
-            supabaseClient: { from: () => ({ insert: async log => {
+            supabaseClient: { from: () => ({ insert: log => ({ select: () => ({ single: async () => {
                 inserted.push(log);
-                return { error: null };
-            } }) },
+                return { data: { id: `saved-${inserted.length}` }, error: null };
+            } }) }) }) },
+            adminAal2Fetch: async () => ({ ok: true }),
             console
         });
         vm.runInContext(qrSource, context);
