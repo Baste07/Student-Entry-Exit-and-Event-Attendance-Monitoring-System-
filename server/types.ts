@@ -43,7 +43,7 @@ export interface StudentRecord {
 
 export interface EmployeeRecord {
   employee_id: string;
-  emp_no: string;
+  emp_no: string | number;
   first_name: string | null;
   middle_name: string | null;
   last_name: string | null;

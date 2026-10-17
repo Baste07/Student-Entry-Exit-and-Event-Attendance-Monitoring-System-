@@ -38,7 +38,7 @@ class Fixture implements AdminGateway {
   student: StudentRecord = { student_id: IDS.student, stud_id: '2-0001', first_name: 'Test', middle_name: null,
     last_name: 'Student', birth_date: '2015-01-01', gender: 'Female', email: 'student@example.invalid',
     current_grade_level: 'Grade 2', sections: { section_name: 'Section A' } };
-  employee: EmployeeRecord = { employee_id: '88888888-8888-4888-8888-888888888888', emp_no: 'EMP-001',
+  employee: EmployeeRecord = { employee_id: '88888888-8888-4888-8888-888888888888', emp_no: 990002,
     first_name: 'Test', middle_name: null, last_name: 'Employee', email: 'employee@example.invalid',
     faculty: 'Science', role: 'teacher', status: 'active' };
   async getUserFromToken(token: string) {
