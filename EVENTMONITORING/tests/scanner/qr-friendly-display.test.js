@@ -19,10 +19,11 @@ const employee = { employee_id: 'employee-uuid', emp_no: 'EMP123', first_name: '
 
 async function scannerPage({ cameraStartFailures = 0, cameraStartFailureKind = 'permission',
     cameraStartGate = null, cameras = [{ id: 'external-a', type: 'external' }],
-    cameraError = null, redirect = false, withTrack = false } = {}) {
+    cameraError = null, redirect = false, withTrack = false, smsEndpointError = false } = {}) {
     const elements = new Map();
     const lookups = [];
     const logs = [];
+    const notifications = [];
     let onReady;
     let cameraDecode;
     let cameraMiss;
@@ -47,7 +48,8 @@ async function scannerPage({ cameraStartFailures = 0, cameraStartFailureKind = '
                     if (event === 'ended') cameraTrackEnded = callback;
                 } }]
             } } : null; },
-            focus() {}, setAttribute() {}, classList: { add() {}, remove() {} }
+            focus() { this.focusCalls = (this.focusCalls || 0) + 1; },
+            setAttribute() {}, classList: { add() {}, remove() {} }
         });
         return elements.get(id);
     };
@@ -68,11 +70,17 @@ async function scannerPage({ cameraStartFailures = 0, cameraStartFailureKind = '
                         : table === 'entry_exit_logs' ? [...logs].reverse() : [];
                     return { data: rows.filter(row => filters.every(([key, value]) => row[key] === value)).slice(0, 1), error: null };
                 },
-                async insert(log) {
-                    assert.equal(table, 'entry_exit_logs');
-                    if (failNextInsert) { failNextInsert = false; return { error: { message: 'Test failure' } }; }
-                    logs.push(log);
-                    return { error: null };
+                insert(log) {
+                    return { select(column) {
+                        assert.equal(table, 'entry_exit_logs');
+                        assert.equal(column, 'id');
+                        return { async single() {
+                            if (failNextInsert) { failNextInsert = false; return { error: { message: 'Test failure' } }; }
+                            const saved = { ...log, id: `saved-log-${logs.length + 1}` };
+                            logs.push(saved);
+                            return { data: { id: saved.id }, error: null };
+                        } };
+                    } };
                 }
             };
         },
@@ -103,6 +111,11 @@ async function scannerPage({ cameraStartFailures = 0, cameraStartFailureKind = '
             }
         },
         supabaseClient: client,
+        adminAal2Fetch: async (_url, options) => {
+            notifications.push(JSON.parse(options.body));
+            if (smsEndpointError) throw new Error('SMS engine offline');
+            return { ok: true };
+        },
         AppSettings: { async load() { return {
             cooldown: '10', autoExit: 'true', enforceGateHours: 'false', lateThreshold: '23:59'
         }; } },
@@ -141,7 +154,7 @@ async function scannerPage({ cameraStartFailures = 0, cameraStartFailureKind = '
     await onReady();
     await new Promise(setImmediate);
     return {
-        context, element, radios, lookups, logs, cameraAttempts,
+        context, element, radios, lookups, logs, notifications, cameraAttempts,
         counts() { return { cameraStarts, cameraStops, cameraClears, beeps }; },
         failNextInsert() { failNextInsert = true; },
         runTimer(delay) {
@@ -192,6 +205,23 @@ async function scannerPage({ cameraStartFailures = 0, cameraStartFailureKind = '
             gunTimer = null;
             callback();
             await new Promise(setImmediate);
+        },
+        async typeWithQrGun(raw, { pauseBetweenKeys = false, enter = true } = {}) {
+            if (!vm.runInContext('qrGunMode', context)) {
+                element('qrGunButton').handlers.click({ currentTarget: element('qrGunButton') });
+                await new Promise(setImmediate);
+            }
+            const input = element('personId');
+            assert.ok(input.focusCalls > 0, 'QR Gun mode focuses the keyboard-wedge input');
+            for (const character of raw) {
+                input.value += character;
+                input.handlers.input({ currentTarget: input });
+                if (pauseBetweenKeys) await new Promise(setImmediate);
+            }
+            if (enter) {
+                input.handlers.keydown({ key: 'Enter', preventDefault() {}, currentTarget: input });
+            }
+            await new Promise(setImmediate);
         }
     };
 }
@@ -210,6 +240,161 @@ test('QR lookup uses the permanent UUID while the field and result show the disp
     assert.equal(page.logs[0].log_type, 'entry');
     assert.match(page.element('previewMessage').textContent, /Entry recorded/);
     assert.ok(!page.element('personId').value.includes('student_uuid:'));
+});
+
+test('QR camera, Manual ID, and QR Gun each notify once per saved Entry and Exit ID', async () => {
+    for (const method of ['camera', 'manual', 'gun']) {
+        const page = await scannerPage();
+        page.context.clock = 100_000;
+        vm.runInContext('Date.now = () => clock', page.context);
+        const scan = async () => {
+            if (method === 'camera') {
+                if (page.logs.length) { await page.cameraMiss(); page.runTimer(750); }
+                await page.cameraScan(qrPayload);
+            } else if (method === 'manual') {
+                await page.lookup('1-0001', 'student', 'manual', true);
+            } else if (!page.logs.length) {
+                await page.gunScan(qrPayload);
+            } else {
+                page.element('personId').value = qrPayload;
+                page.element('personId').handlers.keydown({ key: 'Enter', preventDefault() {},
+                    currentTarget: page.element('personId') });
+                await new Promise(setImmediate);
+            }
+        };
+        await scan();
+        assert.equal(page.logs.length, 1, method);
+        assert.equal(page.logs[0].log_type, 'entry', method);
+        assert.deepEqual(page.notifications, [{ entry_exit_log_id: page.logs[0].id }], method);
+        if (method === 'manual') await page.lookup('1-0001', 'student', 'manual', true);
+        if (method === 'gun') {
+            page.element('personId').value = qrPayload;
+            page.element('personId').handlers.keydown({ key: 'Enter', preventDefault() {},
+                currentTarget: page.element('personId') });
+            await new Promise(setImmediate);
+        }
+        assert.equal(page.notifications.length, 1, `${method} repeated inside cooldown`);
+        page.context.clock += 10_000;
+        await scan();
+        assert.equal(page.logs.length, 2, method);
+        assert.equal(page.logs[1].log_type, 'exit', method);
+        assert.deepEqual(page.notifications, page.logs.map(row => ({ entry_exit_log_id: row.id })), method);
+    }
+});
+
+test('USB keyboard-wedge QR Gun types characters, Enter saves once, then input focuses and clears', async () => {
+    const page = await scannerPage();
+    page.context.clock = 100_000;
+    vm.runInContext('Date.now = () => clock', page.context);
+
+    await page.typeWithQrGun(qrPayload);
+    assert.deepEqual(page.lookups[0], { table: 'students', filters: [['student_id', studentUuid]] });
+    assert.equal(page.logs.length, 1);
+    assert.equal(page.logs[0].student_id, studentUuid);
+    assert.equal(page.logs[0].scan_method, 'qr');
+    assert.equal(page.logs[0].log_type, 'entry');
+    assert.deepEqual(page.notifications, [{ entry_exit_log_id: page.logs[0].id }]);
+    assert.match(page.element('previewMeta').textContent, /1-0001/);
+    assert.match(page.element('previewMessage').textContent, /Entry recorded/);
+    assert.equal(page.element('personId').value, '');
+    assert.ok(page.element('personId').focusCalls >= 2, 'mode switch and successful save focus the next scan');
+    assert.throws(() => page.runTimer(350), /Expected a 350 ms timer/,
+        'Enter cancels the input-complete fallback instead of recording a second time');
+
+    // Some wedges emit a second Enter after the input has already cleared.
+    page.element('personId').handlers.keydown({
+        key: 'Enter', preventDefault() {}, currentTarget: page.element('personId')
+    });
+    await new Promise(setImmediate);
+    assert.equal(page.logs.length, 1);
+    assert.equal(page.notifications.length, 1);
+
+    await page.typeWithQrGun(qrPayload);
+    assert.equal(page.logs.length, 1, 'repeat inside the saved gate cooldown cannot write');
+    assert.equal(page.notifications.length, 1);
+
+    page.element('againButton').handlers.click();
+    await page.typeWithQrGun(qrPayloadB);
+    assert.equal(page.logs.length, 2, 'another student is independent of the first cooldown');
+    assert.equal(page.logs[1].student_id, studentBUuid);
+    assert.deepEqual(page.notifications, page.logs.map(log => ({ entry_exit_log_id: log.id })));
+
+    page.context.clock += 10_000;
+    await page.typeWithQrGun(qrPayload);
+    assert.equal(page.logs.length, 3);
+    assert.equal(page.logs[2].log_type, 'exit');
+    assert.equal(page.logs[2].student_id, studentUuid);
+    assert.deepEqual(page.notifications, page.logs.map(log => ({ entry_exit_log_id: log.id })));
+});
+
+test('slower keyboard-wedge typing, invalid QR, and failed save never send an extra SMS request', async () => {
+    const page = await scannerPage();
+    await page.typeWithQrGun('not a school QR', { pauseBetweenKeys: true });
+    assert.match(page.element('pageStatus').textContent, /Waiting for a valid ID/);
+    assert.equal(page.logs.length, 0);
+    assert.equal(page.notifications.length, 0);
+
+    page.element('againButton').handlers.click();
+    page.failNextInsert();
+    await page.typeWithQrGun(qrPayload, { pauseBetweenKeys: true });
+    assert.match(page.element('pageStatus').textContent, /Could not save the gate log/);
+    assert.equal(page.logs.length, 0);
+    assert.equal(page.notifications.length, 0);
+
+    page.element('againButton').handlers.click();
+    await page.typeWithQrGun(qrPayload, { pauseBetweenKeys: true });
+    assert.equal(page.logs.length, 1);
+    assert.equal(page.notifications.length, 1);
+    assert.equal(page.element('personId').value, '');
+});
+
+test('QR Gun keyboard input also supports wedges without an Enter suffix', async () => {
+    const page = await scannerPage();
+    await page.typeWithQrGun(qrPayload, { enter: false });
+    assert.equal(page.logs.length, 0);
+    page.runTimer(350);
+    await new Promise(setImmediate);
+    assert.equal(page.logs.length, 1);
+    assert.deepEqual(page.notifications, [{ entry_exit_log_id: page.logs[0].id }]);
+    assert.equal(page.element('personId').value, '');
+    assert.doesNotMatch(source, /navigator\.(?:usb|serial)|WebUSB|WebSerial|requestDevice|requestPort/i);
+});
+
+test('invalid, cooldown-blocked, and failed gate writes never request SMS', async () => {
+    const page = await scannerPage();
+    await page.lookup('1-9999', 'student', 'manual', true);
+    await page.cameraScan('not a student QR');
+    assert.equal(page.notifications.length, 0);
+    await page.lookup('1-0001', 'student', 'manual', true);
+    assert.equal(page.notifications.length, 1);
+    await page.lookup('1-0001', 'student', 'manual', true);
+    assert.equal(page.notifications.length, 1);
+
+    const failed = await scannerPage();
+    failed.failNextInsert();
+    await failed.lookup('1-0001', 'student', 'manual', true);
+    assert.equal(failed.notifications.length, 0);
+});
+
+test('held QR does not request duplicate SMS; another student is independent', async () => {
+    const page = await scannerPage();
+    await page.cameraScan(qrPayload);
+    await page.cameraScan(qrPayload);
+    assert.equal(page.notifications.length, 1);
+    await page.cameraScan(qrPayloadB);
+    assert.equal(page.notifications.length, 2);
+    assert.equal(page.logs[1].student_id, studentBUuid);
+});
+
+test('employee logs do not request student SMS and SMS endpoint failure preserves gate success', async () => {
+    const page = await scannerPage({ smsEndpointError: true });
+    await page.lookup('EMP123', 'employee', 'manual', true);
+    assert.equal(page.logs.length, 1);
+    assert.equal(page.notifications.length, 0);
+    await page.lookup('1-0001', 'student', 'manual', true);
+    assert.equal(page.logs.length, 2);
+    assert.equal(page.notifications.length, 1);
+    assert.match(page.element('previewMessage').textContent, /Entry recorded/);
 });
 
 test('manual ID, Search Again, and role switching stay separate from QR lookup', async () => {

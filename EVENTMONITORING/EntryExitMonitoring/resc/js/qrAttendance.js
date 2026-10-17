@@ -16,6 +16,22 @@ let qrGunSubmitTimer = null;
 let requestBusy = false;
 let pendingPerson = null;
 const recordedAt = new Map();
+const GATE_SMS_NOTIFY_URL = 'http://127.0.0.1:5000/gate_sms_notify';
+
+async function notifySavedStudentGateLog(logId) {
+    if (!logId) return;
+    try {
+        const response = await adminAal2Fetch(GATE_SMS_NOTIFY_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entry_exit_log_id: logId })
+        });
+        if (!response.ok) console.warn('[qrAttendance] SMS notification unavailable.');
+    } catch (_) {
+        // The saved gate record remains successful even when the local SMS engine is offline.
+        console.warn('[qrAttendance] SMS notification unavailable.');
+    }
+}
 
 function extractGateQrId(raw) {
     const text = String(raw || '').replace(/[\u2010-\u2015]/g, '-').trim();
@@ -256,7 +272,8 @@ async function recordCheckIn() {
         const now = gateNow();
         const movement = await nextMovement(person, role, now);
         const log = buildGateLog(person, role, source, movement, now, new Date().toISOString());
-        const { error } = await supabaseClient.from('entry_exit_logs').insert(log);
+        const { data: savedLog, error } = await supabaseClient.from('entry_exit_logs')
+            .insert(log).select('id').single();
         if (error) throw error;
         recordedAt.set(key, Date.now());
         pendingPerson = null;
@@ -265,6 +282,7 @@ async function recordCheckIn() {
         message.textContent = `${movement === 'entry' ? 'Entry' : 'Exit'} recorded${log.is_late ? ' · Late arrival' : ''}.`;
         message.className = 'success';
         showStatus('Gate attendance saved successfully.', 'success');
+        if (role === 'student') void notifySavedStudentGateLog(savedLog?.id);
         if (source === 'qr' && qrGunMode) {
             document.getElementById('personId').value = '';
             document.getElementById('personId').focus();

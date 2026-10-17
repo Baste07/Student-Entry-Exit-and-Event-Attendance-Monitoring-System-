@@ -74,6 +74,7 @@ from flask_cors import CORS
 from local_admin_auth import require_admin_aal2, local_service_or_admin
 from supabase import create_client, Client
 from sms_notifications import generate_attendance_sms, resolve_guardian_phone, send_sms
+from gate_sms_notification import notify_gate_sms
 from runtime_settings import RuntimeSettings
 from event_attendance_cooldown import RecentEventAttendance
 from student_face_embedding_store import (
@@ -2797,6 +2798,20 @@ def email_status_latest():
     if latest:
         return jsonify({"success": True, "log": latest})
     return jsonify({"success": False, "message": "No email activity yet"})
+
+@app.route('/gate_sms_notify', methods=['POST'])
+@require_admin_aal2
+def gate_sms_notify():
+    """Notify only for an independently verified, saved QR/ID student gate log."""
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or set(body) != {'entry_exit_log_id'}:
+        return jsonify({'success': False, 'status': 'invalid_request'}), 400
+    result, status_code = notify_gate_sms(
+        supabase, runtime_settings, body['entry_exit_log_id'],
+        _attendance_timestamp_label,
+    )
+    return jsonify(result), status_code
+
 
 @app.route('/sms_status', methods=['GET'])
 def sms_status():
