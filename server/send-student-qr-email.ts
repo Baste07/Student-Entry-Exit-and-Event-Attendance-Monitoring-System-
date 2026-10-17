@@ -1,6 +1,6 @@
 import type { AdminGateway } from './types.js';
 import type { QrMail } from './mail.js';
-import { buildQrMail, sendQrMail } from './mail.js';
+import { buildEmployeeQrMail, buildQrMail, sendQrMail } from './mail.js';
 import { requireActiveAdminAal2 } from './admin-auth.js';
 import { bodyObject, json, trimmed, uuidPattern } from './responses.js';
 import { methodOnly } from './http.js';
@@ -14,28 +14,38 @@ export async function sendStudentQrEmail(
   if ('response' in authorization) return authorization.response;
   const body = await bodyObject(request);
   if (!body) return json(400, { success: false, message: 'Invalid JSON body.' });
+  const employeeId = trimmed(body.employeeUuid).toLowerCase();
   const payload = trimmed(body.qrPayload).toLowerCase();
-  const id = trimmed(body.studentUuid).toLowerCase() || (payload.startsWith('student_uuid:') ? payload.slice(13) : '');
-  if (!uuidPattern.test(id) || (payload && payload !== `student_uuid:${id}`)) {
-    return json(422, { success: false, message: 'A valid student UUID QR payload is required.' });
+  const studentId = trimmed(body.studentUuid).toLowerCase() ||
+    (payload.startsWith('student_uuid:') ? payload.slice('student_uuid:'.length) : '');
+  if (employeeId && studentId) return json(422, { success: false, message: 'Provide only one QR recipient.' });
+  if (!uuidPattern.test(employeeId || studentId)) {
+    return json(422, { success: false, message: employeeId ? 'A valid employee UUID is required.' : 'A valid student UUID QR payload is required.' });
   }
   let student;
-  try { student = await gateway.getStudent(id); }
-  catch { return json(502, { success: false, message: 'Could not verify the student record.' }); }
-  if (!student || student.student_id.toLowerCase() !== id) return json(404, { success: false, message: 'Student not found.' });
-  if (!student.stud_id) return json(422, { success: false, message: 'Student ID is required.' });
-  if (!student.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(student.email)) {
-    return json(422, { success: false, message: 'A valid student email is required.' });
+  let employee;
+  try {
+    if (employeeId) employee = await gateway.getEmployee(employeeId);
+    else student = await gateway.getStudent(studentId);
+  } catch { return json(502, { success: false, message: 'Could not verify the recipient record.' }); }
+  if (employeeId) {
+    if (!employee || employee.employee_id.toLowerCase() !== employeeId) return json(404, { success: false, message: 'Employee not found.' });
+    if (!employee.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(employee.email)) return json(422, { success: false, message: 'A valid employee email is required.' });
+  } else {
+    if (payload && payload !== `student_uuid:${studentId}`) return json(422, { success: false, message: 'A valid student UUID QR payload is required.' });
+    if (!student || student.student_id.toLowerCase() !== studentId) return json(404, { success: false, message: 'Student not found.' });
+    if (!student.stud_id) return json(422, { success: false, message: 'Student ID is required.' });
+    if (!student.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(student.email)) return json(422, { success: false, message: 'A valid student email is required.' });
   }
-  // The browser cannot turn this endpoint into an arbitrary SMTP relay.
-  if (body.email && trimmed(body.email).toLowerCase() !== student.email.toLowerCase()) {
-    return json(409, { success: false, message: 'Student email changed. Refresh the student record before sending.' });
+  const storedEmail = employee?.email || student?.email || '';
+  if (body.email && trimmed(body.email).toLowerCase() !== storedEmail.toLowerCase()) {
+    return json(409, { success: false, message: `${employeeId ? 'Employee' : 'Student'} email changed. Refresh the record before sending.` });
   }
   try {
-    const mail = await buildQrMail(student);
+    const mail = employee ? await buildEmployeeQrMail(employee) : await buildQrMail(student!);
     await sender(mail);
   } catch {
     return json(500, { success: false, message: 'Failed to send email. Check SMTP configuration.' });
   }
-  return json(200, { success: true, message: 'Student QR email sent successfully with PNG attachment.' });
+  return json(200, { success: true, message: `${employeeId ? 'Employee' : 'Student'} QR email sent successfully with PNG attachment.` });
 }

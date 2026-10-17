@@ -138,6 +138,11 @@ function displayTeachers(teachers) {
                 <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </button>
         `);
+        buttons.push(`
+            <button class="btn-icon" title="Send Employee QR" onclick="sendEmployeeQr('${teacher.id}')">
+                <svg viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4Z"/></svg>
+            </button>
+        `);
         
         if (teacher.status === 'suspended') {
             buttons.push(`
@@ -165,6 +170,33 @@ function displayTeachers(teachers) {
 
         tbody.appendChild(row);
     });
+}
+
+async function sendEmployeeQr(employeeId, button = null, email = null) {
+    const employee = allTeachers.find(item => item.id === employeeId) || { id: employeeId, email };
+    if (!employee) return false;
+    if (!EMAIL_LIKE_PATTERN.test(String(employee.email || '').trim())) {
+        UIFeedback.error('A valid employee email is required before sending a QR code.', 'QR not sent');
+        return false;
+    }
+    if (button) button.disabled = true;
+    try {
+        const response = await adminAal2Fetch('send-student-qr-email.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employeeUuid: employee.id })
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.success) throw new Error(result?.message || `HTTP ${response.status}`);
+        UIFeedback.success('The Employee QR code was sent to the employee email.', 'QR sent');
+        return true;
+    } catch (error) {
+        console.error('Employee QR email failed:', error);
+        UIFeedback.error('The Employee was not changed, but the QR email could not be sent. Try again later.', 'QR not sent');
+        return false;
+    } finally {
+        if (button) button.disabled = false;
+    }
 }
 
 function updateStatistics() {
@@ -412,8 +444,9 @@ async function submitTeacherForm(e) {
                 return;
             }
             
+            const employeeUuid = crypto.randomUUID();
             const { error: insertError } = await supabaseClient.from('employees').insert([{
-                employee_id: crypto.randomUUID(),
+                employee_id: employeeUuid,
                 emp_no: employeeId,
                 first_name: firstName,
                 middle_name: middleName || null,
@@ -429,7 +462,10 @@ async function submitTeacherForm(e) {
             }]);
             
             if (insertError) throw insertError;
-            savedMessage = 'Employee created successfully.';
+            const qrSent = await sendEmployeeQr(employeeUuid, null, email);
+            savedMessage = qrSent
+                ? 'Employee created successfully. QR code sent to employee email.'
+                : 'Employee created successfully, but the QR email could not be sent.';
         }
         
         if (teacherModal) teacherModal.hide();
@@ -852,14 +888,15 @@ async function startImport() {
     let failed = 0;
     const total = validRows.length;
 
-    addLog(log, 'info', `Starting import of ${total} teacher(s)...`);
+    addLog(log, 'info', `Starting import of ${total} employee(s)...`);
 
     for (let i = 0; i < validRows.length; i++) {
         const row = validRows[i];
 
         try {
+            const employeeUuid = crypto.randomUUID();
             const { error: insertError } = await supabaseClient.from('employees').insert([{
-                employee_id: crypto.randomUUID(),
+                employee_id: employeeUuid,
                 emp_no: row.employeeId,
                 first_name: row.firstName,
                 middle_name: row.middleName || null,
@@ -878,6 +915,9 @@ async function startImport() {
 
             success++;
             addLog(log, 'ok', `[Row ${row.rowIndex}] Imported: ${row.firstName} ${row.lastName} (${row.employeeId})`);
+            const qrSent = await sendEmployeeQr(employeeUuid, null, row.email);
+            addLog(log, qrSent ? 'ok' : 'warning',
+                `[Row ${row.rowIndex}] QR email ${qrSent ? 'sent' : 'could not be sent'}${qrSent ? '' : '; employee remains created'}.`);
 
         } catch (err) {
             failed++;
@@ -886,7 +926,7 @@ async function startImport() {
 
         const progress = Math.round(((i + 1) / total) * 100);
         fill.style.width = progress + '%';
-        text.textContent = `${i + 1} of ${total} teachers processed`;
+        text.textContent = `${i + 1} of ${total} employees processed`;
         pct.textContent = progress + '%';
         await sleep(60);
     }
@@ -998,7 +1038,7 @@ function downloadTeacherTemplate() {
     if (window.XLSX) {
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
-        XLSX.utils.book_append_sheet(wb, ws, 'Teachers');
+        XLSX.utils.book_append_sheet(wb, ws, 'Employees');
         XLSX.writeFile(wb, 'teacher-import-template.xlsx');
         return;
     }

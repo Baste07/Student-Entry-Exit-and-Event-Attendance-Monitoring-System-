@@ -79,6 +79,12 @@ test('QR payload parser accepts student IDs in plain text, JSON and URLs', () =>
     assert.equal(extractGateQrId('unrelated QR data'), null);
 });
 
+test('QR payload parser accepts immutable Employee UUIDs', () => {
+    const uuid = '88888888-8888-4888-8888-888888888888';
+    assert.deepEqual(extractGateQrId(`employee_uuid:${uuid}`), { id: `employee_uuid:${uuid}`, role: 'employee' });
+    assert.deepEqual(extractGateQrId(`{"id":"employee_uuid:${uuid}"}`), { id: `employee_uuid:${uuid}`, role: 'employee' });
+});
+
 test('gate QR and manual records keep the correct person, movement and late rules', () => {
     assert.equal(movementFromLatest('true', 'entry'), 'exit');
     assert.equal(movementFromLatest('true', 'exit'), 'entry');

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { AdminGateway, AdminProfile, AuditRecord, AuthAccount, Factor, StudentRecord } from './types.js';
+import type { AdminGateway, AdminProfile, AuditRecord, AuthAccount, EmployeeRecord, Factor, StudentRecord } from './types.js';
 import { BackendError } from './types.js';
 
 export function serverClient(): SupabaseClient {
@@ -137,5 +137,12 @@ export class SupabaseAdminGateway implements AdminGateway {
     if (!data) return null;
     const section = Array.isArray(data.sections) ? data.sections[0] : data.sections;
     return { ...data, sections: section ?? null } as StudentRecord;
+  }
+  async getEmployee(id: string): Promise<EmployeeRecord | null> {
+    const { data, error } = await this.client.from('employees')
+      .select('employee_id,emp_no,first_name,middle_name,last_name,email,faculty,role,status')
+      .eq('employee_id', id).maybeSingle();
+    if (error) failed(error);
+    return data as EmployeeRecord | null;
   }
 }

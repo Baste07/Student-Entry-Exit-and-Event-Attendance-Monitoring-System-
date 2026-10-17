@@ -37,10 +37,14 @@ function extractGateQrId(raw) {
     const text = String(raw || '').replace(/[\u2010-\u2015]/g, '-').trim();
     const uuidMatch = text.match(/student_uuid\s*:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
     if (uuidMatch) return { id: `student_uuid:${uuidMatch[1].toLowerCase()}`, role: 'student' };
+    const employeeUuidMatch = text.match(/employee_uuid\s*:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+    if (employeeUuidMatch) return { id: `employee_uuid:${employeeUuidMatch[1].toLowerCase()}`, role: 'employee' };
     const candidate = value => {
         const id = String(value || '').trim();
         const uuid = id.match(/^student_uuid:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
         if (uuid) return { id: `student_uuid:${uuid[1].toLowerCase()}`, role: 'student' };
+        const employeeUuid = id.match(/^employee_uuid:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+        if (employeeUuid) return { id: `employee_uuid:${employeeUuid[1].toLowerCase()}`, role: 'employee' };
         if (/^([Kk]|[1-9]|10)-\d{1,4}$/.test(id)) return { id, role: 'student' };
         if (/^EMP\d+$/i.test(id) || /^\d{9}$/.test(id)) return { id, role: 'employee' };
         return null;
@@ -175,9 +179,10 @@ async function findPerson(id, role) {
         if (error) throw error;
         return data?.[0] || null;
     }
+    const employeeUuid = String(id).match(/^employee_uuid:([0-9a-f-]{36})$/i);
     const { data, error } = await supabaseClient.from('employees')
         .select('employee_id, emp_no, first_name, middle_name, last_name, faculty')
-        .eq('emp_no', id).limit(1);
+        .eq(employeeUuid ? 'employee_id' : 'emp_no', employeeUuid ? employeeUuid[1] : id).limit(1);
     if (error) throw error;
     return data?.[0] || null;
 }
