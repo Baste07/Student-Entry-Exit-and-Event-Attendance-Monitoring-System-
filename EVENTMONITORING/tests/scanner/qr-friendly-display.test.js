@@ -7,14 +7,16 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.resolve(__dirname, '../../EntryExitMonitoring/resc/js/qrAttendance.js'), 'utf8');
 const studentUuid = '123e4567-e89b-42d3-a456-426614174000';
 const studentBUuid = '123e4567-e89b-42d3-a456-426614174001';
+const employeeUuid = '223e4567-e89b-42d3-a456-426614174000';
 const qrPayload = `student_uuid:${studentUuid}`;
 const qrPayloadB = `student_uuid:${studentBUuid}`;
+const employeeQrPayload = `employee_uuid:${employeeUuid}`;
 const student = {
     student_id: studentUuid, stud_id: '1-0001', first_name: 'John', middle_name: 'Sebastian',
     last_name: 'Larga', current_grade_level: 'Grade 1', sections: { section_name: 'MABAIT' }
 };
 const studentB = { ...student, student_id: studentBUuid, stud_id: '1-0014', first_name: 'Jane' };
-const employee = { employee_id: 'employee-uuid', emp_no: 'EMP123', first_name: 'Maria',
+const employee = { employee_id: employeeUuid, emp_no: 'EMP123', first_name: 'Maria',
     last_name: 'Reyes', faculty: 'Office' };
 
 async function scannerPage({ cameraStartFailures = 0, cameraStartFailureKind = 'permission',
@@ -395,6 +397,33 @@ test('employee logs do not request student SMS and SMS endpoint failure preserve
     assert.equal(page.logs.length, 2);
     assert.equal(page.notifications.length, 1);
     assert.match(page.element('previewMessage').textContent, /Entry recorded/);
+});
+
+test('Employee UUID QR shows emp_no while the gate log keeps employee_id', async () => {
+    const page = await scannerPage();
+    await page.lookup(employeeQrPayload, 'employee', 'qr');
+    assert.deepEqual(page.lookups[0], { table: 'employees', filters: [['employee_id', employeeUuid]] });
+    assert.equal(page.element('personId').value, 'EMP123');
+    assert.doesNotMatch(page.element('personId').value, /employee_uuid:/i);
+    assert.equal(vm.runInContext('pendingPerson.person.employee_id', page.context), employeeUuid);
+    await vm.runInContext('recordCheckIn()', page.context);
+    assert.equal(page.logs[0].employee_id, employeeUuid);
+    assert.equal(page.logs[0].student_id, null);
+    assert.equal(page.notifications.length, 0);
+});
+
+test('Employee QR Gun resolves UUID to emp_no and preserves manual employee numbers', async () => {
+    const page = await scannerPage();
+    await page.gunScan(employeeQrPayload);
+    assert.deepEqual(page.lookups[0], { table: 'employees', filters: [['employee_id', employeeUuid]] });
+    assert.equal(page.logs[0].employee_id, employeeUuid);
+    assert.equal(page.logs[0].student_id, null);
+    assert.equal(page.notifications.length, 0);
+
+    const manual = await scannerPage();
+    await manual.lookup('EMP123', 'employee', 'manual');
+    assert.deepEqual(manual.lookups[0], { table: 'employees', filters: [['emp_no', 'EMP123']] });
+    assert.equal(manual.element('personId').value, 'EMP123');
 });
 
 test('manual ID, Search Again, and role switching stay separate from QR lookup', async () => {
