@@ -39,8 +39,9 @@ button:disabled { opacity: .55; cursor: wait; }
 .checkin-panel { flex: 1; display: grid; place-items: center; padding: 40px 28px; background: radial-gradient(#dcebf5 1px, transparent 1px) 0 0 / 22px 22px, #f4f9fd; }
 .checkin-shell { width: min(100%, 440px); }
 .top-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: 12px; }
-.top-actions a { color: var(--blue-dark); background: #fff; text-decoration: none; padding: 8px 12px; border: 1px solid var(--border); border-radius: 99px; font-size: 13px; font-weight: 700; }
-.top-actions a:hover { background: #e8f4ff; }
+.top-actions a, .top-actions button { color: var(--blue-dark); background: #fff; text-decoration: none; padding: 8px 12px; border: 1px solid var(--border); border-radius: 99px; font-size: 13px; font-weight: 700; }
+.top-actions a:hover, .top-actions button:hover { background: #e8f4ff; }
+.top-actions a:focus-visible, .top-actions button:focus-visible { outline: 3px solid #80c7f5b3; outline-offset: 2px; }
 .clock-strip { text-align: center; background: #fff; border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; color: var(--blue-dark); font-size: 13px; font-weight: 700; margin-bottom: 16px; }
 .clock-strip i { color: var(--blue-bright); margin-right: 4px; }
 .checkin-card, .preview-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 18px 45px #0b4e781b; }
@@ -112,4 +113,4 @@ button:disabled { opacity: .55; cursor: wait; }
 .preview-card p.error { color: #b42318; }
 
 @media (max-width: 850px) { body { display: block; } .intro-panel { width: 100%; min-height: auto; padding: 24px; gap: 28px; } .intro-main h1 { margin: 12px 0; } .feature, .intro-footer { display: none; } .checkin-panel { padding: 24px 16px 40px; } }
-@media (max-width: 450px) { .checkin-card { padding: 25px 20px; } .card-bar { margin: -25px -20px 24px; } .button-row { flex-wrap: wrap; } .button-row button { flex-basis: 28%; } .top-actions a { font-size: 12px; } }
+@media (max-width: 450px) { .checkin-card { padding: 25px 20px; } .card-bar { margin: -25px -20px 24px; } .button-row { flex-wrap: wrap; } .button-row button { flex-basis: 28%; } .top-actions a, .top-actions button { font-size: 12px; } }

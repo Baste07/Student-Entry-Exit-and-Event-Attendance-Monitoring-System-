@@ -70,6 +70,12 @@ test('settings Gate Scanner link opens the saved QR or face page directly', () =
     }
 });
 
+test('QR attendance page provides a protected route back to facial recognition', () => {
+    const source = fs.readFileSync(require.resolve('../../EntryExitMonitoring/gate/qrAttendance.html'), 'utf8');
+    assert.match(source, /id="backToFaceRecognition"[^>]*onclick="GateScanRoute\.go\('face'\)"/);
+    assert.match(source, /fa-arrow-left"><\/i>\s*Back to Face Recognition/);
+});
+
 test('QR payload parser accepts student IDs in plain text, JSON and URLs', () => {
     assert.deepEqual(extractGateQrId('K-001'), { id: 'K-001', role: 'student' });
     assert.deepEqual(extractGateQrId('{"stud_id":"10-1234"}'), { id: '10-1234', role: 'student' });
