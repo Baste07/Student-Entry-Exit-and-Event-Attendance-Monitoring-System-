@@ -246,6 +246,20 @@ hr {
 }
 .btn-submit:hover { background: var(--blue-mid); transform: translateY(-1px); box-shadow: 0 5px 16px rgba(11, 78, 120, 0.28); }
 .btn-submit:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+.btn-modal-primary {
+    width: 100%; padding: 11px 20px; border: none; border-radius: 10px;
+    background: var(--blue-dark); color: var(--white); cursor: pointer;
+    font: 700 14px 'Nunito Sans', sans-serif;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 3px 10px rgba(11, 78, 120, 0.2); transition: all 0.2s;
+}
+.btn-modal-primary:hover:not(:disabled) {
+    background: var(--blue-mid); transform: translateY(-1px);
+    box-shadow: 0 5px 16px rgba(11, 78, 120, 0.28);
+}
+.btn-modal-primary:focus-visible { outline: 3px solid var(--blue-bright); outline-offset: 2px; }
+.btn-modal-primary:disabled { background: #ccc; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-modal-primary[hidden] { display: none; }
 .face-employee-result {
     margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--border);
     border-radius: 8px; background: var(--surface); color: var(--text-body);
