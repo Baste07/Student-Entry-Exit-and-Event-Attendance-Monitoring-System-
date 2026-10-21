@@ -22,8 +22,15 @@ body { margin: 0; font-family: 'Nunito Sans', sans-serif; background: #fff; colo
 .header-titles p, .section-heading p, .chart-card-head p { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
 .page-actions, .filter-actions, .detail-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 button { font-family: 'Nunito Sans', sans-serif; }
-.btn-report, .btn-generate, .btn-reset { border: 0; border-radius: 9px; padding: 10px 15px; color: #fff; font-size: 13px; font-weight: 800; cursor: pointer; }
-.btn-report.excel { background: #059669; }.btn-report.pdf { background: #dc2626; }
+.btn-report { border: 1px solid var(--border); border-radius: 8px; padding: 8px 13px; background: var(--surface); color: var(--blue-dark); font: 700 12px 'Nunito Sans', sans-serif; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: background .2s ease, transform .2s ease, box-shadow .2s ease; }
+.btn-report:hover:not(:disabled) { background: var(--hover-bg); transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn-report.excel { background: #ecfdf5; color: #15803d; border-color: #bbf7d0; }
+.btn-report.excel:hover:not(:disabled) { background: #dcfce7; }
+.btn-report.pdf { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.btn-report.pdf:hover:not(:disabled) { background: #fee2e2; }
+.btn-report:focus-visible { outline: 3px solid var(--blue-bright); outline-offset: 2px; }
+.btn-report:disabled { opacity: .52; cursor: not-allowed; }
+.btn-generate, .btn-reset { border: 0; border-radius: 9px; padding: 10px 15px; color: #fff; font-size: 13px; font-weight: 800; cursor: pointer; }
 .btn-generate { background: var(--blue-dark); }.btn-generate:hover { background: var(--blue-mid); }
 .btn-reset { background: #e5eff7; color: var(--blue-dark); }.btn-reset:hover { background: #d7e9f5; }
 button:disabled { opacity: .52; cursor: not-allowed; }

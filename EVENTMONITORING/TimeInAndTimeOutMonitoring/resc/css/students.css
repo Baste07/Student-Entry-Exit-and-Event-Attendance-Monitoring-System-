@@ -201,26 +201,33 @@ hr {
 }
 
 .btn-report { 
-    padding: 9px 18px; 
-    background: #e0f2fe;
-    color: #0b4e78;
-    border: 1.5px solid #bae6fd;
-    border-radius: 8px; 
-    font-size: 13.5px; 
-    font-weight: 800; 
-    cursor: pointer; 
-    display: inline-flex; 
-    align-items: center; 
-    gap: 8px; 
-    transition: all .2s ease; 
-    font-family: 'Nunito Sans', sans-serif; 
-    margin-left: auto;
+    padding: 8px 13px;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    background: #ecfdf5;
+    color: #15803d;
+    font: 700 12px 'Nunito Sans', sans-serif;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
 }
 
-.btn-report:hover { 
-    background: #bae6fd;
-    transform: translateY(-2px); 
-    box-shadow: 0 4px 12px rgba(11, 78, 120, 0.15);
+.btn-report:hover:not(:disabled) {
+    background: #dcfce7;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-report:focus-visible {
+    outline: 3px solid var(--blue-bright);
+    outline-offset: 2px;
+}
+
+.btn-report:disabled {
+    opacity: .5;
+    cursor: not-allowed;
 }
 
 .btn-add {
@@ -241,8 +248,26 @@ hr {
 .btn-add:hover         { background: #0a3d5e; transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .btn-add--dark         { background: #0a3d5e; }
 .btn-add--dark:hover   { background: #082e47; }
-.btn-add--amber        { background: #d97706; }
-.btn-add--amber:hover  { background: #b45309; }
+.btn-add--amber {
+    padding: 8px 13px;
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
+    background: #fff7ed;
+    color: #b45309;
+    font: 700 12px 'Nunito Sans', sans-serif;
+    gap: 6px;
+    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.btn-add--amber:hover:not(:disabled) {
+    background: #ffedd5;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+.btn-add--amber:focus-visible {
+    outline: 3px solid #fdba74;
+    outline-offset: 2px;
+}
+.btn-add--amber:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ===============================
    Controls / Filters Card

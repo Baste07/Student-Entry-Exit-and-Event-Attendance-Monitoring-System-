@@ -72,6 +72,40 @@ hr {
 .btn-add:hover { background: var(--blue-mid); transform: translateY(-1px); }
 .export-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
 .export-actions .btn-add { margin-left: 0; }
+.export-actions .btn-add.btn-export-csv,
+.export-actions .btn-add.btn-export-pdf {
+    padding: 8px 13px;
+    border: 1px solid;
+    border-radius: 8px;
+    font: 700 12px 'Nunito Sans', sans-serif;
+    gap: 6px;
+    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.export-actions .btn-add.btn-export-csv {
+    background: #ecfdf5;
+    color: #15803d;
+    border-color: #bbf7d0;
+}
+.export-actions .btn-add.btn-export-csv:hover {
+    background: #dcfce7;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+.export-actions .btn-add.btn-export-pdf {
+    background: #fef2f2;
+    color: #dc2626;
+    border-color: #fecaca;
+}
+.export-actions .btn-add.btn-export-pdf:hover {
+    background: #fee2e2;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+.export-actions .btn-add.btn-export-csv:focus-visible,
+.export-actions .btn-add.btn-export-pdf:focus-visible {
+    outline: 3px solid var(--blue-bright);
+    outline-offset: 2px;
+}
 
 .controls-card {
     background: var(--white); border-radius: var(--radius-lg);
@@ -88,9 +122,10 @@ hr {
 /* Updated grid: now 7 columns to accommodate userTypeFilter */
 .table-controls {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr auto;
+    grid-template-columns: minmax(0, 2fr) repeat(5, minmax(0, 1fr)) auto;
     gap: 14px; align-items: end;
 }
+.table-controls > .control-group { min-width: 0; }
 .control-group { display: flex; flex-direction: column; gap: 5px; }
 .control-group label {
     font-size: 11px; font-weight: 700; text-transform: uppercase;
@@ -100,20 +135,22 @@ hr {
 .control-group select {
     padding: 9px 12px; border: 1.5px solid var(--border);
     border-radius: 8px; font-size: 13.5px; color: var(--text-dark);
-    background: var(--surface); font-family: 'Nunito Sans', sans-serif;
+    background: var(--white); font-family: 'Nunito Sans', sans-serif;
     transition: border-color .2s;
 }
 .control-group input:focus,
 .control-group select:focus { outline: none; border-color: var(--blue-mid); background: var(--white); }
 
 .btn-clear {
-    padding: 9px 16px; border: 1.5px solid var(--border);
-    border-radius: 8px; background: var(--white); color: var(--text-muted);
+    height: 40px; padding: 0 16px;
+    border: 1.5px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--text-body);
     font-size: 13px; font-weight: 600; cursor: pointer;
     display: inline-flex; align-items: center; gap: 6px;
-    transition: all .2s; font-family: 'Nunito Sans', sans-serif;
+    transition: all .18s; font-family: 'Nunito Sans', sans-serif;
+    white-space: nowrap;
 }
-.btn-clear:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+.btn-clear:hover { background: #e8f4fc; border-color: var(--blue-bright); }
 
 .table-container { overflow-x: auto; border-radius: var(--radius-lg); border: 1.5px solid var(--border); }
 .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -203,15 +240,16 @@ hr {
 
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 1200px) {
-    .table-controls { grid-template-columns: 2fr 1fr 1fr 1fr; }
+    .table-controls { grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 1100px) {
-    .table-controls { grid-template-columns: 1fr 1fr 1fr; }
+    .table-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .table-controls > .control-group:last-child { grid-column: 1 / -1; }
 }
 @media (max-width: 900px) {
     .main-content { margin-left: 0; margin-top: 0; }
     .container { padding: 20px 16px; }
-    .table-controls { grid-template-columns: 1fr 1fr; }
+    .table-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
     .table-controls { grid-template-columns: 1fr; }

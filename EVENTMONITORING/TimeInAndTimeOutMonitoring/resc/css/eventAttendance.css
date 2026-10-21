@@ -121,12 +121,19 @@ hr {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    transition: background .2s ease, transform .2s ease;
+    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
 }
-.btn-report:hover:not(:disabled) { background: var(--hover-bg); transform: translateY(-1px); }
+.btn-report:hover:not(:disabled) {
+    background: var(--hover-bg);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+.btn-report.excel { background: #ecfdf5; color: #15803d; border-color: #bbf7d0; }
+.btn-report.excel:hover:not(:disabled) { background: #dcfce7; }
 .btn-report.pdf { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
 .btn-report.pdf:hover:not(:disabled) { background: #fee2e2; }
 .btn-report:disabled { opacity: .5; cursor: not-allowed; }
+.btn-report:focus-visible { outline: 3px solid var(--blue-bright); outline-offset: 2px; }
 
 .selector-body {
     display: flex;

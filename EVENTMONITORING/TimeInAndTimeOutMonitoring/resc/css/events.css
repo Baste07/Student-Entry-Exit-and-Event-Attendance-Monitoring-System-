@@ -77,12 +77,29 @@ hr { border: 0; height: 2px; background: linear-gradient(90deg, var(--blue-dark)
 
 /* Add Button */
 .btn-add {
-    background: var(--blue-dark); color: var(--white); padding: 10px 20px; border: none;
-    border-radius: 8px; font-size: 13.5px; font-weight: 700; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;
-    font-family: 'Nunito Sans', sans-serif; margin-left: auto;
+    padding: 8px 13px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--blue-dark);
+    font: 700 12px 'Nunito Sans', sans-serif;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+    margin-left: auto;
 }
-.btn-add:hover { background: var(--blue-mid); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.btn-add:hover:not(:disabled) {
+    background: var(--hover-bg);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+.btn-add:focus-visible {
+    outline: 3px solid var(--blue-bright);
+    outline-offset: 2px;
+}
+.btn-add:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Filters Panel */
 .controls-card {

@@ -71,11 +71,22 @@ hr {
     width: 100%; min-width: 0;
     padding: 9px 12px; border: 1.5px solid var(--border);
     border-radius: 8px; font-size: 13.5px; color: var(--text-dark);
-    background: var(--surface); font-family: 'Nunito Sans', sans-serif;
+    background: var(--white); font-family: 'Nunito Sans', sans-serif;
     transition: border-color .2s;
 }
 .control-group input:focus,
 .control-group select:focus { outline: none; border-color: var(--blue-mid); background: var(--white); }
+.btn-clear {
+    height: 40px; padding: 0 16px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    background: var(--surface); color: var(--text-body);
+    border: 1.5px solid var(--border); border-radius: 8px;
+    font: 600 13px 'Nunito Sans', sans-serif;
+    cursor: pointer; white-space: nowrap;
+    transition: all .18s;
+}
+.btn-clear:hover { background: #e8f4fc; border-color: var(--blue-bright); }
+.btn-clear:disabled { opacity: .55; cursor: not-allowed; }
 .control-group select:disabled { opacity: .55; cursor: not-allowed; }
 .report-actions { flex-direction: row; align-items: flex-end; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 
@@ -88,31 +99,35 @@ select:focus-visible {
 }
 
 .btn-generate {
-    padding: 10px 18px; background: var(--blue-dark); color: var(--white);
-    border: none; border-radius: 8px; font-size: 13.5px; font-weight: 700;
+    padding: 8px 13px; background: var(--surface); color: var(--blue-dark);
+    border: 1px solid var(--border); border-radius: 8px; font: 700 12px 'Nunito Sans', sans-serif;
     cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
-    transition: background .2s; font-family: 'Nunito Sans', sans-serif;
+    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
     white-space: nowrap;
 }
-.btn-generate:hover { background: var(--blue-mid); }
+.btn-generate:hover:not(:disabled) { background: var(--hover-bg, #e8f4fc); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 
 .btn-export-pdf {
-    padding: 10px 14px; background: #dc2626; color: var(--white);
-    border: none; border-radius: 8px; font-size: 13px; font-weight: 700;
+    padding: 8px 13px; background: #fef2f2; color: #dc2626;
+    border: 1px solid #fecaca; border-radius: 8px; font: 700 12px 'Nunito Sans', sans-serif;
     cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
-    transition: background .2s; font-family: 'Nunito Sans', sans-serif;
+    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
     white-space: nowrap;
 }
-.btn-export-pdf:hover { background: #b91c1c; }
+.btn-export-pdf:hover:not(:disabled) { background: #fee2e2; transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 
 .btn-export-csv {
-    padding: 10px 14px; background: #059669; color: var(--white);
-    border: none; border-radius: 8px; font-size: 13px; font-weight: 700;
+    padding: 8px 13px; background: #ecfdf5; color: #15803d;
+    border: 1px solid #bbf7d0; border-radius: 8px; font: 700 12px 'Nunito Sans', sans-serif;
     cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
-    transition: background .2s; font-family: 'Nunito Sans', sans-serif;
+    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
     white-space: nowrap;
 }
-.btn-export-csv:hover { background: #047857; }
+.btn-export-csv:hover:not(:disabled) { background: #dcfce7; transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.btn-export-pdf:focus-visible,
+.btn-export-csv:focus-visible { outline: 3px solid var(--blue-bright); outline-offset: 2px; }
+.btn-export-pdf:disabled,
+.btn-export-csv:disabled { opacity: .5; cursor: not-allowed; }
 
 .panel {
     background: var(--white); border-radius: var(--radius-lg);
