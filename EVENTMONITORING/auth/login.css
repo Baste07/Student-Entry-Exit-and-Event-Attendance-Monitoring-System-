@@ -441,6 +441,11 @@ body {
     }
 
     .auth-hero {
+        order: 1;
+        justify-content: center;
+    }
+
+    .auth-panel {
         order: 2;
     }
 

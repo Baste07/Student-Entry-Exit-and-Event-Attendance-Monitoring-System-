@@ -44,6 +44,15 @@
                     <span class="stat-badge active"><i class="fa-solid fa-circle-check"></i> <span id="badgeActive">0</span> Active</span>
                     <span class="stat-badge inactive"><i class="fa-solid fa-circle-xmark"></i> <span id="badgeInactive">0</span> Inactive</span>
                 </div>
+
+                <div class="header-actions">
+                    <button type="button" class="btn-report" onclick="downloadTeacherReport()">
+                        <i class="fa-solid fa-file-lines" aria-hidden="true"></i> Generate Report
+                    </button>
+                    <button type="button" class="btn-add btn-add--amber" data-local-operation onclick="openFaceRegModal()">
+                        <i class="fa-solid fa-camera"></i> Register Face
+                    </button>
+                </div>
             </div>
             <hr>
 
@@ -114,6 +123,26 @@
 
         </div>
     </main>
+
+    <div id="faceRegModal" class="modal" onclick="if(event.target === this) closeFaceRegModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-user-plus"></i> Register Employee Face</h2>
+                <button type="button" class="close-modal" aria-label="Close" onclick="closeFaceRegModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="faceEmployeeNumber">Employee Number</label>
+                <input type="text" id="faceEmployeeNumber" placeholder="Enter employee number" autocomplete="off">
+            </div>
+            <div id="faceEmployeeResult" class="face-employee-result" hidden></div>
+            <button type="button" id="faceEmployeeSearchButton" class="btn-modal-primary" onclick="searchEmployeeForFace()">
+                <i class="fa-solid fa-magnifying-glass"></i> Find Employee
+            </button>
+            <button type="button" id="faceEmployeeContinueButton" class="btn-modal-primary" data-local-operation onclick="continueToFaceRegistration()" hidden>
+                <i class="fa-solid fa-camera"></i> Continue to Face Registration
+            </button>
+        </div>
+    </div>
 
     <!-- Toast -->
     <div class="toast" id="toast">
