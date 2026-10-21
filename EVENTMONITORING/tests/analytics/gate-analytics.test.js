@@ -149,7 +149,11 @@ test('dashboard and report pages reference existing assets and unique element ID
         const version = html.match(new RegExp(`data-${marker}="([^"]+)"`))?.[1];
         assert.ok(version, `${file} is missing its cache version`);
         assert.ok(html.includes(`gate-analytics.js?v=${version}`));
-        assert.ok(html.includes(`${file === 'dashboard.html' ? 'dashboard' : 'reports'}.js?v=${version}`));
+        const scriptName = file === 'dashboard.html' ? 'dashboard' : 'reports';
+        assert.ok(html.includes(`${scriptName}.js?v=${version}`));
+        const script = fs.readFileSync(path.join(__dirname, '../../EntryExitMonitoring/resc/js', `${scriptName}.js`), 'utf8');
+        const datasetProperty = file === 'dashboard.html' ? 'gateDashboardVersion' : 'gateReportsVersion';
+        assert.ok(script.includes(`dataset.${datasetProperty} !== '${version}'`), `${file} and ${scriptName}.js cache versions differ`);
     }
 });
 
