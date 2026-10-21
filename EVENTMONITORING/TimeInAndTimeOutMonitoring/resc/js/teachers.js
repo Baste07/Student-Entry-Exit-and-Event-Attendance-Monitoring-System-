@@ -142,6 +142,109 @@ function bindEvents() {
     });
 }
 
+function downloadTeacherReport() {
+    const columns = [
+        ['Employee ID', 'emp_no'],
+        ['Last Name', 'last_name'],
+        ['First Name', 'first_name'],
+        ['Middle Name', 'middle_name'],
+        ['Suffix', 'suffix'],
+        ['Faculty', 'faculty'],
+        ['Phone Number', 'phone_number'],
+        ['Email', 'email'],
+        ['Role', 'role'],
+        ['Status', 'status']
+    ];
+    const csvEscape = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const csv = [
+        columns.map(([heading]) => csvEscape(heading)).join(','),
+        ...allTeachers.map(teacher => columns.map(([, key]) => csvEscape(teacher[key] || '')).join(','))
+    ].join('\r\n');
+    const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `employees-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+}
+
+function openFaceRegModal() {
+    const modal = document.getElementById('faceRegModal');
+    const searchInput = document.getElementById('faceEmployeeNumber');
+    const result = document.getElementById('faceEmployeeResult');
+    const continueButton = document.getElementById('faceEmployeeContinueButton');
+    result.hidden = true;
+    result.textContent = '';
+    continueButton.hidden = true;
+    modal.classList.add('active');
+    searchInput.focus();
+}
+
+function closeFaceRegModal() {
+    const modal = document.getElementById('faceRegModal');
+    modal.classList.remove('active');
+    document.getElementById('faceEmployeeNumber').value = '';
+    document.getElementById('faceEmployeeResult').hidden = true;
+    document.getElementById('faceEmployeeContinueButton').hidden = true;
+}
+
+async function searchEmployeeForFace() {
+    const input = document.getElementById('faceEmployeeNumber');
+    const searchButton = document.getElementById('faceEmployeeSearchButton');
+    const result = document.getElementById('faceEmployeeResult');
+    const continueButton = document.getElementById('faceEmployeeContinueButton');
+    const employeeNumber = input.value.trim();
+
+    result.hidden = true;
+    continueButton.hidden = true;
+    if (!employeeNumber) {
+        showToast('Enter an employee number to continue.', true);
+        input.focus();
+        return;
+    }
+
+    searchButton.disabled = true;
+    searchButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching...';
+    try {
+        const { data: employee, error } = await supabaseClient
+            .from('employees')
+            .select('emp_no, first_name, middle_name, last_name, suffix')
+            .eq('emp_no', employeeNumber)
+            .maybeSingle();
+        if (error) throw error;
+        if (!employee) {
+            result.textContent = 'No employee was found with that employee number.';
+            result.hidden = false;
+            return;
+        }
+
+        result.innerHTML = `<strong>${escHtml(employee.emp_no)}</strong> — ${escHtml([
+            employee.first_name, employee.middle_name, employee.last_name, employee.suffix
+        ].filter(Boolean).join(' '))}`;
+        result.hidden = false;
+        continueButton.dataset.employeeNumber = employee.emp_no;
+        continueButton.hidden = false;
+    } catch (error) {
+        console.error('Employee lookup for face registration failed:', error);
+        showToast('Could not search for the employee. Please try again.', true);
+    } finally {
+        searchButton.disabled = false;
+        searchButton.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Find Employee';
+    }
+}
+
+function continueToFaceRegistration() {
+    const employeeNumber = document.getElementById('faceEmployeeContinueButton').dataset.employeeNumber;
+    if (!employeeNumber) {
+        showToast('Search for an employee before continuing.', true);
+        return;
+    }
+    window.location.href = `../students/accountRegistration.html?role=professor&employee_id=${encodeURIComponent(employeeNumber)}`;
+}
+
 // ══════════════════════════════════════════════════════════
 // UI HELPERS
 // ══════════════════════════════════════════════════════════
