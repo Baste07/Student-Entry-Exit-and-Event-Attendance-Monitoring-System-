@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '../..');
 const source = fs.readFileSync(path.join(root, 'TimeInAndTimeOutMonitoring/resc/js/events.js'), 'utf8');
 const targets = require(path.join(root, 'shared/event-targets.js'));
+const scheduleConflicts = require(path.join(root, 'shared/event-schedule-conflicts.js'));
 const migration = fs.readFileSync(path.join(root, 'database/migrations/20261016_event_grade_section_targets.sql'), 'utf8');
 const year = '00000000-0000-4000-8000-000000000001';
 const sectionA = '00000000-0000-4000-8000-000000000011';
@@ -20,7 +21,7 @@ function page() {
     const element = id => {
         if (!elements.has(id)) elements.set(id, {
             value: '', innerHTML: '', textContent: '', checked: false, style: {},
-            classList: { add() {}, remove() {}, contains() { return false; } },
+            classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
             setAttribute() {}, removeAttribute() {}, scrollIntoView() {},
             querySelectorAll() { return []; },
             querySelector() { return { disabled: false, innerHTML: '' }; },
@@ -29,7 +30,13 @@ function page() {
         return elements.get(id);
     };
     const client = {
-        rpc: async (name, args) => { calls.push({ kind: 'rpc', name, args }); return { data: name === 'save_grade_targeted_event' ? 'event-new' : [], error: null }; },
+        rpc: (name, args) => {
+            calls.push({ kind: 'rpc', name, args });
+            if (name === 'preview_event_grade_participants') {
+                return { order() { return this; }, range: async () => ({ data: [], error: null }) };
+            }
+            return Promise.resolve({ data: 'event-new', error: null });
+        },
         from: name => ({
             update: value => ({ eq: async () => { calls.push({ kind: 'update', name, value }); return { error: null }; } }),
         }),
@@ -40,6 +47,7 @@ function page() {
             body: { style: {} },
         },
         supabaseClient: client, EventTargets: targets,
+        EventScheduleConflicts: scheduleConflicts,
         UIFeedback: { error: message => calls.push({ kind: 'error', message }) },
         setInterval() {}, console,
     });
@@ -96,6 +104,8 @@ test('new normalized grade Event uses only atomic save RPC and no independent ta
     element('isMultiDay').checked = false;
     vm.runInContext(`selectedGrades.add('Grade 1'); gradeSectionTargets.set('Grade 1',null);
         validateLive = () => true; clearValidationError = () => {}; hideOverlapWarning = () => {};
+        fetchScheduleEvents = async () => [];
+        fetchOverlappingRosters = async () => currentEventParticipants;
         closeModal = () => {}; loadEvents = async () => {}; showToast = () => {};
         getManilaNow = () => new Date('2026-10-16T09:00:00');`, context);
     await element('eventForm').submit.call(element('eventForm'), { preventDefault() {} });
@@ -131,6 +141,8 @@ test('legacy grade Event with participant rows stays grade mode and preserves it
         loadGradeLevels = async () => {};
         loadEventParticipants = async () => { currentEventParticipants = [{student_id:'student-1'}]; };
         validateLive = () => true; clearValidationError = () => {}; hideOverlapWarning = () => {};
+        fetchScheduleEvents = async () => [];
+        fetchOverlappingRosters = async () => currentEventParticipants;
         closeModal = () => {}; loadEvents = async () => {}; showToast = () => {};
         getManilaNow = () => new Date('2026-10-16T09:00:00');
     `, context);

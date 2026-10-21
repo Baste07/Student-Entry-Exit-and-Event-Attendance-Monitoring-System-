@@ -308,11 +308,6 @@ form { padding: 22px 26px 26px; }
 .overlap-warning i { font-size: 24px; color: var(--yellow); flex-shrink: 0; }
 .overlap-warning strong { display: block; margin-bottom: 4px; font-weight: 700; }
 .overlap-warning p { margin: 0; font-size: 14px; line-height: 1.5; }
-.overlap-warning label {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
-}
-.overlap-warning input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--yellow); }
 
 /* ═══════════════════════════════════════════════════════════
    NEW: Multi-day Event, Cascading Dropdowns, Student Modal
@@ -510,6 +505,16 @@ form { padding: 22px 26px 26px; }
     .selection-toolbar { flex-wrap: wrap; }
     .selection-count { margin-left: 0; width: 100%; margin-top: 8px; }
 }
+@media(max-width: 700px) {
+    .main-content { margin-top: 0; }
+    #header-container .header-right {
+        width: 100%;
+        min-width: 0;
+        flex-shrink: 1;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+}
 
 /* ═══════════════════════════════════════════════════════════
    MULTI-SELECT DROPDOWN
@@ -674,7 +679,13 @@ form { padding: 22px 26px 26px; }
 .grade-section-group summary span { margin-left: 8px; color: var(--text-muted); font-weight: 400; }
 .grade-section-options { padding: 0 12px 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 7px; }
 .grade-section-options label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
-.grade-section-options input { accent-color: var(--blue-bright); }
+.grade-section-options input {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    margin: 0;
+    accent-color: var(--blue-bright);
+}
 
 /* ═══════════════════════════════════════════════════════════
    LARGER MODAL
@@ -832,20 +843,19 @@ form { padding: 22px 26px 26px; }
     line-height: 1.5;
 }
 
-.overlap-warning label {
-    display: flex;
+.location-conflict-badge {
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-bottom: 6px;
-}
-
-.overlap-warning input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    accent-color: #f59e0b;
+    gap: 5px;
+    margin-top: 5px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid #f59e0b;
+    background: #fef3c7;
+    color: #78350f;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
 /* Student actions row */

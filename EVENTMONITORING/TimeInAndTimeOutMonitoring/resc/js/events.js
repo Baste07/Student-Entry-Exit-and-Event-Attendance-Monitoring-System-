@@ -242,6 +242,8 @@ function renderTable(rows) {
         return;
     }
 
+    // Derive badges from the full loaded list, including events hidden by filters.
+    const locationConflictIds = EventScheduleConflicts.locationConflictIds(allEvents);
     tbody.innerHTML = rows.map(ev => {
         const typeColor = typeColors[ev.event_type] || '#6b7280';
         const status = computeEventStatus(ev);
@@ -263,7 +265,10 @@ function renderTable(rows) {
 
         return `
         <tr data-type="${escHtml(ev.event_type || '')}" data-status="${status}">
-            <td><span class="primary-cell">${escHtml(ev.event_name || '')}</span></td>
+            <td>
+                <span class="primary-cell">${escHtml(ev.event_name || '')}</span>
+                ${locationConflictIds.has(ev.event_id) ? '<span class="location-conflict-badge" title="Another event uses this location during an overlapping time"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Location Conflict</span>' : ''}
+            </td>
             <td>${dateLabel}</td>
             <td>${timeLabel}</td>
             <td><span class="badge" style="background:${typeColor}20;color:${typeColor}">${escHtml(ev.event_type || '—')}</span></td>
@@ -299,7 +304,6 @@ function formatTime(t) {
 document.getElementById('eventForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     clearValidationError();
-    hideOverlapWarning();
 
     const eventId = document.getElementById('eventId').value.trim();
     const eventName = document.getElementById('eventName').value.trim();
@@ -350,6 +354,7 @@ document.getElementById('eventForm').addEventListener('submit', async function (
     const orig = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+    let scheduleChecked = false;
 
     try {
         const now = getManilaNow();
@@ -376,6 +381,14 @@ document.getElementById('eventForm').addEventListener('submit', async function (
             status: initialStatus,
             description: description || null,
         };
+
+        // Refresh both schedules and rosters before saving. The visible list may
+        // be stale if another Admin created or edited an Event in another tab.
+        const scheduleApproved = await reviewScheduleBeforeSave(
+            { ...payload, event_id: eventId || null }, participantMode, editingTargetKind
+        );
+        scheduleChecked = true;
+        if (!scheduleApproved) return;
 
         if (participantMode === 'grade' && editingTargetKind !== 'legacy-grade') {
             if (!applicableSchoolYear) throw new Error('Select an applicable school year before saving.');
@@ -427,13 +440,15 @@ document.getElementById('eventForm').addEventListener('submit', async function (
         }
 
         showToast(isEdit ? 'Event updated successfully!' : 'Event added successfully!');
-        btn.disabled = false;
-        btn.innerHTML = orig;
         closeModal();
         await loadEvents();
     } catch (err) {
         console.error('Save event error:', err);
-        showValidationError(err.message || 'An error occurred. Please try again.');
+        showValidationError((scheduleChecked
+            ? 'The Event could not be saved. '
+            : 'The Event schedule or participants could not be checked. Nothing was saved. ') +
+            (err.message || 'Please try again.'));
+    } finally {
         btn.disabled = false;
         btn.innerHTML = orig;
     }
@@ -969,54 +984,146 @@ async function loadEventParticipants(eventId) {
 }
 
 // ══════════════════════════════════════════════════════════
-// OVERLAP DETECTION
+// EVENT SCHEDULE REVIEW
 // ══════════════════════════════════════════════════════════
 
-function checkEventOverlap(eventDate, eventEndDate, timeStart, timeEnd, excludeEventId = null) {
-    if (!eventDate || !timeStart || !timeEnd) return [];
-    const ourEnd = eventEndDate || eventDate;
-
-    return allEvents.filter(event => {
-        if (excludeEventId && event.event_id === excludeEventId) return false;
-        if (event.status === 'cancelled') return false;
-        if (!event.time_start || !event.time_end) return false;
-
-        const existingEnd = event.end_date || event.event_date;
-        const dateOverlap = eventDate <= existingEnd && ourEnd >= event.event_date;
-        const timeOverlap = timeStart < event.time_end && timeEnd > event.time_start;
-
-        return dateOverlap && timeOverlap;
-    });
+function formatEventSchedule(event) {
+    const formatDate = date => new Date(date + 'T00:00:00')
+        .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const dates = event.end_date && event.end_date !== event.event_date
+        ? `${formatDate(event.event_date)} – ${formatDate(event.end_date)}`
+        : formatDate(event.event_date);
+    const times = event.time_start && event.time_end
+        ? `${formatTime(event.time_start)} – ${formatTime(event.time_end)}`
+        : 'All day';
+    return `${dates} • ${times}`;
 }
 
-function showOverlapWarning(overlappingEvents) {
+function showOverlapWarning(events) {
     const warningDiv = document.getElementById('overlapWarning');
     const detailsDiv = document.getElementById('overlapDetails');
-    if (!warningDiv || !detailsDiv) return false;
-
-    if (!overlappingEvents || overlappingEvents.length === 0) {
-        warningDiv.style.display = 'none';
-        return false;
-    }
-
-    const eventsList = overlappingEvents.map(e => {
-        const timeStr = e.time_start && e.time_end
-            ? `${formatTime(e.time_start)} - ${formatTime(e.time_end)}`
-            : 'All day';
-        const loc = e.location ? ` at ${escHtml(e.location)}` : '';
-        return `<strong>${escHtml(e.event_name)}</strong> (${timeStr}${loc})`;
-    }).join('<br>');
-
-    detailsDiv.innerHTML = eventsList;
-    warningDiv.style.display = 'flex';
-    return true;
+    if (!warningDiv || !detailsDiv) return;
+    detailsDiv.innerHTML = events.map(event =>
+        `<strong>${escHtml(event.event_name)}</strong> — ${escHtml(formatEventSchedule(event))} at ${escHtml(event.location)}`
+    ).join('<br>');
+    warningDiv.classList.toggle('active', events.length > 0);
 }
 
 function hideOverlapWarning() {
     const warningDiv = document.getElementById('overlapWarning');
-    if (warningDiv) warningDiv.style.display = 'none';
-    const confirmBox = document.getElementById('confirmOverlap');
-    if (confirmBox) confirmBox.checked = false;
+    if (warningDiv) warningDiv.classList.remove('active');
+}
+
+async function fetchScheduleEvents(candidate) {
+    // Fetch once per page, never once per event. Re-read at submit so a second
+    // Admin's changes are considered even if this page has been open awhile.
+    const rows = [];
+    const pageSize = 500;
+    const lastDate = candidate.end_date || candidate.event_date;
+    for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabaseClient.from('events')
+            .select('event_id,event_name,event_date,end_date,time_start,time_end,location,status')
+            .lte('event_date', lastDate)
+            .or(`end_date.gte.${candidate.event_date},and(end_date.is.null,event_date.gte.${candidate.event_date})`)
+            .neq('status', 'cancelled')
+            .order('event_date', { ascending: true })
+            .order('event_id', { ascending: true })
+            .range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        const page = data || [];
+        rows.push(...page);
+        if (page.length < pageSize) break;
+    }
+    return EventScheduleConflicts.overlappingEvents(candidate, rows, candidate.event_id);
+}
+
+async function fetchOverlappingRosters(events) {
+    const rows = [];
+    const eventIds = events.map(event => event.event_id);
+    const pageSize = 500;
+    for (let start = 0; start < eventIds.length; start += 50) {
+        const batch = eventIds.slice(start, start + 50);
+        for (let offset = 0; ; offset += pageSize) {
+            const { data, error } = await supabaseClient.from('event_participants')
+                .select('event_id,student_id')
+                .in('event_id', batch)
+                .order('event_id', { ascending: true })
+                .order('student_id', { ascending: true })
+                .range(offset, offset + pageSize - 1);
+            if (error) throw error;
+            const page = data || [];
+            rows.push(...page);
+            if (page.length < pageSize) break;
+        }
+    }
+    return rows;
+}
+
+async function resolveSelectedStudentIds(participantMode, targetKind, eventId) {
+    if (participantMode === 'individual') return [...selectedStudentIds];
+    if (targetKind === 'legacy-grade') {
+        // Legacy targeting is metadata-only on edit; its actual saved roster
+        // remains authoritative. Re-read it in case another Admin changed it
+        // after the edit form opened.
+        const rows = await fetchOverlappingRosters([{ event_id: eventId }]);
+        return rows.map(row => row.student_id);
+    }
+    if (!applicableSchoolYear) throw new Error('The applicable school year is unavailable.');
+    const students = new Set();
+    const rules = getNormalizedRules();
+    const pageSize = 500;
+    for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabaseClient.rpc('preview_event_grade_participants', {
+            p_school_year_id: applicableSchoolYear.id,
+            p_targets: rules,
+            p_event_id: eventId || null,
+        }).order('student_id', { ascending: true }).range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        const page = data || [];
+        page.forEach(row => students.add(row.student_id));
+        if (page.length < pageSize) break;
+    }
+    return [...students];
+}
+
+async function reviewScheduleBeforeSave(candidate, participantMode, targetKind) {
+    // This is an Admin UI preflight, not an atomic database constraint: direct
+    // or concurrent Supabase writes can still create participant conflicts.
+    const [overlapping, selectedIds] = await Promise.all([
+        fetchScheduleEvents(candidate),
+        resolveSelectedStudentIds(participantMode, targetKind, candidate.event_id),
+    ]);
+    const rosters = selectedIds.length && overlapping.length
+        ? await fetchOverlappingRosters(overlapping) : [];
+    const participantMatches = EventScheduleConflicts.participantConflicts(
+        selectedIds, overlapping, rosters
+    );
+    if (participantMatches.length) {
+        // A participant conflict blocks saving, so the informational location
+        // warning must not imply that "Create Anyway" could override it.
+        hideOverlapWarning();
+        const count = new Set(participantMatches.flatMap(match => [...match.studentIds])).size;
+        await UIFeedback.error(
+            `${count} selected participant${count === 1 ? ' is' : 's are'} already assigned to another overlapping event. Change the participants or schedule before saving.`,
+            'Participant Schedule Conflict'
+        );
+        return false;
+    }
+
+    const locationMatches = EventScheduleConflicts.locationConflicts(candidate, overlapping);
+    showOverlapWarning(locationMatches);
+    if (!locationMatches.length) return true;
+    const first = locationMatches[0];
+    const others = locationMatches.length > 1
+        ? ` (${locationMatches.length - 1} more location conflict${locationMatches.length === 2 ? '' : 's'})`
+        : '';
+    return UIFeedback.confirm({
+        title: 'Heads Up: Location Conflict',
+        type: 'warning',
+        message: `Another event is scheduled at this location during the selected time. ${first.event_name}${others}. Location: ${first.location}. Schedule: ${formatEventSchedule(first)}. You may still ${candidate.event_id ? 'update' : 'create'} this event.`,
+        cancelText: 'Review Schedule',
+        confirmText: candidate.event_id ? 'Update Anyway' : 'Create Anyway',
+    });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1171,7 +1278,6 @@ function validateLive() {
     document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
 
     const eventId = document.getElementById('eventId').value;
-    const eventName = document.getElementById('eventName').value.trim();
     const eventDate = document.getElementById('eventDate').value;
     const isMultiDay = document.getElementById('isMultiDay').checked;
     const eventEndDate = document.getElementById('eventEndDate').value;
@@ -1208,51 +1314,22 @@ function validateLive() {
         }
     }
 
-    // 3) Duplicate event — same name landing on the same date
-    if (!error && eventName && eventDate) {
-        const isDuplicate = allEvents.some(ev =>
-            ev.event_id !== eventId &&
-            (ev.event_name || '').trim().toLowerCase() === eventName.toLowerCase() &&
-            (ev.event_date === eventDate || (ev.end_date && eventDate >= ev.event_date && eventDate <= ev.end_date))
-        );
-        if (isDuplicate) {
-            error = { field: 'eventName', msg: `An event named "${eventName}" is already scheduled on this date` };
-        }
+    // Names alone are not unique: two distinct groups may schedule events with
+    // the same name. The participant/schedule check runs before either save.
+    // Immediate, informational location feedback. The fresh roster check
+    // and final warning confirmation happen on submit.
+    if (eventDate) {
+        showOverlapWarning(EventScheduleConflicts.locationConflicts({
+            event_date: eventDate,
+            end_date: isMultiDay ? eventEndDate : null,
+            time_start: timeStart || null,
+            time_end: timeEnd || null,
+            location: document.getElementById('location').value,
+            status: 'upcoming',
+        }, allEvents, eventId));
+    } else {
+        hideOverlapWarning();
     }
-
-    // 4) Overlapping schedule
-    const warningDiv = document.getElementById('overlapWarning');
-    let hasOverlap = false;
-    if (eventDate && timeStart && timeEnd && timeEnd > timeStart) {
-        const overlapping = checkEventOverlap(eventDate, eventEndDate, timeStart, timeEnd, eventId);
-        if (overlapping.length > 0) {
-            hasOverlap = true;
-            const detailsDiv = document.getElementById('overlapDetails');
-            const eventsList = overlapping.map(ev => {
-                const timeStr = ev.time_start && ev.time_end
-                    ? `${formatTime(ev.time_start)} - ${formatTime(ev.time_end)}`
-                    : 'All day';
-                const loc = ev.location ? ` at ${escHtml(ev.location)}` : '';
-                return `<strong>${escHtml(ev.event_name)}</strong> (${timeStr}${loc})`;
-            }).join('<br>');
-            detailsDiv.innerHTML = eventsList;
-            warningDiv.classList.add('active');
-
-            if (!error) {
-                const confirmBox = document.getElementById('confirmOverlap');
-                if (!confirmBox.checked) {
-                    const namesWithTimes = overlapping.map(ev => {
-                        const timeStr = ev.time_start && ev.time_end
-                            ? `${formatTime(ev.time_start)}–${formatTime(ev.time_end)}`
-                            : 'all day';
-                        return `"${ev.event_name}" (${timeStr})`;
-                    }).join(', ');
-                    error = { field: 'overlap', msg: `This time slot overlaps with ${namesWithTimes}` };
-                }
-            }
-        }
-    }
-    if (!hasOverlap) warningDiv.classList.remove('active');
 
     // Display — exactly one message, or none
     const liveBox = document.getElementById('liveValidationBox');

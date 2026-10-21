@@ -199,7 +199,7 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>Location</label>
-                    <input type="text" id="location" placeholder="e.g., Covered Court">
+                    <input type="text" id="location" placeholder="e.g., Covered Court" oninput="validateLive()">
                 </div>
                 <div class="form-group">
                     <label>Status</label>
@@ -279,17 +279,14 @@
                 <textarea id="description" placeholder="Optional: Enter event details"></textarea>
             </div>
 
-            <!-- Overlap Warning -->
-            <div id="overlapWarning" class="overlap-warning">
+            <!-- Informational location warning; a separate participant check blocks double-booking. -->
+            <div id="overlapWarning" class="overlap-warning" role="status" aria-live="polite">
                 <i class="fa-solid fa-triangle-exclamation"></i>
                 <div>
-                    <strong>Schedule Conflict Detected!</strong>
+                    <strong>Heads Up: Location Conflict</strong>
                     <p id="overlapDetails"></p>
+                    <p>You may still create or update this event. Saving will ask you to review the schedule.</p>
                 </div>
-                <label>
-                    <input type="checkbox" id="confirmOverlap" onchange="validateLive()"> Proceed anyway
-                </label>
-                <span class="field-error" id="error-overlap"></span>
             </div>
 
             <button type="submit" class="btn-submit" style="width:100%">
@@ -366,6 +363,7 @@
     <!-- Page logic -->
     <script src="../../shared/ui-feedback.js"></script>
     <script src="../../shared/event-targets.js"></script>
+    <script src="../../shared/event-schedule-conflicts.js"></script>
     <script src="../resc/js/events.js"></script>
     <script src="../../shared/logout-modal.js"></script>
 
