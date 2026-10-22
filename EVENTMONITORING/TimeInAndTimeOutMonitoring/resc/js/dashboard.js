@@ -50,6 +50,27 @@ function getCurrentTime() {
     }).substring(0, 8);
 }
 
+function getManilaDateRange() {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Manila',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(new Date());
+    const part = type => parts.find(item => item.type === type).value;
+    const today = `${part('year')}-${part('month')}-${part('day')}`;
+    const tomorrow = new Date(Date.UTC(
+        Number(part('year')),
+        Number(part('month')) - 1,
+        Number(part('day')) + 1
+    )).toISOString().slice(0, 10);
+
+    return {
+        start: `${today}T00:00:00+08:00`,
+        end: `${tomorrow}T00:00:00+08:00`
+    };
+}
+
 // ────────────────────────────────────────────
 // DYNAMIC STATUS COMPUTATION (mirrors events.js)
 // ────────────────────────────────────────────
@@ -282,26 +303,32 @@ async function loadStatistics(events) {
         ).length;
 
         // Active Students
-        const { count: totalStudents } = await supabaseClient
+        const { count: totalStudents, error: studentsError } = await supabaseClient
             .from('students')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'active');
+        if (studentsError) throw studentsError;
 
-        // Active Teachers
-        const { count: totalTeachers } = await supabaseClient
-            .from('teachers')
+        // Active Employees
+        const { count: totalTeachers, error: employeesError } = await supabaseClient
+            .from('employees')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'active');
+        if (employeesError) throw employeesError;
 
-        // Generated Reports
-        const { count: totalReports } = await supabaseClient
-            .from('attendance_reports')
-            .select('*', { count: 'exact', head: true });
+        // Event check-ins recorded during the current school-local day.
+        const { start, end } = getManilaDateRange();
+        const { count: todayCheckIns, error: attendanceError } = await supabaseClient
+            .from('event_attendance')
+            .select('attendance_id', { count: 'exact', head: true })
+            .gte('time_in', start)
+            .lt('time_in', end);
+        if (attendanceError) throw attendanceError;
 
         document.getElementById('totalEvents').textContent    = totalEvents    || 0;
-        document.getElementById('totalStudents').textContent   = totalStudents   || 0;
-        document.getElementById('totalTeachers').textContent   = totalTeachers   || 0;
-        document.getElementById('totalReports').textContent    = totalReports    || 0;
+        document.getElementById('totalStudents').textContent   = totalStudents   ?? 0;
+        document.getElementById('totalTeachers').textContent   = totalTeachers   ?? 0;
+        document.getElementById('todayCheckIns').textContent  = todayCheckIns  ?? 0;
 
         console.log('✅ Statistics loaded');
 
