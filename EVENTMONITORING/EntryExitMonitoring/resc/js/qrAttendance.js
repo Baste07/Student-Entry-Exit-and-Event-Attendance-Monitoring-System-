@@ -15,6 +15,7 @@ let qrGunMode = false;
 let qrGunSubmitTimer = null;
 let requestBusy = false;
 let pendingPerson = null;
+const SUCCESS_FEEDBACK_DELAY_MS = 800;
 const recordedAt = new Map();
 const GATE_SMS_NOTIFY_URL = 'http://127.0.0.1:5000/gate_sms_notify';
 
@@ -143,6 +144,14 @@ function clearPreview() {
     pendingPerson = null;
     document.getElementById('previewCard').hidden = true;
     document.getElementById('confirmButton').disabled = true;
+}
+
+function isTemporaryFallback() {
+    return window.sessionStorage?.getItem('gate_scan_return_after_success') === 'face';
+}
+
+function waitForSuccessFeedback() {
+    return new Promise(resolve => window.setTimeout(resolve, SUCCESS_FEEDBACK_DELAY_MS));
 }
 
 function personName(person) {
@@ -292,7 +301,11 @@ async function recordCheckIn() {
         message.className = 'success';
         showStatus('Gate attendance saved successfully.', 'success');
         if (role === 'student') void notifySavedStudentGateLog(savedLog?.id);
-        if (source === 'qr' && qrGunMode) {
+        if (isTemporaryFallback()) {
+            await stopQrCamera();
+            await waitForSuccessFeedback();
+            GateScanRoute.go('face');
+        } else if (source === 'qr' && qrGunMode) {
             document.getElementById('personId').value = '';
             document.getElementById('personId').focus();
         }

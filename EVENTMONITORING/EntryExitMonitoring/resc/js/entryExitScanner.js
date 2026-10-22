@@ -136,7 +136,7 @@ function setEngineStatus(online, status = null) {
    MODE SWITCH
 ══════════════════════════════════════════════════ */
 function switchMode(mode) {
-    if (mode === 'qr') GateScanRoute.go('qr');
+    if (mode === 'qr') GateScanRoute.go('qr', { returnAfterSuccess: 'face' });
 }
 
 /* ══════════════════════════════════════════════════
@@ -603,7 +603,7 @@ async function handleSpoofDetected(data) {
    QR MODE
 ══════════════════════════════════════════════════ */
 function startQRMode() {
-    GateScanRoute.go('qr');
+    GateScanRoute.go('qr', { returnAfterSuccess: 'face' });
 }
 
 /* ══════════════════════════════════════════════════
@@ -715,7 +715,7 @@ async function submitManualAccess() {
         const data = await verifyAdminCredentials(email, password);
         if (!data) throw new Error('Invalid administrator credentials.');
 
-        GateScanRoute.go('qr');
+        GateScanRoute.go('qr', { returnAfterSuccess: 'face' });
     } catch (err) {
         console.error('[entryExitScanner] manual access verification failed:', err);
         errorText.textContent = err.message || 'Unable to verify credentials.';

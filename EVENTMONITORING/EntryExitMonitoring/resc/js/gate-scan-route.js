@@ -1,6 +1,7 @@
 /* Choose the Entry-Exit page from the saved scan preference or a one-visit mode link. */
 (function (root) {
     'use strict';
+    const RETURN_AFTER_SUCCESS_KEY = 'gate_scan_return_after_success';
 
     function preferredMode(settings, search = '') {
         const requested = new URLSearchParams(search).get('mode');
@@ -12,11 +13,23 @@
         return mode === 'qr' ? 'qrAttendance.html' : 'entryExitScanner.html';
     }
 
-    function go(mode, { replace = false, override = true } = {}) {
+    function go(mode, {
+        replace = false,
+        override = true,
+        returnAfterSuccess = null,
+        persistent = false
+    } = {}) {
         const target = new URL(pageFor(mode), root.location.href);
         target.searchParams.set('v', '20260927b');
         if (override) target.searchParams.set('mode', mode);
         root.sessionStorage.setItem('allowed_admin_route', target.pathname);
+        if (mode === 'face') {
+            root.sessionStorage.removeItem(RETURN_AFTER_SUCCESS_KEY);
+        } else if (returnAfterSuccess === 'face') {
+            root.sessionStorage.setItem(RETURN_AFTER_SUCCESS_KEY, 'face');
+        } else if (persistent) {
+            root.sessionStorage.removeItem(RETURN_AFTER_SUCCESS_KEY);
+        }
         if (replace) root.location.replace(target.href);
         else root.location.assign(target.href);
     }
@@ -24,11 +37,14 @@
     function redirectIfPreferred(settings, currentMode) {
         const desired = preferredMode(settings, root.location.search);
         if (desired === currentMode) return false;
-        go(desired, { replace: true, override: false });
+        go(desired, { replace: true, override: false, persistent: desired === 'qr' });
         return true;
     }
 
-    const api = { preferredMode, pageFor, go, redirectIfPreferred };
+    const api = {
+        preferredMode, pageFor, go, redirectIfPreferred,
+        returnAfterSuccessKey: RETURN_AFTER_SUCCESS_KEY
+    };
     root.GateScanRoute = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

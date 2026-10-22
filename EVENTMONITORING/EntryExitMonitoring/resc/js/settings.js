@@ -23,6 +23,7 @@ function openSavedGateScanner(event) {
     const page = mode === 'qr' ? 'qrAttendance.html' : 'entryExitScanner.html';
     const target = new URL(`../gate/${page}?v=20260927b`, window.location.href);
     sessionStorage.setItem('allowed_admin_route', target.pathname);
+    sessionStorage.removeItem('gate_scan_return_after_success');
     window.location.assign(target.href);
 }
 
