@@ -8,15 +8,25 @@
 let activeTab = 'lab';           // 'lab' | 'event'
 let allLabRows = [];
 let allEventRows = [];
+let allReportEvents = [];
 let filteredRows = [];
 let statusChart = null;
 let breakdownChart = null;
+let reportPeriodFilter = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!supabaseClient) {
         console.error('Supabase client not initialised. Check config/.env.js');
         return;
     }
+    reportPeriodFilter = EventPeriodFilter.createController({
+        ids: {
+            mode: 'reportPeriodMode', month: 'reportPeriodMonth', quarter: 'reportPeriodQuarter', year: 'reportPeriodYear',
+            monthGroup: 'reportMonthGroup', quarterGroup: 'reportQuarterGroup', yearGroup: 'reportYearGroup',
+            custom: 'reportCustomDates', from: 'reportDateFrom', to: 'reportDateTo', label: 'reportPeriodSummary'
+        },
+        onChange: () => { if (activeTab === 'event') renderActiveTab(); }
+    });
     bindEvents();
     await Promise.all([loadLabAttendance(), loadEventAttendance()]);
     renderActiveTab();
@@ -127,23 +137,25 @@ async function loadEventAttendance() {
         const [attRes, eventsRes] = await Promise.all([
             supabaseClient
                 .from('event_attendance')
-                .select('*, students(student_id, first_name, last_name, id_number, lrn, course, section), teachers(teacher_id, first_name, last_name, employee_id)')
+                .select('*, students(student_id, stud_id, first_name, last_name), employees(employee_id, emp_no, first_name, last_name)')
                 .order('created_at', { ascending: false }),
             supabaseClient
                 .from('events')
-                .select('event_id, event_name, event_date'),
+                .select('event_id, event_name, event_date, end_date, status'),
         ]);
 
         if (attRes.error) throw attRes.error;
         if (eventsRes.error) throw eventsRes.error;
 
+        allReportEvents = eventsRes.data || [];
+        reportPeriodFilter.syncYears(allReportEvents);
         const eventsMap = {};
         (eventsRes.data || []).forEach(ev => { eventsMap[ev.event_id] = ev; });
 
         allEventRows = (attRes.data || []).map(r => {
-            const person = r.students || r.teachers;
-            const role = r.students ? 'Student' : 'Teacher';
-            const idNum = r.students ? (person && (person.id_number || person.lrn)) : (person && person.employee_id);
+            const person = r.students || r.employees;
+            const role = r.students ? 'Student' : 'Employee';
+            const idNum = r.students ? (person && person.stud_id) : (person && person.emp_no);
             const ev = eventsMap[r.event_id] || {};
 
             return {
@@ -153,6 +165,7 @@ async function loadEventAttendance() {
                 id_number: idNum || '—',
                 event: ev.event_name || '—',
                 date: ev.event_date || r.created_at,
+                eventData: ev,
                 time_in: r.time_in,
                 time_out: r.time_out,
                 status: r.status || 'present',
@@ -175,6 +188,9 @@ function switchTab(tab) {
     });
     document.getElementById('labFilterOnly').style.display = tab === 'lab' ? '' : 'none';
     document.getElementById('eventFilterOnly').style.display = tab === 'event' ? '' : 'none';
+    document.getElementById('reportEventPeriodPanel').hidden = tab !== 'event';
+    document.getElementById('labDateFromGroup').hidden = tab !== 'lab';
+    document.getElementById('labDateToGroup').hidden = tab !== 'lab';
     const lbl = document.getElementById('breakdownLabel');
     if (lbl) lbl.textContent = tab === 'lab' ? 'Subject' : 'Event';
     resetFilters();
@@ -212,6 +228,7 @@ function resetFilters() {
     });
     const statusEl = document.getElementById('filterStatus');
     if (statusEl) statusEl.value = '';
+    if (activeTab === 'event') reportPeriodFilter.reset({ emit: false });
     renderActiveTab();
 }
 
@@ -222,12 +239,14 @@ function applyFilters(rows) {
     const to = document.getElementById('filterTo')?.value || '';
     const course = (document.getElementById('filterCourse')?.value || '').toLowerCase().trim();
     const eventName = (document.getElementById('filterEvent')?.value || '').toLowerCase().trim();
+    const eventRange = activeTab === 'event' ? reportPeriodFilter.getRange() : null;
 
     return rows.filter(r => {
         if (search && !(`${r.name} ${r.id_number}`.toLowerCase().includes(search))) return false;
         if (status && (r.status || '').toLowerCase() !== status) return false;
-        if (from && r.date && new Date(r.date) < new Date(from)) return false;
-        if (to && r.date && new Date(r.date) > new Date(to + 'T23:59:59')) return false;
+        if (activeTab === 'lab' && from && r.date && new Date(r.date) < new Date(from)) return false;
+        if (activeTab === 'lab' && to && r.date && new Date(r.date) > new Date(to + 'T23:59:59')) return false;
+        if (activeTab === 'event' && !EventPeriodFilter.eventOverlapsRange(r.eventData, eventRange)) return false;
         if (activeTab === 'lab' && course && !((r.course || '').toLowerCase().includes(course))) return false;
         if (activeTab === 'event' && eventName && !((r.event || '').toLowerCase().includes(eventName))) return false;
         return true;
@@ -279,7 +298,8 @@ function renderTable(rows) {
 
     if (!rows.length) {
         const colspan = activeTab === 'lab' ? 9 : 8;
-        tbody.innerHTML = `<tr><td colspan="${colspan}" class="empty-state"><i class="fa-solid fa-file-circle-question"></i><p>No attendance records found.</p></td></tr>`;
+        const period = activeTab === 'event' ? ` for ${reportPeriodFilter.getRange().label}` : '';
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="empty-state"><i class="fa-solid fa-file-circle-question"></i><p>No attendance records found${escapeHtml(period)}.</p></td></tr>`;
         document.getElementById('recordCountDisplay').textContent = '0';
         return;
     }
@@ -404,6 +424,7 @@ function exportExcel() {
             'Time Out': formatTime(r.time_out), 'Late (min)': r.late_minutes, 'Status': r.status,
         }))
         : filteredRows.map(r => ({
+            'Reporting Period': reportPeriodFilter.getRange().label,
             'Name': r.name, 'Role': r.role, 'ID Number': r.id_number, 'Event': r.event,
             'Date': formatDate(r.date), 'Time In': formatTime(r.time_in), 'Time Out': formatTime(r.time_out),
             'Status': r.status,
@@ -427,6 +448,7 @@ function exportPdf() {
     doc.text(activeTab === 'lab' ? 'Lab / Class Attendance Report' : 'Event Attendance Report', 14, 16);
     doc.setFontSize(10);
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
+    if (activeTab === 'event') doc.text(`Period: ${reportPeriodFilter.getRange().label}`, 14, 28);
 
     const head = activeTab === 'lab'
         ? [['Student', 'ID Number', 'Course/Section', 'Subject', 'Date', 'Time In', 'Time Out', 'Late (min)', 'Status']]
@@ -437,7 +459,7 @@ function exportPdf() {
         : filteredRows.map(r => [r.name, r.role, r.id_number, r.event, formatDate(r.date), formatTime(r.time_in), formatTime(r.time_out), r.status]);
 
     doc.autoTable({
-        head, body, startY: 28, styles: { fontSize: 8 },
+        head, body, startY: activeTab === 'event' ? 34 : 28, styles: { fontSize: 8 },
         headStyles: { fillColor: [26, 71, 49] },
     });
 

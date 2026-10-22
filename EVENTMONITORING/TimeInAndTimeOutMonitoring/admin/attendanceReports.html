@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
     <link rel="stylesheet" href="../resc/css/attendanceReports.css">
+    <link rel="stylesheet" href="../../shared/event-period-filter.css">
     <link rel="icon" type="image/png" sizes="any" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
 <link rel="shortcut icon" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
 
@@ -80,6 +81,14 @@
             </div>
 
             <div class="controls-card">
+                <div class="event-period-panel" id="reportEventPeriodPanel" aria-label="Event reporting period" hidden>
+                    <div class="event-period-field"><label for="reportPeriodMode">Period</label><select id="reportPeriodMode"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="custom">Custom Date</option></select></div>
+                    <div class="event-period-field" id="reportMonthGroup"><label for="reportPeriodMonth">Month</label><select id="reportPeriodMonth"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
+                    <div class="event-period-field" id="reportQuarterGroup" hidden><label for="reportPeriodQuarter">Quarter</label><select id="reportPeriodQuarter"><option value="1">Q1 · Jan–Mar</option><option value="2">Q2 · Apr–Jun</option><option value="3">Q3 · Jul–Sep</option><option value="4">Q4 · Oct–Dec</option></select></div>
+                    <div class="event-period-field" id="reportYearGroup"><label for="reportPeriodYear">Year</label><select id="reportPeriodYear"></select></div>
+                    <div class="event-period-custom" id="reportCustomDates" hidden><div class="event-period-field"><label for="reportDateFrom">Date From</label><input type="date" id="reportDateFrom"></div><div class="event-period-field"><label for="reportDateTo">Date To</label><input type="date" id="reportDateTo"></div></div>
+                    <div class="event-period-summary" id="reportPeriodSummary" aria-live="polite"></div>
+                </div>
                 <div class="fg-grid">
                     <div class="fg">
                         <label><i class="fa-solid fa-magnifying-glass"></i> Search</label>
@@ -103,11 +112,11 @@
                             <option value="excused">Excused</option>
                         </select>
                     </div>
-                    <div class="fg">
+                    <div class="fg" id="labDateFromGroup">
                         <label><i class="fa-solid fa-calendar"></i> From</label>
                         <input type="date" id="filterFrom">
                     </div>
-                    <div class="fg">
+                    <div class="fg" id="labDateToGroup">
                         <label><i class="fa-solid fa-calendar"></i> To</label>
                         <input type="date" id="filterTo">
                     </div>
@@ -142,8 +151,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../config/.env.js"></script>
     <script src="../../config/config.js"></script>
+    <script src="../../shared/event-period-filter.js"></script>
     <script src="../includes/sidebar.js"></script>
-    <script src="../resc/js/attendanceReports.js"></script>
+    <script src="../resc/js/attendanceReports.js?v=20261022"></script>
 
     <script>
         loadHeader();

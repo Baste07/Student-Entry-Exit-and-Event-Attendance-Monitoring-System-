@@ -8,12 +8,21 @@ let allEventsList   = [];
 let currentEventId   = '';
 let currentEvent     = null;
 let currentRecords   = [];
+let eventPeriodFilter = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (!supabaseClient) {
         console.error('Supabase client not initialised. Check config/.env.js');
         return;
     }
+    eventPeriodFilter = EventPeriodFilter.createController({
+        ids: {
+            mode: 'eventPeriodMode', month: 'eventPeriodMonth', quarter: 'eventPeriodQuarter', year: 'eventPeriodYear',
+            monthGroup: 'eventMonthGroup', quarterGroup: 'eventQuarterGroup', yearGroup: 'eventYearGroup',
+            custom: 'eventCustomDates', from: 'eventDateFrom', to: 'eventDateTo', label: 'eventPeriodSummary'
+        },
+        onChange: renderEventOptions
+    });
     init();
     bindEvents();
 });
@@ -34,7 +43,7 @@ async function init() {
 
         allEventsList = data || [];
         await EventTargets.attach(supabaseClient, allEventsList);
-
+        eventPeriodFilter.syncYears(allEventsList);
         renderEventOptions();
     } catch (err) {
         console.error('init error:', err);
@@ -302,13 +311,12 @@ function bindEvents() {
     document.getElementById('searchInput').addEventListener('input', applyFilters);
     document.getElementById('statusFilter').addEventListener('change', applyFilters);
     document.getElementById('sectionFilter').addEventListener('change', applyFilters);
-    document.getElementById('eventDateFrom').addEventListener('change', renderEventOptions);
-    document.getElementById('eventDateTo').addEventListener('change', renderEventOptions);
-
     document.getElementById('clearFilters').addEventListener('click', function () {
         document.getElementById('searchInput').value = '';
         document.getElementById('statusFilter').value = '';
         document.getElementById('sectionFilter').value = '';
+        eventPeriodFilter.reset({ emit: false });
+        renderEventOptions();
         renderTable(currentRecords);
     });
 
@@ -325,6 +333,7 @@ function getReportRows() {
         const lateMinutes = getLateMinutes(record);
 
         return {
+            'Reporting Period': eventPeriodFilter.getRange().label,
             'Student': name,
             'Student ID': student?.stud_id || '—',
             'Grade & Section': section,
@@ -358,7 +367,7 @@ function exportExcel() {
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
     worksheet['!cols'] = [
-        { wch: 28 }, { wch: 16 }, { wch: 20 }, { wch: 12 },
+        { wch: 24 }, { wch: 28 }, { wch: 16 }, { wch: 20 }, { wch: 12 },
         { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 32 }
     ];
     const workbook = XLSX.utils.book_new();
@@ -390,7 +399,8 @@ function exportPdf() {
     doc.text(currentEvent?.event_name || 'Selected Event', 14, 22);
     doc.setFontSize(9);
     doc.text(`${formatDate(currentEvent?.event_date)} | ${eventTarget}`, 14, 28);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 34);
+    doc.text(`Period: ${eventPeriodFilter.getRange().label}`, 14, 34);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 40);
 
     doc.autoTable({
         head: [['Student', 'Student ID', 'Grade & Section', 'Status', 'Time In', 'Time Out', 'Late (min)', 'Remarks']],
@@ -398,7 +408,7 @@ function exportPdf() {
             row['Student'], row['Student ID'], row['Grade & Section'], row.Status,
             row['Time In'], row['Time Out'], row['Late (min)'], row.Remarks
         ]),
-        startY: 40,
+        startY: 46,
         styles: { fontSize: 8, cellPadding: 2.5 },
         headStyles: { fillColor: [11, 78, 120], textColor: 255 },
         alternateRowStyles: { fillColor: [240, 248, 253] },
@@ -446,15 +456,12 @@ function renderEventOptions() {
     const select = document.getElementById('eventSelect');
     if (!select) return;
 
-    const dateFrom = document.getElementById('eventDateFrom')?.value || '';
-    const dateTo = document.getElementById('eventDateTo')?.value || '';
+    const range = eventPeriodFilter.getRange();
     const selectedEventId = select.value;
-    const filteredEvents = allEventsList.filter(event =>
-        (!dateFrom || event.event_date >= dateFrom) &&
-        (!dateTo || event.event_date <= dateTo)
-    );
+    const filteredEvents = range.valid ? EventPeriodFilter.filterEvents(allEventsList, range) : [];
 
-    select.innerHTML = '<option value="">-- Select an Event --</option>' +
+    const firstLabel = filteredEvents.length ? '-- Select an Event --' : `No Events found for ${range.label || 'this period'}`;
+    select.innerHTML = `<option value="">${escHtml(firstLabel)}</option>` +
         filteredEvents.map(ev => {
             const dateStr = formatDate(ev.event_date);
             const statusIcon = ev.status === 'ongoing' ? '🔴 ' : (ev.status === 'upcoming' ? '🔵 ' : '✅ ');

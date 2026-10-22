@@ -1,0 +1,48 @@
+.event-period-panel {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(135px, 1fr));
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 14px;
+}
+.event-period-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.event-period-field label {
+    color: var(--text-muted, #5f7890);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+}
+.event-period-field input,
+.event-period-field select {
+    width: 100%;
+    min-height: 40px;
+    border: 1px solid var(--border, #c8e0f0);
+    border-radius: 8px;
+    padding: 8px 10px;
+    color: var(--text-dark, #17324d);
+    background: #fff;
+    font: 13px 'Nunito Sans', sans-serif;
+}
+.event-period-field input:focus,
+.event-period-field select:focus { outline: 2px solid #9bd1ef; outline-offset: 1px; }
+.event-period-custom {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(135px, 1fr));
+    gap: 12px;
+    grid-column: span 2;
+}
+.event-period-summary {
+    grid-column: 1 / -1;
+    color: var(--text-muted, #5f7890);
+    font-size: 12px;
+    font-weight: 700;
+}
+.event-period-panel [hidden] { display: none !important; }
+@media (max-width: 1100px) {
+    .event-period-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+    .event-period-panel, .event-period-custom { grid-template-columns: 1fr; }
+    .event-period-custom { grid-column: 1 / -1; }
+}

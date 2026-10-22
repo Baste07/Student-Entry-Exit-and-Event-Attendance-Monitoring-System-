@@ -18,6 +18,7 @@
 
     <!-- Page-specific styles -->
     <link rel="stylesheet" href="../resc/css/eventAttendance.css">
+    <link rel="stylesheet" href="../../shared/event-period-filter.css">
     <link rel="icon" type="image/png" sizes="any" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
     <link rel="shortcut icon" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
@@ -60,17 +61,30 @@
                 </div>
                 <div class="selector-body">
                     <div class="selector-field">
-                        <label for="eventSelect"><i class="fa-solid fa-list"></i> Choose an Event</label>
-                        <div class="event-date-filters">
-                            <div>
-                                <label for="eventDateFrom"><i class="fa-regular fa-calendar"></i> Date From</label>
-                                <input type="date" id="eventDateFrom">
+                        <div class="event-period-panel" aria-label="Event period">
+                            <div class="event-period-field">
+                                <label for="eventPeriodMode">Period</label>
+                                <select id="eventPeriodMode"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="custom">Custom Date</option></select>
                             </div>
-                            <div>
-                                <label for="eventDateTo"><i class="fa-regular fa-calendar"></i> Date To</label>
-                                <input type="date" id="eventDateTo">
+                            <div class="event-period-field" id="eventMonthGroup">
+                                <label for="eventPeriodMonth">Month</label>
+                                <select id="eventPeriodMonth"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select>
                             </div>
+                            <div class="event-period-field" id="eventQuarterGroup" hidden>
+                                <label for="eventPeriodQuarter">Quarter</label>
+                                <select id="eventPeriodQuarter"><option value="1">Q1 · Jan–Mar</option><option value="2">Q2 · Apr–Jun</option><option value="3">Q3 · Jul–Sep</option><option value="4">Q4 · Oct–Dec</option></select>
+                            </div>
+                            <div class="event-period-field" id="eventYearGroup">
+                                <label for="eventPeriodYear">Year</label>
+                                <select id="eventPeriodYear"></select>
+                            </div>
+                            <div class="event-period-custom" id="eventCustomDates" hidden>
+                                <div class="event-period-field"><label for="eventDateFrom">Date From</label><input type="date" id="eventDateFrom"></div>
+                                <div class="event-period-field"><label for="eventDateTo">Date To</label><input type="date" id="eventDateTo"></div>
+                            </div>
+                            <div class="event-period-summary" id="eventPeriodSummary" aria-live="polite"></div>
                         </div>
+                        <label for="eventSelect"><i class="fa-solid fa-list"></i> Choose an Event</label>
                         <select id="eventSelect">
                             <option value="">-- Select an Event --</option>
                         </select>
@@ -189,8 +203,9 @@
     <script src="../includes/sidebar.js"></script>
 
     <!-- Page logic -->
+    <script src="../../shared/event-period-filter.js"></script>
     <script src="../../shared/event-targets.js"></script>
-    <script src="../resc/js/eventAttendance.js"></script>
+    <script src="../resc/js/eventAttendance.js?v=20261022"></script>
     <script src="../../shared/logout-modal.js"></script>
 
     <script>
