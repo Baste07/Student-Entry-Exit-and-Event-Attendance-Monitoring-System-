@@ -682,8 +682,8 @@ const typeColors = {
 
 const statusColors = {
     upcoming: { bg: '#e0f2fe', text: '#0369a1' },
-    ongoing: { bg: '#dcfce7', text: '#166534' },
-    completed: { bg: '#f1f5f9', text: '#475569' },
+    ongoing: { bg: '#fff1c6', text: '#92400e' },
+    completed: { bg: '#dcfce7', text: '#166534' },
     cancelled: { bg: '#fee2e2', text: '#b91c1c' },
 };
 
@@ -691,7 +691,7 @@ function renderTable(rows) {
     const tbody = document.getElementById('eventsTableBody');
     if (!rows || rows.length === 0) {
         tbody.innerHTML = `
-            <tr><td colspan="8" class="empty-cell">
+            <tr><td colspan="7" class="empty-cell">
                 <i class="fa-solid fa-calendar-day" style="font-size:36px;display:block;margin-bottom:10px;color:#dcfce7"></i>
                 No events found.
             </td></tr>`;
@@ -729,14 +729,16 @@ function renderTable(rows) {
             <td>${timeLabel}</td>
             <td><span class="badge" style="background:${typeColor}20;color:${typeColor}">${escHtml(ev.event_type || '—')}</span></td>
             <td><span class="secondary-cell">${escHtml(ev.location || '—')}</span></td>
-            <td><span class="badge info">${escHtml(EventTargets.summary(ev))}</span></td>
             <td><span class="badge" style="background:${sc.bg};color:${sc.text}">${escHtml(status)}</span></td>
             <td>
-                <div style="display:flex;gap:8px">
-                    <button class="btn-edit" title="Edit event" onclick="editEvent('${ev.event_id}')">
+                <div class="event-row-actions">
+                    <button type="button" class="btn-view" aria-label="View ${escHtml(ev.event_name || 'event')}" title="View event" onclick="viewEvent('${ev.event_id}')">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="btn-edit" aria-label="Edit ${escHtml(ev.event_name || 'event')}" title="Edit event" onclick="editEvent('${ev.event_id}')">
                         <i class="fa-solid fa-edit"></i>
                     </button>
-                    <button class="btn-delete" title="Delete event" onclick="deleteEvent('${ev.event_id}', '${escHtml(ev.event_name)}')">
+                    <button type="button" class="btn-delete" aria-label="Delete ${escHtml(ev.event_name || 'event')}" title="Delete event" onclick="deleteEvent('${ev.event_id}', '${escHtml(ev.event_name)}')">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </div>
@@ -751,6 +753,102 @@ function formatTime(t) {
     const d = new Date();
     d.setHours(+h, +m, 0, 0);
     return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+async function viewEvent(id) {
+    const ev = allEvents.find(event => event.event_id === id);
+    const modal = document.getElementById('eventViewModal');
+    if (!ev || !modal) {
+        console.error('Unable to view event: event record or details dialog is missing.');
+        return;
+    }
+
+    const status = computeEventStatus(ev);
+    const colors = statusColors[status] || statusColors.upcoming;
+    const formatDate = value => value
+        ? new Date(value + 'T00:00:00').toLocaleDateString('en-US', {
+            month: 'long', day: 'numeric', year: 'numeric',
+        })
+        : '—';
+    const dateLabel = ev.end_date && ev.end_date !== ev.event_date
+        ? `${formatDate(ev.event_date)} – ${formatDate(ev.end_date)}`
+        : formatDate(ev.event_date);
+    const timeLabel = ev.time_start
+        ? `${formatTime(ev.time_start)}${ev.time_end ? ` – ${formatTime(ev.time_end)}` : ''}`
+        : 'All day';
+    const targetLabel = EventTargets.summary(ev);
+
+    setText('eventViewTitle', ev.event_name || 'Event details');
+    setText('eventViewName', ev.event_name || '—');
+    setText('eventViewType', ev.event_type || '—');
+    setText('eventViewDate', dateLabel);
+    setText('eventViewTime', timeLabel);
+    setText('eventViewLocation', ev.location || '—');
+    setText('eventViewDescription', ev.description || 'No description provided.');
+    document.getElementById('eventViewStatus').innerHTML =
+        `<span class="badge" style="background:${colors.bg};color:${colors.text}">${escHtml(status)}</span>`;
+    setText('eventViewTarget', targetLabel);
+
+    const studentList = document.getElementById('eventViewStudentList');
+    modal.dataset.eventId = id;
+    const isIndividualTarget = !ev.targetSummaryUnavailable
+        && Array.isArray(ev.normalizedTargets)
+        && ev.normalizedTargets.length === 0
+        && !ev.target_grade_level;
+    studentList.innerHTML = isIndividualTarget
+        ? '<p class="event-view-loading"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Loading selected students…</p>'
+        : '';
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    modal.querySelector('.close-modal').focus();
+
+    if (!isIndividualTarget) return;
+
+    try {
+        const participantRows = [];
+        const pageSize = 500;
+        for (let offset = 0; ; offset += pageSize) {
+            const { data, error } = await supabaseClient.from('event_participants')
+                .select('student_id, students(student_id, stud_id, first_name, middle_name, last_name)')
+                .eq('event_id', id)
+                .order('student_id', { ascending: true })
+                .range(offset, offset + pageSize - 1);
+            if (error) throw error;
+            const page = data || [];
+            participantRows.push(...page);
+            if (page.length < pageSize) break;
+        }
+
+        if (modal.dataset.eventId !== id || !modal.classList.contains('active')) return;
+        if (participantRows.length === 0) {
+            studentList.innerHTML = '<p class="event-view-empty">No individually selected students are linked to this event.</p>';
+            return;
+        }
+
+        const names = participantRows.map(row => {
+            const student = row.students;
+            if (!student) return `Student record unavailable (${row.student_id})`;
+            const fullName = [student.first_name, student.middle_name, student.last_name]
+                .filter(Boolean).join(' ');
+            return `${fullName || 'Unnamed student'}${student.stud_id ? ` (${student.stud_id})` : ''}`;
+        });
+        studentList.innerHTML = `<p class="event-view-target-label">Selected students (${names.length})</p>
+            <ul>${names.map(name => `<li>${escHtml(name)}</li>`).join('')}</ul>`;
+    } catch (error) {
+        console.error('Unable to load event participants for viewing:', error);
+        if (modal.dataset.eventId === id && modal.classList.contains('active')) {
+            studentList.innerHTML = '<p class="event-view-error" role="alert">Selected student details could not be loaded. Please try again later.</p>';
+        }
+    }
+}
+
+function closeEventView() {
+    const modal = document.getElementById('eventViewModal');
+    if (modal) {
+        modal.classList.remove('active');
+        delete modal.dataset.eventId;
+    }
+    document.body.style.overflow = '';
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1644,31 +1742,41 @@ function bindEvents() {
         if (e.target === this) closeModal();
     });
 
+    document.getElementById('eventViewModal')?.addEventListener('click', function (e) {
+        if (e.target === this) closeEventView();
+    });
+
     document.getElementById('studentModal')?.addEventListener('click', function (e) {
         if (e.target === this) closeStudentModal();
     });
 
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
+            const eventViewModal = document.getElementById('eventViewModal');
+            if (eventViewModal && eventViewModal.classList.contains('active')) {
+                closeEventView();
+                return;
+            }
             const studentModal = document.getElementById('studentModal');
             if (studentModal && studentModal.classList.contains('active')) {
                 closeStudentModal();
                 return;
             }
-            closeModal();
+            const eventModal = document.getElementById('eventModal');
+            if (eventModal && eventModal.classList.contains('active')) closeModal();
         }
     });
 }
 
 function setTableLoading(on) {
     const tbody = document.getElementById('eventsTableBody');
-    if (tbody && on) tbody.innerHTML = `<tr id="loadingRow"><td colspan="8" class="loading-cell"><i class="fa-solid fa-spinner fa-spin"></i> Loading events…</td></tr>`;
+    if (tbody && on) tbody.innerHTML = `<tr id="loadingRow"><td colspan="7" class="loading-cell"><i class="fa-solid fa-spinner fa-spin"></i> Loading events…</td></tr>`;
 }
 
 function showTableError(msg) {
     const tbody = document.getElementById('eventsTableBody');
     if (tbody) tbody.innerHTML = `
-        <tr><td colspan="8" class="empty-cell" style="color:#dc2626">
+        <tr><td colspan="7" class="empty-cell" style="color:#dc2626">
             <i class="fa-solid fa-triangle-exclamation" style="font-size:36px;display:block;margin-bottom:10px"></i>
             ${escHtml(msg)}
         </td></tr>`;

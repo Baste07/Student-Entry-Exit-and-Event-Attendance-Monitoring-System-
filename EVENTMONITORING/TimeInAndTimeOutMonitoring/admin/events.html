@@ -101,14 +101,13 @@
                             <th>Time</th>
                             <th>Type</th>
                             <th>Location</th>
-                            <th>Target</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="eventsTableBody">
                         <tr id="loadingRow">
-                            <td colspan="8" class="loading-cell">
+                            <td colspan="7" class="loading-cell">
                                 <i class="fa-solid fa-spinner fa-spin"></i> Loading events...
                             </td>
                         </tr>
@@ -345,6 +344,45 @@
         </div>
     </div>
 </div>
+
+    <div id="eventViewModal" class="modal">
+        <div class="modal-content modal-xl event-view-content" role="dialog" aria-modal="true" aria-labelledby="eventViewTitle">
+            <div class="modal-header event-view-header">
+                <div>
+                    <span class="event-view-eyebrow">EVENT DETAILS</span>
+                    <h2 id="eventViewTitle">View Event</h2>
+                </div>
+                <button type="button" class="close-modal" aria-label="Close event details" onclick="closeEventView()">&times;</button>
+            </div>
+            <div class="event-view-note" role="note">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                Viewing only — event information cannot be changed here.
+            </div>
+            <div class="event-view-body">
+                <section class="event-view-section" aria-labelledby="eventViewInfoHeading">
+                    <h3 id="eventViewInfoHeading"><i class="fa-solid fa-circle-info"></i> Event information</h3>
+                    <dl class="event-view-grid">
+                        <div><dt>Event name</dt><dd id="eventViewName">—</dd></div>
+                        <div><dt>Event type</dt><dd id="eventViewType">—</dd></div>
+                        <div><dt>Date</dt><dd id="eventViewDate">—</dd></div>
+                        <div><dt>Time</dt><dd id="eventViewTime">—</dd></div>
+                        <div><dt>Location</dt><dd id="eventViewLocation">—</dd></div>
+                        <div><dt>Status</dt><dd id="eventViewStatus">—</dd></div>
+                        <div class="event-view-wide"><dt>Description</dt><dd id="eventViewDescription">—</dd></div>
+                    </dl>
+                </section>
+                <section class="event-view-section" aria-labelledby="eventViewParticipantsHeading">
+                    <h3 id="eventViewParticipantsHeading"><i class="fa-solid fa-users"></i> Participants</h3>
+                    <p class="event-view-target-label">Target groups</p>
+                    <p id="eventViewTarget" class="event-view-target">—</p>
+                    <div id="eventViewStudentList" class="event-view-student-list" aria-live="polite"></div>
+                </section>
+            </div>
+            <div class="event-view-footer">
+                <button type="button" class="btn-cancel" onclick="closeEventView()">Close</button>
+            </div>
+        </div>
+    </div>
 
     <div class="time-picker-overlay" id="eventTimePicker" hidden>
         <section class="time-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="timePickerTitle" tabindex="-1">
