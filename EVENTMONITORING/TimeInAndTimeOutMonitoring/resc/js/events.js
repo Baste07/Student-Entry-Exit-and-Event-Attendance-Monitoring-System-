@@ -350,7 +350,12 @@ document.getElementById('eventForm').addEventListener('submit', async function (
         return;
     }
 
-    const btn = this.querySelector('.btn-submit');
+    const btn = document.getElementById('eventSubmitButton');
+    if (!(btn instanceof HTMLButtonElement)) {
+        console.error('Event submit button not found. Check the event modal markup.');
+        showValidationError('Unable to save the Event because the submit button is unavailable. Please refresh the page and try again.');
+        return;
+    }
     const orig = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
@@ -1210,12 +1215,13 @@ function showValidationError(message) {
     clearValidationError();
     const div = document.createElement('div');
     div.className = 'validation-error';
+    div.setAttribute('role', 'alert');
+    div.setAttribute('aria-live', 'assertive');
     div.innerHTML = `<i class="fa-solid fa-exclamation-triangle"></i><span>${escHtml(message)}</span>`;
     const form = document.getElementById('eventForm');
     if (form && form.parentElement) {
         form.parentElement.insertBefore(div, form);
         div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        setTimeout(() => div.remove(), 6000);
     }
 }
 
