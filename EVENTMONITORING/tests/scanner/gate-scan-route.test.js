@@ -22,12 +22,20 @@ test('redirect sets the gate navigation token for the destination page', () => {
         search: '',
         replace: url => { redirected = url; }
     };
-    globalThis.sessionStorage = { setItem: (key, value) => stored.set(key, value) };
+    globalThis.sessionStorage = {
+        setItem: (key, value) => stored.set(key, value),
+        removeItem: key => stored.delete(key)
+    };
     try {
         assert.equal(route.redirectIfPreferred({ scanMethod: 'qr' }, 'face'), true);
         assert.match(new URL(redirected).pathname, /\/gate\/qrAttendance\.html$/);
         assert.equal(new URL(redirected).searchParams.get('v'), '20260927b');
         assert.equal(stored.get('allowed_admin_route'), new URL(redirected).pathname);
+        stored.set(route.returnAfterSuccessKey, 'face');
+        globalThis.location.search = '';
+        redirected = '';
+        assert.equal(route.redirectIfPreferred({ scanMethod: 'qr' }, 'face'), true);
+        assert.equal(stored.has(route.returnAfterSuccessKey), false);
         globalThis.location.search = '?mode=face';
         redirected = '';
         assert.equal(route.redirectIfPreferred({ scanMethod: 'qr' }, 'face'), false);
@@ -46,6 +54,35 @@ test('redirect sets the gate navigation token for the destination page', () => {
     }
 });
 
+test('route intent distinguishes temporary QR fallback from persistent QR mode', () => {
+    const oldLocation = globalThis.location;
+    const oldStorage = globalThis.sessionStorage;
+    const stored = new Map();
+    const assigned = [];
+    globalThis.location = {
+        href: 'http://localhost/CAPSTONEFINAL/EVENTMONITORING/EntryExitMonitoring/gate/entryExitScanner.html',
+        search: '',
+        assign: url => assigned.push(url)
+    };
+    globalThis.sessionStorage = {
+        setItem: (key, value) => stored.set(key, value),
+        removeItem: key => stored.delete(key),
+        getItem: key => stored.get(key) || null
+    };
+    try {
+        route.go('qr', { returnAfterSuccess: 'face' });
+        assert.equal(stored.get(route.returnAfterSuccessKey), 'face');
+        route.go('qr', { persistent: true });
+        assert.equal(stored.has(route.returnAfterSuccessKey), false);
+        route.go('face');
+        assert.equal(stored.has(route.returnAfterSuccessKey), false);
+        assert.equal(assigned.length, 3);
+    } finally {
+        globalThis.location = oldLocation;
+        globalThis.sessionStorage = oldStorage;
+    }
+});
+
 test('settings Gate Scanner link opens the saved QR or face page directly', () => {
     const source = fs.readFileSync(require.resolve('../../EntryExitMonitoring/resc/js/settings.js'), 'utf8');
     const routes = [];
@@ -57,7 +94,10 @@ test('settings Gate Scanner link opens the saved QR or face page directly', () =
             href: 'http://localhost/CAPSTONEFINAL/EVENTMONITORING/EntryExitMonitoring/admin/settings.html',
             assign(url) { routes.push(url); }
         } },
-        sessionStorage: { setItem(key, value) { stored.set(key, value); } },
+        sessionStorage: {
+            setItem(key, value) { stored.set(key, value); },
+            removeItem(key) { stored.delete(key); }
+        },
         UIFeedback: { error() { throw new Error('Gate settings unexpectedly unavailable'); } }
     });
     vm.runInContext(source, context);
@@ -74,6 +114,21 @@ test('QR attendance page provides a protected route back to facial recognition',
     const source = fs.readFileSync(require.resolve('../../EntryExitMonitoring/gate/qrAttendance.html'), 'utf8');
     assert.match(source, /id="backToFaceRecognition"[^>]*onclick="GateScanRoute\.go\('face'\)"/);
     assert.match(source, /fa-arrow-left"><\/i>\s*Back to Face Recognition/);
+});
+
+test('Face QR actions mark temporary fallback and successful QR records return after cleanup', () => {
+    const faceHtml = fs.readFileSync(require.resolve('../../EntryExitMonitoring/gate/entryExitScanner.html'), 'utf8');
+    const faceSource = fs.readFileSync(require.resolve('../../EntryExitMonitoring/resc/js/entryExitScanner.js'), 'utf8');
+    const qrSource = fs.readFileSync(require.resolve('../../EntryExitMonitoring/resc/js/qrAttendance.js'), 'utf8');
+    assert.match(faceHtml, /GateScanRoute\.go\('qr',\s*\{\s*returnAfterSuccess:\s*'face'\s*\}\)/);
+    assert.match(faceSource, /GateScanRoute\.go\('qr',\s*\{\s*returnAfterSuccess:\s*'face'\s*\}\)/);
+    assert.match(qrSource, /if \(isTemporaryFallback\(\)\) \{[\s\S]*?await stopQrCamera\(\);[\s\S]*?GateScanRoute\.go\('face'\)/);
+    assert.match(qrSource, /notifySavedStudentGateLog\(savedLog\?\.id\)/);
+});
+
+test('persistent QR setting clears stale temporary fallback intent', () => {
+    const source = fs.readFileSync(require.resolve('../../EntryExitMonitoring/resc/js/settings.js'), 'utf8');
+    assert.match(source, /sessionStorage\.removeItem\('gate_scan_return_after_success'\)/);
 });
 
 test('QR payload parser accepts student IDs in plain text, JSON and URLs', () => {

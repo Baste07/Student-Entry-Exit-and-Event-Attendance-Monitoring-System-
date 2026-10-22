@@ -103,7 +103,7 @@
             <button class="mode-tab active" id="tabFace" type="button">
                 <i class="fa-solid fa-face-smile"></i> Face Recognition
             </button>
-            <button class="mode-tab" id="tabManual" type="button" onclick="GateScanRoute.go('qr')">
+            <button class="mode-tab" id="tabManual" type="button" onclick="GateScanRoute.go('qr', { returnAfterSuccess: 'face' })">
                 <i class="fa-solid fa-qrcode"></i> QR / ID Check-In
             </button>
         </div>
