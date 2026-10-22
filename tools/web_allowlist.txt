@@ -167,6 +167,8 @@ shared/admin-inactivity.js
 shared/admin-mfa.js
 shared/event-targets.js
 shared/event-schedule-conflicts.js
+shared/event-period-filter.css
+shared/event-period-filter.js
 shared/global.css
 shared/global.js
 shared/logout-modal.css

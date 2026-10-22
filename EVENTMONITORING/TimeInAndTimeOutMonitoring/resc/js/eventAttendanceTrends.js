@@ -7,18 +7,24 @@ const PAGE_SIZE = 500;
 const EVENT_CHUNK_SIZE = 80;
 const DETAIL_LIMIT = 200;
 const MANILA_TIME_ZONE = 'Asia/Manila';
-const ANALYTICS_PAGE_VERSION = '20261008';
+const ANALYTICS_PAGE_VERSION = '20261022';
 const state = {
-    events: [], participants: [], attendance: [], charts: {}, loadedRange: null,
+    allEvents: null, events: [], participants: [], attendance: [], charts: {}, loadedRange: null,
     view: null, completedView: null, performance: null, detailTab: 'late',
     activeTab: 'overview', requestId: 0
 };
+let analyticsPeriodFilter = null;
 
 if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => {
     if (!ensureCurrentPage()) return;
-    const from = document.getElementById('trendDateFrom');
-    from.value = defaultFromDate();
-    document.getElementById('trendDateTo').value = manilaDate();
+    analyticsPeriodFilter = EventPeriodFilter.createController({
+        ids: {
+            mode: 'trendPeriodMode', month: 'trendPeriodMonth', quarter: 'trendPeriodQuarter', year: 'trendPeriodYear',
+            monthGroup: 'trendMonthGroup', quarterGroup: 'trendQuarterGroup', yearGroup: 'trendYearGroup',
+            custom: 'trendCustomDates', from: 'trendDateFrom', to: 'trendDateTo', label: 'trendPeriodSummary'
+        },
+        onChange: loadRange
+    });
     document.getElementById('btnApplyTrends').addEventListener('click', loadRange);
     document.getElementById('btnResetTrends').addEventListener('click', resetFilters);
     for (const id of ['trendEventType', 'trendStatus']) field(id).addEventListener('change', () => {
@@ -31,7 +37,6 @@ if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded
         render();
     });
     for (const id of ['trendEvent', 'trendSection', 'trendGrouping']) field(id).addEventListener('change', render);
-    for (const id of ['trendDateFrom', 'trendDateTo']) field(id).addEventListener('change', loadRange);
     for (const tab of ['overview', 'performance', 'breakdown', 'trends']) {
         field(`analytics${tab[0].toUpperCase() + tab.slice(1)}Tab`).addEventListener('click', () => selectTab(tab));
     }
@@ -80,11 +85,6 @@ function manilaDate(timestamp = new Date()) {
     const parts = new Intl.DateTimeFormat('en-US', { timeZone: MANILA_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(timestamp);
     const get = part => parts.find(item => item.type === part).value;
     return `${get('year')}-${get('month')}-${get('day')}`;
-}
-function defaultFromDate() {
-    const today = manilaDate().split('-').map(Number);
-    const date = new Date(Date.UTC(today[0] - 1, today[1] - 1, today[2]));
-    return date.toISOString().slice(0, 10);
 }
 function displayDate(iso) {
     return iso ? new Date(`${iso}T00:00:00+08:00`).toLocaleDateString('en-PH', { timeZone: MANILA_TIME_ZONE, month: 'short', day: 'numeric', year: 'numeric' }) : '—';
@@ -344,38 +344,41 @@ async function fetchForEvents(table, columns, eventIds, orderColumn) {
     return rows;
 }
 async function loadRange() {
-    const from = value('trendDateFrom');
-    const to = value('trendDateTo');
-    if (from && to && from > to) {
+    const range = analyticsPeriodFilter?.getRange() || EventPeriodFilter.getPeriodRange({
+        mode: 'custom', from: value('trendDateFrom'), to: value('trendDateTo')
+    });
+    if (!range.valid) {
         UIFeedback.fieldError(field('trendDateTo'), 'Date To must be on or after Date From.');
         return;
     }
-    const rangeKey = `${from}|${to}`;
+    const rangeKey = `${range.mode}|${range.start || ''}|${range.endExclusive || ''}`;
     if (state.loadedRange === rangeKey) return render();
     const request = ++state.requestId;
     field('trendLoading').hidden = false;
     field('trendError').hidden = true;
+    field('trendResults').hidden = true;
+    field('trendEmpty').hidden = true;
     field('btnApplyTrends').disabled = true;
+    field('btnExportExcel').disabled = true;
+    field('btnExportPdf').disabled = true;
     try {
         const eventSettings = await AppSettings.load(supabaseClient, 'event', { missingTableDefaults: true });
         const grace = Number(eventSettings.late_grace_minutes);
         if (!Number.isInteger(grace) || grace < 0 || grace > 99) throw new Error('Invalid event grace setting');
         EVENT_LATE_GRACE_MINUTES = grace;
-        const events = await fetchPages(() => {
-            let query = supabaseClient.from('events').select('event_id,event_name,event_date,end_date,time_start,time_end,event_type,status')
-                .order('event_date', { ascending: true }).order('event_id', { ascending: true });
-            if (from) query = query.gte('event_date', from);
-            if (to) query = query.lte('event_date', to);
-            return query;
-        });
-        const activeEvents = events.filter(event => event.status !== 'cancelled');
+        const events = state.allEvents || await fetchPages(() => supabaseClient.from('events')
+            .select('event_id,event_name,event_date,end_date,time_start,time_end,event_type,status')
+            .order('event_date', { ascending: true }).order('event_id', { ascending: true }));
+        state.allEvents = events;
+        analyticsPeriodFilter?.syncYears(events);
+        const activeEvents = EventPeriodFilter.filterEvents(events, range).filter(event => event.status !== 'cancelled');
         const ids = activeEvents.map(event => event.event_id);
         const [participants, attendance] = ids.length ? await Promise.all([
             fetchForEvents('event_participants', 'event_id,student_id,participant_id,students(student_id,stud_id,current_grade_level,first_name,middle_name,last_name,section_id,sections(section_id,section_name))', ids, 'participant_id'),
             fetchForEvents('event_attendance', 'attendance_id,event_id,student_id,employee_id,time_in,time_out,remarks', ids, 'attendance_id')
         ]) : [[], []];
         if (request !== state.requestId) return;
-        Object.assign(state, { events: activeEvents, participants, attendance, loadedRange: rangeKey });
+        Object.assign(state, { events: activeEvents, participants, attendance, loadedRange: rangeKey, activeRange: range });
         populateFilters();
         render();
     } catch (error) {
@@ -424,8 +427,7 @@ function populateEventOptions() {
 function resetFilters() {
     ['trendEvent', 'trendGrade', 'trendSection', 'trendEventType', 'trendStatus'].forEach(id => { field(id).value = ''; });
     field('trendGrouping').value = 'event';
-    field('trendDateFrom').value = defaultFromDate();
-    field('trendDateTo').value = manilaDate();
+    analyticsPeriodFilter?.reset({ emit: false });
     field('detailSearch').value = '';
     populateFilters();
     loadRange();
@@ -445,6 +447,8 @@ function render() {
     field('btnExportExcel').disabled = events.length === 0;
     field('btnExportPdf').disabled = events.length === 0;
     if (!events.length) {
+        const empty = field('trendEmpty').querySelector('p');
+        if (empty) empty.textContent = `No Events found for ${state.activeRange?.label || 'the selected period'}.`;
         state.view = null;
         state.completedView = null;
         state.performance = null;
@@ -491,8 +495,7 @@ function renderOverview() {
     const selected = value('trendEvent');
     const event = selected ? report.rows.find(row => String(row.event.event_id) === selected) : null;
     setText('viewTitle', event ? eventLabel(event) : `${report.rows.length} event${report.rows.length === 1 ? '' : 's'} selected`);
-    const from = value('trendDateFrom'), to = value('trendDateTo');
-    setText('viewSubtitle', `${from || 'All dates'} to ${to || 'today'} · ${report.completed.length} completed event${report.completed.length === 1 ? '' : 's'} in performance · Manila dates`);
+    setText('viewSubtitle', `${state.activeRange?.label || 'Selected period'} · ${report.completed.length} completed event${report.completed.length === 1 ? '' : 's'} in performance · scheduled Manila dates`);
     setText('statAttendanceRate', totals.rate === null ? 'N/A' : percentLabel(totals.rate));
     setText('attendanceRateNote', totals.expected
         ? `${totals.attended} of ${totals.expected} expected students attended across ${report.rated.length} completed event${report.rated.length === 1 ? '' : 's'} with participant lists.`
@@ -695,7 +698,8 @@ function exportExcel() {
     if (!window.XLSX) return UIFeedback.error('The Excel export library is unavailable. Please refresh and try again.');
     try {
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(exportRows()), 'Event Analytics');
+        const rows = exportRows().map(row => ({ 'Reporting Period': state.activeRange?.label || 'Selected period', ...row }));
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Event Analytics');
         XLSX.writeFile(workbook, 'event_attendance_analytics.xlsx');
         UIFeedback.success('Filtered event analytics exported to Excel.');
     } catch (error) {
@@ -713,8 +717,9 @@ function exportPdf() {
         pdf.setFontSize(16);
         pdf.text('Event Attendance Analytics', 14, 16);
         pdf.setFontSize(9);
-        pdf.text(`Completed events: ${rows.length}   Expected: ${state.performance.totals.expected}   Attended: ${state.performance.totals.attended}   Rate: ${state.performance.totals.rate === null ? 'N/A' : percentLabel(state.performance.totals.rate)}`, 14, 23);
-        pdf.autoTable({ startY: 29, head: [Object.keys(rows[0])], body: rows.map(Object.values), styles: { fontSize: 7 }, headStyles: { fillColor: [11, 78, 120] } });
+        pdf.text(`Period: ${state.activeRange?.label || 'Selected period'}`, 14, 23);
+        pdf.text(`Completed events: ${rows.length}   Expected: ${state.performance.totals.expected}   Attended: ${state.performance.totals.attended}   Rate: ${state.performance.totals.rate === null ? 'N/A' : percentLabel(state.performance.totals.rate)}`, 14, 29);
+        pdf.autoTable({ startY: 35, head: [Object.keys(rows[0])], body: rows.map(Object.values), styles: { fontSize: 7 }, headStyles: { fillColor: [11, 78, 120] } });
         pdf.save('event_attendance_analytics.pdf');
         UIFeedback.success('Filtered event analytics exported to PDF.');
     } catch (error) {

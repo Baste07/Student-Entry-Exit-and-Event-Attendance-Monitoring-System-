@@ -9,7 +9,8 @@
     <link rel="stylesheet" href="../../shared/global.css">
     <link rel="stylesheet" href="../resc/css/header.css">
     <link rel="stylesheet" href="../resc/css/nav.css">
-    <link rel="stylesheet" href="../resc/css/eventAttendanceTrends.css?v=20261008">
+    <link rel="stylesheet" href="../resc/css/eventAttendanceTrends.css?v=20261022">
+    <link rel="stylesheet" href="../../shared/event-period-filter.css">
     <link rel="stylesheet" href="../../shared/ui-feedback.css">
     <link rel="stylesheet" href="../../shared/logout-modal.css">
     <link rel="icon" type="image/png" href="../../auth/assets/ElTresEresCenciaEscuelaLogo.png">
@@ -18,7 +19,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
-<body data-event-analytics-version="20261008">
+<body data-event-analytics-version="20261022">
     <div id="header-container"></div>
     <div id="sidebar-container"></div>
     <main class="main-content">
@@ -35,15 +36,21 @@
             </div>
 
             <section class="controls-card" aria-label="Event analytics filters">
-                <div class="section-heading"><h2><i class="fa-solid fa-sliders-h"></i> Filters</h2><span id="rangeHint">The last 12 months are shown by default. Clear the dates to include all history.</span></div>
+                <div class="section-heading"><h2><i class="fa-solid fa-sliders-h"></i> Filters</h2><span id="rangeHint">Events are grouped by their scheduled Manila dates.</span></div>
+                <div class="event-period-panel" aria-label="Analytics reporting period">
+                    <div class="event-period-field"><label for="trendPeriodMode">Period</label><select id="trendPeriodMode"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="custom">Custom Date</option></select></div>
+                    <div class="event-period-field" id="trendMonthGroup"><label for="trendPeriodMonth">Month</label><select id="trendPeriodMonth"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
+                    <div class="event-period-field" id="trendQuarterGroup" hidden><label for="trendPeriodQuarter">Quarter</label><select id="trendPeriodQuarter"><option value="1">Q1 · Jan–Mar</option><option value="2">Q2 · Apr–Jun</option><option value="3">Q3 · Jul–Sep</option><option value="4">Q4 · Oct–Dec</option></select></div>
+                    <div class="event-period-field" id="trendYearGroup"><label for="trendPeriodYear">Year</label><select id="trendPeriodYear"></select></div>
+                    <div class="event-period-custom" id="trendCustomDates" hidden><div class="event-period-field"><label for="trendDateFrom">Date From</label><input type="date" id="trendDateFrom"></div><div class="event-period-field"><label for="trendDateTo">Date To</label><input type="date" id="trendDateTo"></div></div>
+                    <div class="event-period-summary" id="trendPeriodSummary" aria-live="polite"></div>
+                </div>
                 <div class="filter-grid">
                     <div class="control-group"><label for="trendEvent">Event</label><select id="trendEvent"><option value="">All Events</option></select></div>
                     <div class="control-group"><label for="trendEventType">Event Type</label><select id="trendEventType"><option value="">All Types</option></select></div>
                     <div class="control-group"><label for="trendStatus">Event Status</label><select id="trendStatus"><option value="">All Non-Cancelled Statuses</option><option value="completed">Completed</option><option value="ongoing">Ongoing</option><option value="upcoming">Upcoming</option></select></div>
                     <div class="control-group"><label for="trendGrade">Grade</label><select id="trendGrade"><option value="">All Grades</option></select></div>
                     <div class="control-group"><label for="trendSection">Section</label><select id="trendSection"><option value="">All Sections</option></select></div>
-                    <div class="control-group"><label for="trendDateFrom">Date From</label><input type="date" id="trendDateFrom"></div>
-                    <div class="control-group"><label for="trendDateTo">Date To</label><input type="date" id="trendDateTo"></div>
                     <div class="control-group"><label for="trendGrouping">Trend Grouping</label><select id="trendGrouping"><option value="event">Each Event</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
                 </div>
                 <div class="filter-actions"><button type="button" class="btn-generate" id="btnApplyTrends"><i class="fa-solid fa-chart-column"></i> Apply Filters</button><button type="button" class="btn-reset" id="btnResetTrends">Reset Filters</button></div>
@@ -103,9 +110,10 @@
     <script src="../../config/.env.js"></script>
     <script src="../../config/config.js"></script>
     <script src="../../shared/settings-service.js"></script>
+    <script src="../../shared/event-period-filter.js"></script>
     <script src="../includes/sidebar.js"></script>
     <script src="../../shared/ui-feedback.js"></script>
-    <script src="../resc/js/eventAttendanceTrends.js?v=20261008"></script>
+    <script src="../resc/js/eventAttendanceTrends.js?v=20261022"></script>
     <script src="../../shared/logout-modal.js"></script>
     <script>loadHeader(); loadSidebar('event-attendance-trends');</script>
 </body>
