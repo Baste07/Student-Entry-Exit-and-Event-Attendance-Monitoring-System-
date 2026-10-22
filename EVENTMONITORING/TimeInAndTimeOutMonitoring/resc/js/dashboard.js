@@ -413,6 +413,9 @@ function displayEvents(events) {
         const statusClass = event.status === 'ongoing' || event.isOngoing ? 'occupied'
             : event.status === 'upcoming' ? 'pending'
             : 'available';
+        const eventStatusClass = event.status === 'ongoing' || event.isOngoing ? 'ongoing'
+            : event.status === 'upcoming' ? 'upcoming'
+            : 'completed';
         
         const headerClass = event.status === 'ongoing' || event.isOngoing ? 'occupied'
             : event.status === 'upcoming' ? 'pending'
@@ -430,7 +433,7 @@ function displayEvents(events) {
             : 'available';
 
         html += `
-            <div class="lab-card" id="event-${event.event_id}">
+            <div class="lab-card ${eventStatusClass}" id="event-${event.event_id}">
                 <div class="lab-card-header ${headerClass}">
                     <span class="lab-status-badge ${statusBadgeClass}">
                         ${statusText}
