@@ -25,7 +25,21 @@ const studentCache = new Map();
 let selectedStudentIds = new Set();
 let currentEventParticipants = [];
 
+let activeTimeInput = null;
+let activeTimeTrigger = null;
+let pickerHour = 12;
+let pickerMinute = 0;
+let pickerPeriod = 'AM';
+let pickerMode = 'hour';
+let activeDateInput = null;
+let activeDateTrigger = null;
+let calendarYear;
+let calendarMonth;
+let pendingCalendarDate = '';
+
 document.addEventListener('DOMContentLoaded', () => {
+    bindTimePicker();
+    bindDatePicker();
     if (!supabaseClient) {
         console.error('Supabase client not initialised. Check config/.env.js');
         return;
@@ -41,6 +55,448 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 1000);
 });
+
+function bindTimePicker() {
+    const overlay = document.getElementById('eventTimePicker');
+    if (!overlay) {
+        console.error('Event time picker markup is missing.');
+        return;
+    }
+
+    document.querySelectorAll('.time-picker-trigger').forEach(trigger => {
+        trigger.addEventListener('click', () => openTimePicker(trigger));
+        const input = document.getElementById(trigger.dataset.timePicker);
+        if (input instanceof HTMLInputElement) {
+            updateTimePickerTrigger(input);
+            input.addEventListener('input', () => updateTimePickerTrigger(input));
+            input.addEventListener('change', () => updateTimePickerTrigger(input));
+        }
+    });
+
+    const hourInput = document.getElementById('timePickerHour');
+    const minuteInput = document.getElementById('timePickerMinute');
+    hourInput.addEventListener('input', () => {
+        const value = Number(hourInput.value);
+        if (hourInput.value !== '' && value >= 1 && value <= 12) {
+            pickerHour = value;
+            renderTimePickerDial();
+        }
+    });
+    minuteInput.addEventListener('input', () => {
+        const value = Number(minuteInput.value);
+        if (minuteInput.value !== '' && value >= 0 && value <= 59) {
+            pickerMinute = value;
+            renderTimePickerDial();
+        }
+    });
+
+    overlay.querySelectorAll('[data-period]').forEach(button => {
+        button.addEventListener('click', () => {
+            pickerPeriod = button.dataset.period;
+            updateTimePickerDisplay();
+        });
+    });
+    overlay.querySelectorAll('[data-time-mode]').forEach(button => {
+        button.addEventListener('click', () => {
+            pickerMode = button.dataset.timeMode;
+            updateTimePickerDisplay();
+            renderTimePickerDial();
+        });
+    });
+    overlay.querySelector('.time-picker-close').addEventListener('click', closeTimePicker);
+    overlay.querySelector('.time-picker-cancel').addEventListener('click', closeTimePicker);
+    overlay.querySelector('.time-picker-clear').addEventListener('click', clearTimePicker);
+    overlay.querySelector('.time-picker-confirm').addEventListener('click', confirmTimePicker);
+    overlay.addEventListener('click', event => {
+        if (event.target === overlay) closeTimePicker();
+    });
+    overlay.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            closeTimePicker();
+        } else if (event.key === 'Tab') {
+            const focusable = Array.from(overlay.querySelectorAll(
+                'button:not([disabled]), input:not([disabled])'
+            ));
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        }
+    });
+}
+
+function openTimePicker(trigger) {
+    const input = document.getElementById(trigger.dataset.timePicker);
+    const overlay = document.getElementById('eventTimePicker');
+    if (!(input instanceof HTMLInputElement) || !overlay) {
+        console.error('Unable to open time picker: time input or dialog is missing.');
+        return;
+    }
+
+    activeTimeInput = input;
+    activeTimeTrigger = trigger;
+    updateTimePickerTrigger(input);
+    const [hours, minutes] = input.value ? input.value.split(':').map(Number) : [0, 0];
+    pickerHour = input.value ? (hours % 12 || 12) : 12;
+    pickerMinute = input.value ? minutes : 0;
+    pickerPeriod = input.value && hours >= 12 ? 'PM' : 'AM';
+    pickerMode = 'hour';
+
+    document.getElementById('timePickerTitle').textContent =
+        input.id === 'timeStart' ? 'Choose start time' : 'Choose end time';
+    document.getElementById('timePickerHour').value = String(pickerHour).padStart(2, '0');
+    document.getElementById('timePickerMinute').value = String(pickerMinute).padStart(2, '0');
+    trigger.classList.add('is-open');
+    overlay.hidden = false;
+    updateTimePickerDisplay();
+    renderTimePickerDial();
+    document.getElementById('timePickerHour').focus();
+}
+
+function updateTimePickerDisplay() {
+    const overlay = document.getElementById('eventTimePicker');
+    overlay.querySelectorAll('[data-period]').forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.period === pickerPeriod));
+    });
+    overlay.querySelectorAll('[data-time-mode]').forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.timeMode === pickerMode));
+    });
+    document.getElementById('timePickerHour').classList.toggle('is-active', pickerMode === 'hour');
+    document.getElementById('timePickerMinute').classList.toggle('is-active', pickerMode === 'minute');
+}
+
+function renderTimePickerDial() {
+    const dial = document.getElementById('timePickerDial');
+    if (!dial) return;
+    dial.setAttribute('aria-label', pickerMode === 'hour' ? 'Choose hour' : 'Choose minute');
+    const center = dial.clientWidth / 2;
+    const selectedValue = pickerMode === 'hour'
+        ? pickerHour
+        : Math.round(pickerMinute / 5) % 12;
+    const options = Array.from({ length: 12 }, (_, index) => {
+        const angle = index * (Math.PI / 6);
+        const radius = center - 26;
+        const x = center + Math.sin(angle) * radius;
+        const y = center - Math.cos(angle) * radius;
+        const value = pickerMode === 'hour' ? (index === 0 ? 12 : index) : index * 5;
+        const label = pickerMode === 'hour' ? String(value) : String(value).padStart(2, '0');
+        const isSelected = pickerMode === 'hour' ? value === selectedValue : index === selectedValue;
+        return `<button type="button" class="time-picker-dial-option" style="left:${x}px;top:${y}px"
+                    aria-label="${pickerMode === 'hour' ? `Hour ${label}` : `Minute ${label}`}"
+                    aria-pressed="${isSelected}" data-clock-value="${value}">${label}</button>`;
+    });
+    dial.innerHTML = options.join('');
+    dial.querySelectorAll('[data-clock-value]').forEach(button => {
+        button.addEventListener('click', () => {
+            const value = Number(button.dataset.clockValue);
+            if (pickerMode === 'hour') {
+                pickerHour = value;
+                document.getElementById('timePickerHour').value = String(value).padStart(2, '0');
+                pickerMode = 'minute';
+                updateTimePickerDisplay();
+                renderTimePickerDial();
+            } else {
+                pickerMinute = value;
+                document.getElementById('timePickerMinute').value = String(value).padStart(2, '0');
+                renderTimePickerDial();
+            }
+        });
+    });
+}
+
+function updateTimePickerTrigger(input) {
+    const trigger = document.querySelector(`[data-time-picker="${input.id}"]`);
+    if (!trigger) return;
+    const value = trigger.querySelector('.time-picker-value');
+    const isEmpty = !input.value;
+    trigger.classList.toggle('is-empty', isEmpty);
+    value.textContent = isEmpty ? 'Choose time' : formatPickerTime(input.value);
+    const timeLabel = input.id === 'timeStart' ? 'start time' : 'end time';
+    trigger.setAttribute('aria-label', isEmpty
+        ? `Choose ${timeLabel}`
+        : `Change ${timeLabel}, currently ${formatPickerTime(input.value)}`);
+}
+
+function formatPickerTime(value) {
+    const [hours, minutes] = value.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    return `${String(hours % 12 || 12).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
+}
+
+function confirmTimePicker() {
+    const hourInput = document.getElementById('timePickerHour');
+    const minuteInput = document.getElementById('timePickerMinute');
+    if (!hourInput.reportValidity()) return;
+    if (!minuteInput.reportValidity()) return;
+    if (!activeTimeInput) {
+        console.error('Unable to apply selected time: no active time input.');
+        closeTimePicker();
+        return;
+    }
+
+    const hour12 = Number(hourInput.value) % 12;
+    const hour24 = hour12 + (pickerPeriod === 'PM' ? 12 : 0);
+    activeTimeInput.value = `${String(hour24).padStart(2, '0')}:${String(Number(minuteInput.value)).padStart(2, '0')}`;
+    activeTimeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    activeTimeInput.dispatchEvent(new Event('change', { bubbles: true }));
+    updateTimePickerTrigger(activeTimeInput);
+    closeTimePicker();
+}
+
+function clearTimePicker() {
+    if (!activeTimeInput) return;
+    activeTimeInput.value = '';
+    activeTimeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    activeTimeInput.dispatchEvent(new Event('change', { bubbles: true }));
+    updateTimePickerTrigger(activeTimeInput);
+    closeTimePicker();
+}
+
+function closeTimePicker() {
+    const overlay = document.getElementById('eventTimePicker');
+    if (overlay) overlay.hidden = true;
+    if (activeTimeTrigger) {
+        activeTimeTrigger.classList.remove('is-open');
+        activeTimeTrigger.focus();
+    }
+    activeTimeInput = null;
+    activeTimeTrigger = null;
+}
+
+function bindDatePicker() {
+    const overlay = document.getElementById('eventDatePicker');
+    if (!overlay) {
+        console.error('Event date picker markup is missing.');
+        return;
+    }
+
+    document.querySelectorAll('.date-picker-trigger').forEach(trigger => {
+        trigger.addEventListener('click', () => openDatePicker(trigger));
+        const input = document.getElementById(trigger.dataset.datePicker);
+        if (input instanceof HTMLInputElement) {
+            updateDatePickerTrigger(input);
+            input.addEventListener('input', () => updateDatePickerTrigger(input));
+            input.addEventListener('change', () => updateDatePickerTrigger(input));
+        }
+    });
+
+    overlay.querySelectorAll('[data-month-step]').forEach(button => {
+        button.addEventListener('click', () => {
+            closeDateMonthJump();
+            calendarMonth += Number(button.dataset.monthStep);
+            if (calendarMonth < 0) {
+                calendarMonth = 11;
+                calendarYear -= 1;
+            } else if (calendarMonth > 11) {
+                calendarMonth = 0;
+                calendarYear += 1;
+            }
+            renderDatePickerCalendar();
+        });
+    });
+    overlay.querySelector('.date-picker-month-label').addEventListener('click', toggleDateMonthJump);
+    overlay.querySelector('.date-picker-jump-apply').addEventListener('click', applyDateMonthJump);
+    document.getElementById('datePickerYearInput').addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            applyDateMonthJump();
+        }
+    });
+    overlay.querySelector('.date-picker-close').addEventListener('click', closeDatePicker);
+    overlay.querySelector('.date-picker-cancel').addEventListener('click', closeDatePicker);
+    overlay.querySelector('.date-picker-clear').addEventListener('click', clearDatePicker);
+    overlay.querySelector('.date-picker-today').addEventListener('click', () => {
+        const today = getManilaNow();
+        pendingCalendarDate = getLocalDateISO(today);
+        calendarYear = today.getFullYear();
+        calendarMonth = today.getMonth();
+        closeDateMonthJump();
+        renderDatePickerCalendar();
+    });
+    overlay.querySelector('.date-picker-confirm').addEventListener('click', confirmDatePicker);
+    overlay.addEventListener('click', event => {
+        if (event.target === overlay) closeDatePicker();
+    });
+    overlay.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            closeDatePicker();
+        } else if (event.key === 'Tab') {
+            const focusable = Array.from(overlay.querySelectorAll(
+                'button:not([disabled]), input:not([disabled]), select:not([disabled])'
+            )).filter(element => !element.closest('[hidden]'));
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        }
+    });
+}
+
+function openDatePicker(trigger) {
+    const input = document.getElementById(trigger.dataset.datePicker);
+    const overlay = document.getElementById('eventDatePicker');
+    if (!(input instanceof HTMLInputElement) || !overlay) {
+        console.error('Unable to open date picker: date input or dialog is missing.');
+        return;
+    }
+
+    activeDateInput = input;
+    activeDateTrigger = trigger;
+    pendingCalendarDate = input.value;
+    const initialDate = input.value ? parseLocalDate(input.value) : getManilaNow();
+    calendarYear = initialDate.getFullYear();
+    calendarMonth = initialDate.getMonth();
+    document.getElementById('datePickerTitle').textContent =
+        input.id === 'eventDate' ? 'Choose event date' : 'Choose end date';
+    trigger.classList.add('is-open');
+    overlay.hidden = false;
+    renderDatePickerCalendar();
+    overlay.querySelector('.date-picker-confirm').focus();
+}
+
+function renderDatePickerCalendar() {
+    const calendar = document.getElementById('datePickerCalendar');
+    const monthLabel = document.getElementById('datePickerMonthLabel');
+    if (!calendar || !monthLabel) return;
+
+    const firstWeekday = new Date(calendarYear, calendarMonth, 1).getDay();
+    const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+    const todayISO = getLocalDateISO(getManilaNow());
+    const displayMonth = new Date(calendarYear, calendarMonth, 1)
+        .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    monthLabel.querySelector('span').textContent = displayMonth;
+    document.getElementById('datePickerMonthSelect').value = String(calendarMonth);
+    document.getElementById('datePickerYearInput').value = String(calendarYear);
+
+    const cells = [];
+    for (let index = 0; index < firstWeekday; index += 1) {
+        cells.push('<span class="date-picker-empty" aria-hidden="true"></span>');
+    }
+    for (let day = 1; day <= daysInMonth; day += 1) {
+        const dateValue = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isSelected = dateValue === pendingCalendarDate;
+        const isToday = dateValue === todayISO;
+        const classes = [
+            'date-picker-day',
+            isSelected ? 'is-selected' : '',
+            isToday ? 'is-today' : '',
+        ].filter(Boolean).join(' ');
+        cells.push(`<button type="button" class="${classes}" data-calendar-date="${dateValue}"
+            aria-label="${new Date(calendarYear, calendarMonth, day).toLocaleDateString('en-US', { dateStyle: 'full' })}"
+            aria-pressed="${isSelected}">${day}</button>`);
+    }
+    calendar.innerHTML = cells.join('');
+    calendar.querySelectorAll('[data-calendar-date]').forEach(button => {
+        button.addEventListener('click', () => {
+            pendingCalendarDate = button.dataset.calendarDate;
+            renderDatePickerCalendar();
+            calendar.querySelector(`[data-calendar-date="${pendingCalendarDate}"]`)?.focus();
+        });
+    });
+}
+
+function toggleDateMonthJump() {
+    const panel = document.getElementById('datePickerMonthJump');
+    const toggle = document.getElementById('datePickerMonthLabel');
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute('aria-expanded', String(!panel.hidden));
+    if (!panel.hidden) {
+        document.getElementById('datePickerYearInput').focus();
+        document.getElementById('datePickerYearInput').select();
+    }
+}
+
+function closeDateMonthJump() {
+    const panel = document.getElementById('datePickerMonthJump');
+    const toggle = document.getElementById('datePickerMonthLabel');
+    panel.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+}
+
+function applyDateMonthJump() {
+    const yearInput = document.getElementById('datePickerYearInput');
+    const monthSelect = document.getElementById('datePickerMonthSelect');
+    if (!yearInput.reportValidity()) return;
+
+    calendarYear = Number(yearInput.value);
+    calendarMonth = Number(monthSelect.value);
+    closeDateMonthJump();
+    renderDatePickerCalendar();
+    document.getElementById('datePickerMonthLabel').focus();
+}
+
+function getLocalDateISO(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function parseLocalDate(value) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+}
+
+function updateDatePickerTrigger(input) {
+    const trigger = document.querySelector(`[data-date-picker="${input.id}"]`);
+    if (!trigger) return;
+    const value = trigger.querySelector('.date-picker-value');
+    const isEmpty = !input.value;
+    const dateLabel = input.id === 'eventDate' ? 'event date' : 'end date';
+    trigger.classList.toggle('is-empty', isEmpty);
+    value.textContent = isEmpty
+        ? 'Choose date'
+        : parseLocalDate(input.value).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        });
+    trigger.setAttribute('aria-label', isEmpty
+        ? `Choose ${dateLabel}`
+        : `Change ${dateLabel}, currently ${value.textContent}`);
+}
+
+function confirmDatePicker() {
+    if (!activeDateInput || !pendingCalendarDate) return;
+    activeDateInput.value = pendingCalendarDate;
+    activeDateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    activeDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+    updateDatePickerTrigger(activeDateInput);
+    closeDatePicker();
+}
+
+function clearDatePicker() {
+    if (!activeDateInput) return;
+    activeDateInput.value = '';
+    activeDateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    activeDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+    updateDatePickerTrigger(activeDateInput);
+    closeDatePicker();
+}
+
+function closeDatePicker() {
+    const overlay = document.getElementById('eventDatePicker');
+    if (overlay) overlay.hidden = true;
+    closeDateMonthJump();
+    if (activeDateTrigger) {
+        activeDateTrigger.classList.remove('is-open');
+        activeDateTrigger.focus();
+    }
+    activeDateInput = null;
+    activeDateTrigger = null;
+    pendingCalendarDate = '';
+}
 
 // ══════════════════════════════════════════════════════════
 // DYNAMIC STATUS COMPUTATION
@@ -226,8 +682,8 @@ const typeColors = {
 
 const statusColors = {
     upcoming: { bg: '#e0f2fe', text: '#0369a1' },
-    ongoing: { bg: '#dcfce7', text: '#166534' },
-    completed: { bg: '#f1f5f9', text: '#475569' },
+    ongoing: { bg: '#fff1c6', text: '#92400e' },
+    completed: { bg: '#dcfce7', text: '#166534' },
     cancelled: { bg: '#fee2e2', text: '#b91c1c' },
 };
 
@@ -235,7 +691,7 @@ function renderTable(rows) {
     const tbody = document.getElementById('eventsTableBody');
     if (!rows || rows.length === 0) {
         tbody.innerHTML = `
-            <tr><td colspan="8" class="empty-cell">
+            <tr><td colspan="7" class="empty-cell">
                 <i class="fa-solid fa-calendar-day" style="font-size:36px;display:block;margin-bottom:10px;color:#dcfce7"></i>
                 No events found.
             </td></tr>`;
@@ -273,14 +729,16 @@ function renderTable(rows) {
             <td>${timeLabel}</td>
             <td><span class="badge" style="background:${typeColor}20;color:${typeColor}">${escHtml(ev.event_type || '—')}</span></td>
             <td><span class="secondary-cell">${escHtml(ev.location || '—')}</span></td>
-            <td><span class="badge info">${escHtml(EventTargets.summary(ev))}</span></td>
             <td><span class="badge" style="background:${sc.bg};color:${sc.text}">${escHtml(status)}</span></td>
             <td>
-                <div style="display:flex;gap:8px">
-                    <button class="btn-edit" title="Edit event" onclick="editEvent('${ev.event_id}')">
+                <div class="event-row-actions">
+                    <button type="button" class="btn-view" aria-label="View ${escHtml(ev.event_name || 'event')}" title="View event" onclick="viewEvent('${ev.event_id}')">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="btn-edit" aria-label="Edit ${escHtml(ev.event_name || 'event')}" title="Edit event" onclick="editEvent('${ev.event_id}')">
                         <i class="fa-solid fa-edit"></i>
                     </button>
-                    <button class="btn-delete" title="Delete event" onclick="deleteEvent('${ev.event_id}', '${escHtml(ev.event_name)}')">
+                    <button type="button" class="btn-delete" aria-label="Delete ${escHtml(ev.event_name || 'event')}" title="Delete event" onclick="deleteEvent('${ev.event_id}', '${escHtml(ev.event_name)}')">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </div>
@@ -295,6 +753,102 @@ function formatTime(t) {
     const d = new Date();
     d.setHours(+h, +m, 0, 0);
     return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+async function viewEvent(id) {
+    const ev = allEvents.find(event => event.event_id === id);
+    const modal = document.getElementById('eventViewModal');
+    if (!ev || !modal) {
+        console.error('Unable to view event: event record or details dialog is missing.');
+        return;
+    }
+
+    const status = computeEventStatus(ev);
+    const colors = statusColors[status] || statusColors.upcoming;
+    const formatDate = value => value
+        ? new Date(value + 'T00:00:00').toLocaleDateString('en-US', {
+            month: 'long', day: 'numeric', year: 'numeric',
+        })
+        : '—';
+    const dateLabel = ev.end_date && ev.end_date !== ev.event_date
+        ? `${formatDate(ev.event_date)} – ${formatDate(ev.end_date)}`
+        : formatDate(ev.event_date);
+    const timeLabel = ev.time_start
+        ? `${formatTime(ev.time_start)}${ev.time_end ? ` – ${formatTime(ev.time_end)}` : ''}`
+        : 'All day';
+    const targetLabel = EventTargets.summary(ev);
+
+    setText('eventViewTitle', ev.event_name || 'Event details');
+    setText('eventViewName', ev.event_name || '—');
+    setText('eventViewType', ev.event_type || '—');
+    setText('eventViewDate', dateLabel);
+    setText('eventViewTime', timeLabel);
+    setText('eventViewLocation', ev.location || '—');
+    setText('eventViewDescription', ev.description || 'No description provided.');
+    document.getElementById('eventViewStatus').innerHTML =
+        `<span class="badge" style="background:${colors.bg};color:${colors.text}">${escHtml(status)}</span>`;
+    setText('eventViewTarget', targetLabel);
+
+    const studentList = document.getElementById('eventViewStudentList');
+    modal.dataset.eventId = id;
+    const isIndividualTarget = !ev.targetSummaryUnavailable
+        && Array.isArray(ev.normalizedTargets)
+        && ev.normalizedTargets.length === 0
+        && !ev.target_grade_level;
+    studentList.innerHTML = isIndividualTarget
+        ? '<p class="event-view-loading"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Loading selected students…</p>'
+        : '';
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    modal.querySelector('.close-modal').focus();
+
+    if (!isIndividualTarget) return;
+
+    try {
+        const participantRows = [];
+        const pageSize = 500;
+        for (let offset = 0; ; offset += pageSize) {
+            const { data, error } = await supabaseClient.from('event_participants')
+                .select('student_id, students(student_id, stud_id, first_name, middle_name, last_name)')
+                .eq('event_id', id)
+                .order('student_id', { ascending: true })
+                .range(offset, offset + pageSize - 1);
+            if (error) throw error;
+            const page = data || [];
+            participantRows.push(...page);
+            if (page.length < pageSize) break;
+        }
+
+        if (modal.dataset.eventId !== id || !modal.classList.contains('active')) return;
+        if (participantRows.length === 0) {
+            studentList.innerHTML = '<p class="event-view-empty">No individually selected students are linked to this event.</p>';
+            return;
+        }
+
+        const names = participantRows.map(row => {
+            const student = row.students;
+            if (!student) return `Student record unavailable (${row.student_id})`;
+            const fullName = [student.first_name, student.middle_name, student.last_name]
+                .filter(Boolean).join(' ');
+            return `${fullName || 'Unnamed student'}${student.stud_id ? ` (${student.stud_id})` : ''}`;
+        });
+        studentList.innerHTML = `<p class="event-view-target-label">Selected students (${names.length})</p>
+            <ul>${names.map(name => `<li>${escHtml(name)}</li>`).join('')}</ul>`;
+    } catch (error) {
+        console.error('Unable to load event participants for viewing:', error);
+        if (modal.dataset.eventId === id && modal.classList.contains('active')) {
+            studentList.innerHTML = '<p class="event-view-error" role="alert">Selected student details could not be loaded. Please try again later.</p>';
+        }
+    }
+}
+
+function closeEventView() {
+    const modal = document.getElementById('eventViewModal');
+    if (modal) {
+        modal.classList.remove('active');
+        delete modal.dataset.eventId;
+    }
+    document.body.style.overflow = '';
 }
 
 // ══════════════════════════════════════════════════════════
@@ -350,7 +904,12 @@ document.getElementById('eventForm').addEventListener('submit', async function (
         return;
     }
 
-    const btn = this.querySelector('.btn-submit');
+    const btn = document.getElementById('eventSubmitButton');
+    if (!(btn instanceof HTMLButtonElement)) {
+        console.error('Event submit button not found. Check the event modal markup.');
+        showValidationError('Unable to save the Event because the submit button is unavailable. Please refresh the page and try again.');
+        return;
+    }
     const orig = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
@@ -483,6 +1042,10 @@ async function deleteEvent(eventId, eventName) {
 
 function openAddModal() {
     document.getElementById('eventForm').reset();
+    updateDatePickerTrigger(document.getElementById('eventDate'));
+    updateDatePickerTrigger(document.getElementById('eventEndDate'));
+    updateTimePickerTrigger(document.getElementById('timeStart'));
+    updateTimePickerTrigger(document.getElementById('timeEnd'));
     document.getElementById('eventId').value = '';
 
     selectedGrades.clear();
@@ -535,15 +1098,19 @@ async function editEvent(id) {
     document.getElementById('eventId').value = ev.event_id;
     document.getElementById('eventName').value = ev.event_name || '';
     document.getElementById('eventDate').value = ev.event_date || '';
+    updateDatePickerTrigger(document.getElementById('eventDate'));
     document.getElementById('eventType').value = ev.event_type || '';
     document.getElementById('timeStart').value = ev.time_start || '';
     document.getElementById('timeEnd').value = ev.time_end || '';
+    updateTimePickerTrigger(document.getElementById('timeStart'));
+    updateTimePickerTrigger(document.getElementById('timeEnd'));
     document.getElementById('location').value = ev.location || '';
     document.getElementById('description').value = ev.description || '';
 
     const hasEndDate = ev.end_date && ev.end_date !== ev.event_date;
     document.getElementById('isMultiDay').checked = hasEndDate;
     document.getElementById('eventEndDate').value = hasEndDate ? ev.end_date : '';
+    updateDatePickerTrigger(document.getElementById('eventEndDate'));
     toggleEndDate();
 
     selectedGrades.clear();
@@ -1138,11 +1705,10 @@ function toggleEndDate() {
 
     if (isChecked) {
         endDateRow.style.display = 'flex';
-        endDateInput.setAttribute('required', 'required');
     } else {
         endDateRow.style.display = 'none';
         endDateInput.value = '';
-        endDateInput.removeAttribute('required');
+        updateDatePickerTrigger(endDateInput);
     }
 }
 
@@ -1176,31 +1742,41 @@ function bindEvents() {
         if (e.target === this) closeModal();
     });
 
+    document.getElementById('eventViewModal')?.addEventListener('click', function (e) {
+        if (e.target === this) closeEventView();
+    });
+
     document.getElementById('studentModal')?.addEventListener('click', function (e) {
         if (e.target === this) closeStudentModal();
     });
 
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
+            const eventViewModal = document.getElementById('eventViewModal');
+            if (eventViewModal && eventViewModal.classList.contains('active')) {
+                closeEventView();
+                return;
+            }
             const studentModal = document.getElementById('studentModal');
             if (studentModal && studentModal.classList.contains('active')) {
                 closeStudentModal();
                 return;
             }
-            closeModal();
+            const eventModal = document.getElementById('eventModal');
+            if (eventModal && eventModal.classList.contains('active')) closeModal();
         }
     });
 }
 
 function setTableLoading(on) {
     const tbody = document.getElementById('eventsTableBody');
-    if (tbody && on) tbody.innerHTML = `<tr id="loadingRow"><td colspan="8" class="loading-cell"><i class="fa-solid fa-spinner fa-spin"></i> Loading events…</td></tr>`;
+    if (tbody && on) tbody.innerHTML = `<tr id="loadingRow"><td colspan="7" class="loading-cell"><i class="fa-solid fa-spinner fa-spin"></i> Loading events…</td></tr>`;
 }
 
 function showTableError(msg) {
     const tbody = document.getElementById('eventsTableBody');
     if (tbody) tbody.innerHTML = `
-        <tr><td colspan="8" class="empty-cell" style="color:#dc2626">
+        <tr><td colspan="7" class="empty-cell" style="color:#dc2626">
             <i class="fa-solid fa-triangle-exclamation" style="font-size:36px;display:block;margin-bottom:10px"></i>
             ${escHtml(msg)}
         </td></tr>`;
@@ -1210,12 +1786,13 @@ function showValidationError(message) {
     clearValidationError();
     const div = document.createElement('div');
     div.className = 'validation-error';
+    div.setAttribute('role', 'alert');
+    div.setAttribute('aria-live', 'assertive');
     div.innerHTML = `<i class="fa-solid fa-exclamation-triangle"></i><span>${escHtml(message)}</span>`;
     const form = document.getElementById('eventForm');
     if (form && form.parentElement) {
         form.parentElement.insertBefore(div, form);
         div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        setTimeout(() => div.remove(), 6000);
     }
 }
 
@@ -1288,7 +1865,11 @@ function validateLive() {
     let error = null; // only ever show ONE message at a time
 
     // 1) Date validity — start date in the past, end date in the past, or end before start
-    if (eventDate && eventDate < todayStr) {
+    if (!eventDate) {
+        error = { field: 'eventDate', msg: 'Please select an event date' };
+    } else if (isMultiDay && !eventEndDate) {
+        error = { field: 'eventEndDate', msg: 'Please select an end date for this multi-day event' };
+    } else if (eventDate < todayStr) {
         error = { field: 'eventDate', msg: 'Event date cannot be set in the past' };
     } else if (isMultiDay && eventEndDate) {
         if (eventEndDate < todayStr) {

@@ -35,14 +35,24 @@ let lastScannerErrorToastAt = 0;
    CLOCK
 ══════════════════════════════════════════════════ */
 (function tick() {
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-    let h = now.getHours(),
-        mm = String(now.getMinutes()).padStart(2, '0'),
-        ss = String(now.getSeconds()).padStart(2, '0'),
-        ap = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
+    const now = new Date();
     const el = document.getElementById('gateClock');
-    if (el) el.textContent = `${h}:${mm}:${ss} ${ap}`;
+    if (el) {
+        const date = now.toLocaleDateString('en-US', {
+            timeZone: 'Asia/Manila',
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+        const time = now.toLocaleTimeString('en-US', {
+            timeZone: 'Asia/Manila',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        el.textContent = `${date} · ${time}`;
+    }
     setTimeout(tick, 1000);
 })();
 

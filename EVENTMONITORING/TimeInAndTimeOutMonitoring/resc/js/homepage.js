@@ -4,8 +4,6 @@
 
 // ── Date / Time Helpers ──────────────────────────────────
 
-const todayISO = new Date().toLocaleDateString('en-CA');
-
 function timeToDate(t) {
     if (!t) return null;
     const [h, m, s] = t.split(':');
@@ -18,6 +16,36 @@ function formatTime(t) {
     const d = timeToDate(t);
     if (!d) return '—';
     return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[character]);
+}
+
+function formatEventDate(date) {
+    if (!date) return 'Date not specified';
+    return new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    });
+}
+
+function eventDateLabel(event) {
+    const startDate = formatEventDate(event.event_date);
+    if (!event.end_date || event.end_date === event.event_date) return startDate;
+    return `${startDate} – ${formatEventDate(event.end_date)}`;
+}
+
+function eventTimeLabel(event) {
+    if (!event.time_start && !event.time_end) return 'All day';
+    return `${event.time_start ? formatTime(event.time_start) : '—'} – ${event.time_end ? formatTime(event.time_end) : '—'}`;
 }
 
 // ── Dynamic Status Computation (mirrors events.js) ───────
@@ -79,7 +107,7 @@ async function syncEventStatuses(events) {
 
     if (updates.length === 0) return;
 
-    Promise.all(updates.map(async upd => {
+    await Promise.all(updates.map(async upd => {
         try {
             const { error } = await supabaseClient
                 .from('events')
@@ -111,26 +139,6 @@ if (footerYear) footerYear.textContent = new Date().getFullYear();
 // EVENTS FETCH & RENDER
 // ══════════════════════════════════════════════════════════
 
-async function fetchOngoingEvents() {
-    try {
-        const { data, error } = await supabaseClient
-            .from('events')
-            .select('event_id, event_name, event_date, end_date, time_start, time_end, event_type, location, description, target_grade_level, target_section, status')
-            .eq('status', 'ongoing')
-            .order('time_start', { ascending: true });
-
-        if (error) { console.error('fetchOngoingEvents:', error); return []; }
-        const events = data || [];
-        if (typeof location !== 'undefined' && location.pathname.includes('/admin/')) {
-            await EventTargets.attach(supabaseClient, events);
-        }
-        return events;
-    } catch (err) {
-        console.error('fetchOngoingEvents error:', err);
-        return [];
-    }
-}
-
 async function fetchEventAttendanceCount(eventId) {
     try {
         const { count, error } = await supabaseClient
@@ -149,24 +157,26 @@ async function fetchEventAttendanceCount(eventId) {
 
 // ── Fetch ALL event statuses (upcoming + ongoing + completed) ──
 async function fetchAllEvents() {
-    try {
+    const pageSize = 500;
+    const events = [];
+
+    for (let offset = 0; ; offset += pageSize) {
         const { data, error } = await supabaseClient
             .from('events')
             .select('event_id, event_name, event_date, end_date, time_start, time_end, event_type, location, description, target_grade_level, target_section, status')
-            .neq('status', 'cancelled')
             .order('event_date', { ascending: true })
-            .limit(10);
+            .order('event_id', { ascending: true })
+            .range(offset, offset + pageSize - 1);
 
-        if (error) { console.error('fetchAllEvents:', error); return []; }
-        const events = data || [];
-        if (typeof location !== 'undefined' && location.pathname.includes('/admin/')) {
-            await EventTargets.attach(supabaseClient, events);
-        }
-        return events;
-    } catch (err) {
-        console.error('fetchAllEvents error:', err);
-        return [];
+        if (error) throw error;
+
+        const page = data || [];
+        events.push(...page);
+        if (page.length < pageSize) break;
     }
+
+    await EventTargets.attach(supabaseClient, events);
+    return events;
 }
 
 const typeColors = {
@@ -175,69 +185,74 @@ const typeColors = {
 };
 
 function safeTargetSummary(event) {
-    if (!event.targetSummaryUnavailable && !event.normalizedTargets?.length && !event.target_grade_level) return '';
-    return EventTargets.summary(event).replace(/[&<>"']/g, character => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    })[character]);
+    return escapeHtml(EventTargets.summary(event));
+}
+
+function renderEventDetails(event) {
+    const audience = safeTargetSummary(event) || 'Audience details unavailable';
+    const description = event.description?.trim()
+        ? escapeHtml(event.description.trim())
+        : 'No event description provided.';
+
+    return `
+        <div class="event-details">
+            <div class="event-detail">
+                <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                <div><span>Date</span><strong>${escapeHtml(eventDateLabel(event))}</strong></div>
+            </div>
+            <div class="event-detail">
+                <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                <div><span>Time</span><strong>${escapeHtml(eventTimeLabel(event))}</strong></div>
+            </div>
+            <div class="event-detail">
+                <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                <div><span>Location</span><strong>${escapeHtml(event.location?.trim() || 'Location not specified')}</strong></div>
+            </div>
+            <div class="event-detail">
+                <i class="fa-solid fa-users" aria-hidden="true"></i>
+                <div><span>Audience</span><strong>${audience}</strong></div>
+            </div>
+        </div>
+        <p class="event-desc">${description}</p>`;
 }
 
 // ── Ongoing event with live attendance count ──
 function renderOngoingEventCard(ev, presentCount) {
     const color = typeColors[ev.event_type?.toLowerCase()] || '#6b7280';
-    const timeLabel = ev.time_start
-        ? `${formatTime(ev.time_start)} – ${formatTime(ev.time_end)}`
-        : 'All day';
 
     return `
-        <div class="card event-card" style="border-left:4px solid #22c55e;">
-            <div class="event-header" style="display:flex; justify-content:space-between; align-items:center;">
-                <span class="event-type" style="background:${color}20; color:${color}">${ev.event_type || 'Event'}</span>
-                <span style="background:#dcfce7; color:#166534; font-size:12px; padding:2px 8px; border-radius:4px; font-weight:600;">
+        <div class="card event-card event-card--ongoing">
+            <div class="event-header">
+                <span class="event-type" style="background:${color}20; color:${color}">${escapeHtml(ev.event_type || 'Event')}</span>
+                <span class="event-status-badge ongoing">
                     <i class="fa-solid fa-circle-play"></i> LIVE
                 </span>
             </div>
-            <div class="event-name" style="font-size:18px; font-weight:700;">${ev.event_name || 'Untitled Event'}</div>
-            <div class="event-meta" style="margin-bottom:12px;">
-                <span><i class="fa-solid fa-clock"></i> ${timeLabel}</span>
-                ${ev.location ? `<span style="margin-left:12px;"><i class="fa-solid fa-location-dot"></i> ${ev.location}</span>` : ''}
-            </div>
-            ${safeTargetSummary(ev) ? `<div class="event-desc">Target: ${safeTargetSummary(ev)}</div>` : ''}
-            <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:#f0fdf4; border-radius:8px;">
-                <span style="color:#166534; font-size:14px; font-weight:600;">
+            <h3 class="event-name">${escapeHtml(ev.event_name || 'Untitled Event')}</h3>
+            ${renderEventDetails(ev)}
+            <div class="event-attendance-summary">
+                <span>
                     <i class="fa-solid fa-users"></i> Attendance
                 </span>
-                <span style="font-size:24px; font-weight:800; color:#16a34a;">${presentCount} <span style="font-size:13px; font-weight:500; color:#6b7280;">present</span></span>
+                <strong>${presentCount} <small>checked in</small></strong>
             </div>
         </div>`;
 }
 
 function renderEvent(ev) {
-    const eventDate = new Date(ev.event_date + 'T00:00:00');
-    const isToday = ev.event_date === todayISO;
-    const dateLabel = isToday ? 'Today' : eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
     const color = typeColors[ev.event_type?.toLowerCase()] || '#6b7280';
-
-    // Show status badge if not upcoming
-    let statusBadge = '';
-    if (ev.status === 'ongoing') {
-        statusBadge = `<span style="background:#dcfce7; color:#166534; font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600; margin-left:8px;"><i class="fa-solid fa-circle-play"></i> Ongoing</span>`;
-    } else if (ev.status === 'completed') {
-        statusBadge = `<span style="background:#f1f5f9; color:#475569; font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600; margin-left:8px;"><i class="fa-solid fa-check-circle"></i> Done</span>`;
-    }
+    const status = ev.status === 'completed'
+        ? { label: 'Completed', icon: 'fa-check-circle', className: 'completed' }
+        : { label: 'Upcoming', icon: 'fa-calendar-check', className: 'upcoming' };
 
     return `
-        <div class="card event-card">
+        <div class="card event-card event-card--${status.className}">
             <div class="event-header">
-                <span class="event-type" style="background:${color}20; color:${color}">${ev.event_type || 'Event'}</span>
-                <span class="event-date">${dateLabel}</span>
+                <span class="event-type" style="background:${color}20; color:${color}">${escapeHtml(ev.event_type || 'Event')}</span>
+                <span class="event-status-badge ${status.className}"><i class="fa-solid ${status.icon}"></i> ${status.label}</span>
             </div>
-            <div class="event-name">${ev.event_name || 'Untitled Event'}${statusBadge}</div>
-            <div class="event-meta">
-                ${ev.location ? `<span><i class="fa-solid fa-location-dot"></i> ${ev.location}</span>` : ''}
-            </div>
-            ${ev.description ? `<div class="event-desc">${ev.description}</div>` : ''}
-            ${safeTargetSummary(ev) ? `<div class="event-desc">Target: ${safeTargetSummary(ev)}</div>` : ''}
+            <h3 class="event-name">${escapeHtml(ev.event_name || 'Untitled Event')}</h3>
+            ${renderEventDetails(ev)}
         </div>`;
 }
 
@@ -245,87 +260,90 @@ function renderEvent(ev) {
 // MAIN LOAD
 // ══════════════════════════════════════════════════════════
 
+let isPageLoading = false;
+
 async function loadPage() {
+    if (isPageLoading) return;
+    isPageLoading = true;
+
     const icon = document.getElementById('refreshIcon');
     if (icon) icon.classList.add('fa-spin');
 
-    const [allEvents, ongoingFromDB] = await Promise.all([
-        fetchAllEvents(),
-        fetchOngoingEvents()
-    ]);
+    try {
+        const workingEvents = await fetchAllEvents();
+        await syncEventStatuses(workingEvents);
 
-    // Merge the two fetches (dedup by event_id) into one working set so status
-    // sync covers everything the dashboard knows about, including events that
-    // should be "ongoing" now but haven't been flagged that way in the DB yet.
-    const eventMap = new Map();
-    allEvents.forEach(ev => eventMap.set(ev.event_id, ev));
-    ongoingFromDB.forEach(ev => { if (!eventMap.has(ev.event_id)) eventMap.set(ev.event_id, ev); });
-    const workingEvents = Array.from(eventMap.values());
+        // Split events by (now up-to-date) status for the three rows
+        const ongoingEvents   = workingEvents.filter(ev => ev.status === 'ongoing');
+        const upcomingEvents  = workingEvents.filter(ev => ev.status !== 'ongoing' && ev.status !== 'completed' && ev.status !== 'cancelled');
+        const completedEvents = workingEvents.filter(ev => ev.status === 'completed');
 
-    // Keep Supabase in sync before rendering — see syncEventStatuses above.
-    await syncEventStatuses(workingEvents);
-
-    // Split events by (now up-to-date) status for the three rows
-    const ongoingEvents   = workingEvents.filter(ev => ev.status === 'ongoing');
-    const upcomingEvents  = workingEvents.filter(ev => ev.status !== 'ongoing' && ev.status !== 'completed' && ev.status !== 'cancelled');
-    const completedEvents = workingEvents.filter(ev => ev.status === 'completed');
-
-    // ── ONGOING EVENTS (with live attendance) ──
-    const ongoingSection = document.getElementById('ongoingEventsSection');
-    const ongoingGrid    = document.getElementById('ongoingEventsGrid');
-    const badgeOngoing   = document.getElementById('ongoingEventsBadge');
-    if (badgeOngoing) badgeOngoing.textContent = ongoingEvents.length;
-    if (ongoingSection && ongoingGrid) {
-        if (ongoingEvents.length > 0) {
-            ongoingSection.style.display = '';
-            const cards = await Promise.all(
-                ongoingEvents.map(async ev => {
-                    const count = await fetchEventAttendanceCount(ev.event_id);
-                    return renderOngoingEventCard(ev, count);
-                })
-            );
-            ongoingGrid.innerHTML = cards.join('');
-        } else {
-            ongoingSection.style.display = 'none';
+        // ── ONGOING EVENTS (with live attendance) ──
+        const ongoingSection = document.getElementById('ongoingEventsSection');
+        const ongoingGrid    = document.getElementById('ongoingEventsGrid');
+        const badgeOngoing   = document.getElementById('ongoingEventsBadge');
+        if (badgeOngoing) badgeOngoing.textContent = ongoingEvents.length;
+        if (ongoingSection && ongoingGrid) {
+            if (ongoingEvents.length > 0) {
+                ongoingSection.style.display = '';
+                const cards = await Promise.all(
+                    ongoingEvents.map(async ev => {
+                        const count = await fetchEventAttendanceCount(ev.event_id);
+                        return renderOngoingEventCard(ev, count);
+                    })
+                );
+                ongoingGrid.innerHTML = cards.join('');
+            } else {
+                ongoingSection.style.display = 'none';
+            }
         }
-    }
 
-    // ── Badge ──
-    const badgeEvents = document.getElementById('eventsBadge');
-    if (badgeEvents) badgeEvents.textContent = upcomingEvents.length;
+        // ── Upcoming Events ──
+        const badgeEvents = document.getElementById('eventsBadge');
+        if (badgeEvents) badgeEvents.textContent = upcomingEvents.length;
 
-    // ── Upcoming Events ──
-    const eventsGrid = document.getElementById('eventsGrid');
-    if (eventsGrid) {
-        eventsGrid.innerHTML = upcomingEvents.length
-            ? upcomingEvents.map(renderEvent).join('')
-            : `<div class="empty">
+        const eventsGrid = document.getElementById('eventsGrid');
+        if (eventsGrid) {
+            eventsGrid.innerHTML = upcomingEvents.length
+                ? upcomingEvents.map(renderEvent).join('')
+                : `<div class="empty">
                    <i class="fa-solid fa-calendar-xmark"></i>
                    <h3>No Events</h3>
                    <p>No upcoming events to display.</p>
                </div>`;
-    }
+        }
 
-    // ── Completed Events ──
-    const badgeCompleted = document.getElementById('completedEventsBadge');
-    if (badgeCompleted) badgeCompleted.textContent = completedEvents.length;
+        // ── Completed Events ──
+        const badgeCompleted = document.getElementById('completedEventsBadge');
+        if (badgeCompleted) badgeCompleted.textContent = completedEvents.length;
 
-    const completedGrid = document.getElementById('completedEventsGrid');
-    if (completedGrid) {
-        completedGrid.innerHTML = completedEvents.length
-            ? completedEvents.map(renderEvent).join('')
-            : `<div class="empty">
+        const completedGrid = document.getElementById('completedEventsGrid');
+        if (completedGrid) {
+            completedGrid.innerHTML = completedEvents.length
+                ? completedEvents.map(renderEvent).join('')
+                : `<div class="empty">
                    <i class="fa-solid fa-calendar-xmark"></i>
                    <h3>No Completed Events</h3>
                    <p>Completed events will appear here.</p>
                </div>`;
-    }
+        }
 
-    // ── Refresh label ──
-    const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    const refreshLabel = document.getElementById('refreshLabel');
-    if (refreshLabel) refreshLabel.textContent = `Last updated ${now} · auto-refreshes every 5s`;
-    if (icon) icon.classList.remove('fa-spin');
+        // ── Refresh label ──
+        const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const refreshLabel = document.getElementById('refreshLabel');
+        if (refreshLabel) refreshLabel.textContent = `Last updated ${now} · auto-refreshes every 5s`;
+    } catch (error) {
+        console.error('Homepage event load failed:', error);
+        for (const id of ['ongoingEventsGrid', 'eventsGrid', 'completedEventsGrid']) {
+            const grid = document.getElementById(id);
+            if (grid) grid.innerHTML = '<div class="empty" role="alert"><h3>Events could not be loaded</h3><p>Please refresh the page or try again shortly.</p></div>';
+        }
+        const refreshLabel = document.getElementById('refreshLabel');
+        if (refreshLabel) refreshLabel.textContent = 'Unable to refresh events. Retrying in 5 seconds.';
+    } finally {
+        if (icon) icon.classList.remove('fa-spin');
+        isPageLoading = false;
+    }
 }
 
 // Initial load + auto-refresh every 5 seconds

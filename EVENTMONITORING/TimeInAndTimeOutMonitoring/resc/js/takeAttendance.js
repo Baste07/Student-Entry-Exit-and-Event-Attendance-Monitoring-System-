@@ -227,9 +227,14 @@ function phaseLabel(phase) {
         validating: 'Validating cache',
         rebuilding: 'Rebuilding from source',
         ready: 'Face DB ready',
+        partial_sync: 'Face DB ready with sync warnings',
         error: 'Face DB load error'
     };
     return map[phase] || 'Starting engine';
+}
+
+function isFaceDatabaseReady(status) {
+    return !!status.face_db_ready && ['ready', 'partial_sync'].includes(status.face_db_phase);
 }
 
 function formatMs(ms) {
@@ -250,14 +255,14 @@ function updateSessionButtonState() {
         startBtn.disabled = true;
         startBtn.innerHTML = '<i class="fa-solid fa-power-off" style="color:#fca5a5;"></i> Please Start Engine First';
     } else if (!isFaceDbReady) {
-        startBtn.style.display = 'none';
+        startBtn.style.display = 'inline-flex';
         startBtn.disabled = true;
-        startBtn.innerHTML = '<i class="fa-solid fa-database"></i> Preparing Face Database...';
-        setOutput('info', 'fa-solid fa-database', 'Preparing face data. Start Session will appear automatically when scanning is ready.');
+        startBtn.innerHTML = '<i class="fa-solid fa-database"></i> Preparing Face Data...';
+        setOutput('info', 'fa-solid fa-database', 'Preparing face data. Start Scanner will be available when it is ready.');
     } else {
         startBtn.style.display = 'inline-flex';
         startBtn.disabled = false;
-        startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start Session';
+        startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start Scanner';
     }
 
     renderTileStates();
@@ -394,7 +399,7 @@ setInterval(async () => {
                     setOutput('error', 'fa-solid fa-camera', 'Camera Required: Connect or enable a webcam, then retry.');
                 }
                 attendanceCameraUnavailable = unavailable;
-                isFaceDbReady = !!status.face_db_ready && status.face_db_phase === 'ready';
+                isFaceDbReady = isFaceDatabaseReady(status);
                 const newPhase = status.face_db_phase || (isFaceDbReady ? 'ready' : 'starting');
 
                 // Show popup when entering rebuilding phase
@@ -517,7 +522,7 @@ async function waitForFlask(retries = 60, delayMs = 1000) {
             if (res.ok || res.status === 200) {
                 const status = await fetchEngineStatus();
                 if (status) {
-                    isFaceDbReady = !!status.face_db_ready && status.face_db_phase === 'ready';
+                    isFaceDbReady = isFaceDatabaseReady(status);
                     const phase = phaseLabel(status.face_db_phase);
                     const source = status.data_source === 'cache' ? 'cache' : 'remote';
                     const total = formatMs(status?.durations_ms?.total_startup);
@@ -622,7 +627,7 @@ startBtn.addEventListener('click', async () => {
     if (!isEngineOnline) return;
 
     if (!isFaceDbReady) {
-        setOutput('info', 'fa-solid fa-database', 'Face database is still warming up. Please wait for Start Session to appear.');
+        setOutput('info', 'fa-solid fa-database', 'Face database is still warming up. Please wait until Start Scanner is available.');
         return;
     }
 
@@ -798,6 +803,5 @@ if (window.EventSource) {
         console.log('SSE connection lost, will retry...');
     };
 }
-
 
 

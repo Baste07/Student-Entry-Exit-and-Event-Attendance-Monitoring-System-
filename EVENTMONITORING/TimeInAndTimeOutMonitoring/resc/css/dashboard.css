@@ -354,9 +354,9 @@ hr {
     position: relative;
 }
 
-.lab-card-header.occupied   { background: linear-gradient(135deg,#e0f2fe,#bae6fd); border-bottom-color:#2f8fce; }
+.lab-card-header.occupied   { background: linear-gradient(135deg,#fff8e6,#fff1c6); border-bottom-color:var(--yellow); }
 .lab-card-header.dismissing { background: linear-gradient(135deg,#fff7ed,#fed7aa); border-bottom-color:#f97316; }
-.lab-card-header.pending    { background: linear-gradient(135deg,#fefce8,#fef9c3); border-bottom-color:var(--yellow); }
+.lab-card-header.pending    { background: linear-gradient(135deg,#e8f4fc,#d9efff); border-bottom-color:var(--blue-bright); }
 
 .lab-status-badge {
     position: absolute;
@@ -370,11 +370,11 @@ hr {
     letter-spacing: .5px;
 }
 
-.lab-status-badge.occupied    { background: var(--blue-dark);   color: var(--white); animation: pulse 2s infinite; }
+.lab-status-badge.occupied    { background: var(--yellow); color: var(--blue-dark); animation: pulse 2s infinite; }
 .lab-status-badge.available   { background: #0b4e78; color: var(--white); }
 .lab-status-badge.maintenance { background: #6b7280; color: var(--white); }
 .lab-status-badge.dismissing  { background: #f97316; color: var(--white); animation: pulse 2s infinite; }
-.lab-status-badge.pending     { background: var(--yellow); color: var(--blue-dark); }
+.lab-status-badge.pending     { background: var(--blue-dark); color: var(--white); }
 
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.65} }
 
@@ -408,6 +408,8 @@ hr {
 }
 
 .lab-meta-item i { color: var(--blue-bright); font-size: 11px; }
+.lab-card.ongoing .lab-meta-item i { color: #b77900; }
+.lab-card.upcoming .lab-meta-item i { color: var(--blue-bright); }
 
 .lab-progress-container {
     height: 6px;
@@ -440,15 +442,15 @@ hr {
 .lab-capacity-text { color: var(--text-muted); font-size: 12.5px; }
 
 .current-session-info {
-    background: #f0f9ff;
+    background: var(--yellow-light);
     padding: 12px 16px;
-    border-top: 1px solid #bae6fd;
+    border-top: 1px solid var(--yellow);
 }
 
 .current-session-title {
     font-size: 11.5px;
     font-weight: 700;
-    color: var(--blue-dark);
+    color: #765000;
     margin-bottom: 7px;
     text-transform: uppercase;
     letter-spacing: .5px;
@@ -468,7 +470,7 @@ hr {
     font-family: 'Nunito Sans', sans-serif;
 }
 
-.current-session-detail i { width: 14px; color: var(--blue-bright); font-size: 12px; }
+.current-session-detail i { width: 14px; color: #b77900; font-size: 12px; }
 
 .dismissing-session-info {
     background: #fff7ed;
@@ -480,11 +482,11 @@ hr {
 }
 
 .pending-session-info {
-    background: #fefce8;
+    background: #e8f4fc;
     padding: 10px 16px;
-    border-top: 1px solid var(--yellow);
+    border-top: 1px solid var(--blue-bright);
     display: flex; align-items: center; gap: 7px;
-    font-size: 13px; color: #854d0e; font-weight: 600;
+    font-size: 13px; color: var(--blue-dark); font-weight: 600;
     font-family: 'Nunito Sans', sans-serif;
 }
 
