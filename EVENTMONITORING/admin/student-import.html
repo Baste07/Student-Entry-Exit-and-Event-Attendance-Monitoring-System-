@@ -817,7 +817,8 @@
                     </svg>
                     <div>
                         <p style="margin:0 0 .5rem 0;">Are you sure you want to delete <strong id="deleteStudentName">this student</strong> (<span id="deleteStudentStudId">-</span>)?</p>
-                        <p style="margin:0;color:#dc3545;font-weight:600;">All records linked to this student — guardian links, attendance logs, event participation, and SMS notifications — will also be permanently deleted.</p>
+                        <p style="margin:0;color:#dc3545;font-weight:600;">This student, guardian links, attendance and gate logs, event participation, SMS records, spoof attempts, saved face embeddings, and pending rollover QR work will be permanently deleted.</p>
+                        <p style="margin:.5rem 0 0 0;">Shared guardians and events are kept. Registration audit logs are kept with the student reference cleared; administrative and rollover history is retained.</p>
                         <p style="margin:.5rem 0 0 0;color:var(--text-muted);font-size:0.85rem;">This action cannot be undone.</p>
                     </div>
                 </div>
@@ -839,7 +840,7 @@
 <script src="../shared/global.js"></script>
 <script src="../shared/ui-feedback.js"></script>
 <script src="admin-specific.js"></script>
-<script src="student-import.js?v=20261004"></script>
+<script src="student-import.js?v=20261027-delete"></script>
 
 <script>
     requireSuperAdmin();
