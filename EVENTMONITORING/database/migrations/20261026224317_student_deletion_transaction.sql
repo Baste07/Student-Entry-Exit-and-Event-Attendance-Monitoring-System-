@@ -1,6 +1,15 @@
 -- Reviewed against the production FK catalog. Installs code only; deletes no data.
 begin;
 
+-- Preserve registration audit identity after removing its live FK reference.
+alter table public.face_registration_logs add column if not exists deleted_student_id uuid;
+alter table public.face_registration_logs drop constraint if exists face_registration_logs_user_check;
+alter table public.face_registration_logs add constraint face_registration_logs_user_check check (
+    (student_id is not null and employee_id is null and deleted_student_id is null)
+    or (student_id is null and employee_id is not null and deleted_student_id is null)
+    or (student_id is null and employee_id is null and deleted_student_id is not null)
+);
+
 create or replace function app_private.delete_student(p_student_id uuid)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -31,7 +40,7 @@ begin
     delete from public.student_guardians where student_id = p_student_id;
     delete from public.spoof_attempts where student_id = p_student_id;
     -- Registration is an administrative audit trail, not a face dataset.
-    update public.face_registration_logs set student_id = null where student_id = p_student_id;
+    update public.face_registration_logs set deleted_student_id = student_id, student_id = null where student_id = p_student_id;
     -- Queue rows are actionable work; rollover changes are immutable history.
     delete from public.student_id_rollover_qr_queue where student_id = p_student_id;
     -- student_face_embeddings already has ON DELETE CASCADE. Profile vectors

@@ -9,7 +9,7 @@ Production catalog reviewed on 2026-10-27 (Manila). Primary key: `students.stude
 | event_attendance.student_id | NO ACTION | Delete student event attendance |
 | student_guardians.student_id | NO ACTION | Delete links; keep guardians |
 | spoof_attempts.student_id | NO ACTION | Delete student spoof attempts |
-| face_registration_logs.student_id | NO ACTION | Clear nullable reference; retain audit row |
+| face_registration_logs.student_id | NO ACTION | Move UUID to deleted_student_id, clear live reference; retain audit row |
 | event_participants.student_id | CASCADE | Explicitly delete student participation |
 | student_face_embeddings.student_id | CASCADE | Existing cascade deletes stored vectors |
 | entry_exit_logs.student_id | SET NULL | Explicitly delete student gate attendance, consistent with confirmation |
@@ -19,6 +19,8 @@ Production catalog reviewed on 2026-10-27 (Manila). Primary key: `students.stude
 | student_id_rollover_changes.student_id | No FK, historical identifier | Keep immutable rollover history |
 
 The complete production FK catalog found no additional incoming dependencies on these children. Public columns named student_id/stud_id were also inspected. No lab enrollment/attendance tables exist in the inspected production schema. Shared events, guardians, sections, school years, employees, other students and generic system audit history remain intact. No FK policy is changed or disabled. Unknown future blocking constraints fail the transaction rather than silently dropping unknown data.
+
+Registration logs originally require exactly one live student or employee reference. The migration adds a historical deleted_student_id UUID and adjusts that CHECK to also permit exactly one historical student reference, allowing retention without a broken FK or losing audit identity.
 
 `public.delete_student(uuid)` is an invoker wrapper around a private definer with an empty search_path and qualified objects. The private function checks auth.uid() and the existing active, unlocked, AAL2 Super Admin predicate. PUBLIC/anon execution is revoked; authenticated direct student DELETE is revoked. The UUID row lock serializes repeat requests; missing students return deleted=false. Any SQL error rolls back every child operation.
 

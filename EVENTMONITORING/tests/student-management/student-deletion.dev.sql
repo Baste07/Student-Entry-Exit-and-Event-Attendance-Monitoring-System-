@@ -3,7 +3,14 @@
 create table if not exists public.daily_attendance (attendance_id uuid primary key default gen_random_uuid(), student_id uuid references public.students(student_id));
 create table if not exists public.spoof_attempts (spoof_log_id uuid primary key default gen_random_uuid(), student_id uuid references public.students(student_id));
 create table if not exists public.sms_notifications (sms_id uuid primary key default gen_random_uuid(), student_id uuid references public.students(student_id));
-create table if not exists public.face_registration_logs (registration_log_id uuid primary key default gen_random_uuid(), student_id uuid references public.students(student_id));
+create table if not exists public.face_registration_logs (
+    registration_log_id uuid primary key default gen_random_uuid(),
+    student_id uuid references public.students(student_id), employee_id uuid,
+    constraint face_registration_logs_user_check check (
+      (student_id is not null and employee_id is null) or (student_id is null and employee_id is not null))
+);
+
+-- Tests start here (the runner installs the migration after the fixture schema).
 
 create function pg_temp.fail_student_delete() returns trigger language plpgsql as $$
 begin raise exception 'controlled deletion failure'; end $$;
@@ -95,7 +102,7 @@ begin
        or not exists(select 1 from public.events where event_id=e)
        or not exists(select 1 from public.student_guardians where student_id=other and guardian_id=g)
        or not exists(select 1 from public.event_participants where student_id=other and event_id=e)
-       or not exists(select 1 from public.face_registration_logs where registration_log_id=audit_id and student_id is null)
+       or not exists(select 1 from public.face_registration_logs where registration_log_id=audit_id and student_id is null and deleted_student_id=s)
        or not exists(select 1 from public.student_id_rollover_changes where school_year_id=y and student_id=s)
        then raise exception 'shared record or audit retention failed'; end if;
     if has_function_privilege('anon','public.delete_student(uuid)','execute')
