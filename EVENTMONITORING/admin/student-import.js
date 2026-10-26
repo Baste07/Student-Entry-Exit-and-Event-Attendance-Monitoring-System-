@@ -10,6 +10,7 @@ let viewGuardiansModal = null;
 let addGuardianModal = null;
 let deleteStudentModal = null;   // ADD THIS
 let pendingDeleteStudentId = null; // ADD THIS
+let studentDeletionInProgress = false;
 let duplicateRowsInFileCount = 0;
 let duplicateRowsInDatabaseCount = 0;
 let duplicateRowsInFile = [];
@@ -1069,6 +1070,7 @@ async function loadAllStudentsTable() {
         allStudents = data || [];
         populateStudentsFilterOptions();
         renderAllStudentsTable();
+        return true;
     } catch (error) {
         console.error('Error loading students table:', error);
         tbody.innerHTML = `
@@ -1077,6 +1079,7 @@ async function loadAllStudentsTable() {
             </tr>
         `;
         countEl.textContent = '0';
+        return false;
     }
 }
 
@@ -1572,6 +1575,7 @@ async function submitEditStudentForm(event) {
     }
 }
 function deleteStudentRow(studId) {
+    if (studentDeletionInProgress) return;
     const student = allStudents.find(s => String(s.stud_id) === String(studId));
     const displayName = student
         ? (student.last_name ? (student.last_name + ', ' + [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' ')) : [student.first_name, student.middle_name, student.suffix].filter(Boolean).join(' '))
@@ -1590,11 +1594,12 @@ function deleteStudentRow(studId) {
 
 async function confirmDeleteStudent() {
     const studId = pendingDeleteStudentId;
-    if (!studId) return;
+    if (!studId || studentDeletionInProgress) return;
 
     const student = allStudents.find(s => String(s.stud_id) === String(studId));
     const studentUuid = student?.student_id;
     const confirmBtn = document.getElementById('confirmDeleteStudentBtn');
+    studentDeletionInProgress = true;
 
     try {
         if (confirmBtn) {
@@ -1602,33 +1607,28 @@ async function confirmDeleteStudent() {
             confirmBtn.textContent = 'Deleting...';
         }
 
-        if (studentUuid) {
-            // Delete child records first (FK constraints require this order)
-            await supabaseClient.from('sms_notifications').delete().eq('student_id', studentUuid);
-            await supabaseClient.from('daily_attendance').delete().eq('student_id', studentUuid);
-            await supabaseClient.from('event_attendance').delete().eq('student_id', studentUuid);
-            await supabaseClient.from('event_participants').delete().eq('student_id', studentUuid);
-            await supabaseClient.from('student_guardians').delete().eq('student_id', studentUuid);
-        }
-
-        let query = supabaseClient.from('students').delete();
-        if (studentUuid) {
-            query = query.eq('student_id', studentUuid);
-        } else {
-            query = query.eq('stud_id', studId);
-        }
-
-        const { error } = await query;
+        if (!studentUuid) throw new Error('Student details are unavailable. Refresh the list and try again.');
+        const { data, error } = await supabaseClient.rpc('delete_student', { p_student_id: studentUuid });
         if (error) throw error;
+        if (!data || typeof data.deleted !== 'boolean' || data.student_id !== studentUuid) {
+            throw new Error('The server did not confirm the deletion. Refresh the list before retrying.');
+        }
 
-        showImportAlert(`Student ${studId} and all linked records deleted successfully.`, 'success');
+        pendingDeleteStudentId = null;
+        allStudents = allStudents.filter(s => s.student_id !== studentUuid);
         deleteStudentModal?.hide();
-        await loadAllStudentsTable();
+        const refreshed = await loadAllStudentsTable();
+        showImportAlert(data.deleted
+            ? `Student ${studId} and dependent records deleted successfully.`
+            : `Student ${studId} was already deleted.`, refreshed === false ? 'warning' : 'success');
+        if (refreshed === false) {
+            showImportAlert(`Student ${studId} is deleted, but the list could not be refreshed. Reload the page.`, 'warning');
+        }
     } catch (error) {
         console.error('Error deleting student:', error);
         showImportAlert(`Failed to delete student: ${error.message}`, 'danger');
     } finally {
-        pendingDeleteStudentId = null;
+        studentDeletionInProgress = false;
         if (confirmBtn) {
             confirmBtn.disabled = false;
             confirmBtn.textContent = 'Delete Student';
